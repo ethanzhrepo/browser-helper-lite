@@ -162,7 +162,7 @@
 | 界面文案 | i18next + react-i18next。Chrome 自带的 `chrome.i18n` 只跟随浏览器语言，不能在插件内切换，所以界面另用 i18next |
 | 语言选择 | 默认跟随浏览器语言（`chrome.i18n.getUILanguage()`）；设置里可以手动切换，切换后立即生效，并随设置一起同步 |
 | 日期、数字、货币 | 一律用 `Intl` API 按当前语言格式化，比如英文显示 `$1,234.50`，法文显示 `1 234,50 $` |
-| 复数和变量 | 用 ICU 消息格式（i18next-icu）。法语、西语的复数规则和英语不同，要避免出现「1 steps」这类错误 |
+| 复数和变量 | 用 i18next 内置的复数规则（基于 `Intl.PluralRules`）。法语、西语的复数规则和英语不同，要避免出现「1 steps」这类错误 |
 | 布局 | 法语、西语的文案通常比英文长 20–30%，界面不能写死宽度；开发时用最长的语言截图检查 |
 | 翻译流程 | 英文为源语言；中、法、西文由模型初翻，再人工校对；CI 检查缺失和未使用的 key |
 
@@ -644,11 +644,12 @@ flowchart TB
 | 扩展框架 | WXT（基于 Vite） | 支持 MV3 多入口和热更新，自动生成 manifest，可以用构建开关（如 `ENABLE_CDP_DRIVER`）切换 manifest 内容；同时兼容 Edge |
 | UI | React + TypeScript + Tailwind + shadcn/ui | 生态成熟，容易做出 ChatGPT 风格的界面 |
 | 状态管理 | Zustand | 轻量 |
-| 多语言 | i18next + react-i18next + i18next-icu；manifest 部分用 `_locales` | 见 §4.6 |
+| 多语言 | i18next + react-i18next；manifest 部分用 `_locales` | 见 §4.6 |
 | 存储 | `chrome.storage` 存配置；IndexedDB（Dexie）存大数据 | — |
 | 模型抽象 | Vercel AI SDK（`ai` + `@ai-sdk/*`） | 统一了文本、工具调用和流式输出，覆盖主流厂商和 OpenAI 兼容接口，也提供生图和语音接口 |
 | 视频及其他 | 自研适配器 | 各家视频 API 都是「提交任务 + 轮询」，但细节差异很大 |
-| 渲染 | react-markdown + shiki | — |
+| 渲染 | react-markdown + remark-gfm | 代码高亮（shiki）后续按需加入 |
+| 图标 | lucide-react | — |
 | 正文提取 | @mozilla/readability + turndown | — |
 | 搜索 | MiniSearch + `Intl.Segmenter` | 本地全文索引，中文分词用 Chrome 自带能力 |
 | 同步 | Google Drive API v3（直接用 fetch 调用） | 只需要 `drive.file` scope，不必引入 Google 的 JS SDK |
@@ -666,10 +667,13 @@ browser-helper-lite/
 │   ├── background.ts        # Service Worker 入口
 │   ├── sidepanel/           # 侧边栏 UI
 │   ├── options/             # 设置页
+│   ├── extract-page.ts      # 按需注入：页面正文转 Markdown（M0）
 │   ├── content.ts           # 内容脚本：感知、高亮、虚拟光标
 │   └── offscreen/           # 音频录制与播放
 ├── src/
 │   ├── agent/               # Agent 循环、Planner、Navigator、提示词
+│   ├── background/          # 后台服务：聊天流式输出、连接测试（M0）
+│   ├── chat/                # 问答模式：提示词、指令、会话（M0）
 │   ├── browser/             # CDP 驱动、DOM 驱动、DOM 序列化、截图
 │   ├── tools/               # 工具注册表：浏览器 / 多模态 / MCP
 │   ├── providers/           # 各厂商适配：text / image / speech / video
@@ -678,9 +682,12 @@ browser-helper-lite/
 │   ├── storage/             # 配置、Key 加密、IndexedDB
 │   ├── sync/                # SyncBackend 接口、Google Drive 实现、合并逻辑
 │   ├── search/              # 本地全文索引
-│   ├── locales/             # 界面文案：zh-CN / en / fr / es
+│   ├── i18n/  locales/      # 多语言初始化与界面文案：zh-CN / en / fr / es
+│   ├── ui/                  # 共享界面组件与 hooks
 │   └── shared/              # 类型、消息协议、工具函数
 ├── tests/
+│   ├── unit/                # 单元测试（Vitest）
+│   ├── e2e/                 # 端到端测试（Playwright + 模拟模型服务器）
 │   └── eval/                # Agent 评测任务集
 └── docs/
 ```
@@ -719,7 +726,7 @@ browser-helper-lite/
 
 以下工期按单人全职粗估。
 
-### M0 地基（约 1–2 周）
+### M0 地基（约 1–2 周）✅ 已完成（2026-10-22）
 - WXT 工程（含 `ENABLE_CDP_DRIVER` 等构建开关）、侧边栏聊天界面、设置页
 - 文本模型的连接管理（OpenAI / Anthropic / Gemini / DeepSeek / OpenAI 兼容接口及其预设）和 Key 存储
 - 问答模式：`@当前页面`、`@选中文本`、总结、翻译
