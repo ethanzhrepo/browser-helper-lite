@@ -1,0 +1,12 @@
+node_modules
+.output
+.output-e2e
+.wxt
+dist
+*.log
+.env
+.env.*
+!.env.example
+test-results
+playwright-report
+coverage

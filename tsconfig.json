@@ -1,0 +1,9 @@
+{
+  "extends": "./.wxt/tsconfig.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "resolveJsonModule": true,
+    "types": ["vitest/globals", "node"]
+  },
+  "exclude": ["node_modules", ".output", "tests/e2e/**"]
+}

@@ -1,0 +1,209 @@
+{
+  "languageName": "español",
+  "common": {
+    "edit": "Editar",
+    "delete": "Eliminar",
+    "save": "Guardar",
+    "cancel": "Cancelar",
+    "back": "Volver",
+    "dismiss": "Cerrar",
+    "openSettings": "Abrir ajustes"
+  },
+  "header": {
+    "newChat": "Nueva conversación",
+    "history": "Historial",
+    "settings": "Ajustes"
+  },
+  "model": {
+    "choose": "Elegir un modelo",
+    "search": "Buscar modelos",
+    "none": "No hay modelos. Añade una conexión o escribe un ID de modelo en los ajustes.",
+    "manage": "Gestionar modelos"
+  },
+  "empty": {
+    "setupTitle": "Conecta un modelo para empezar",
+    "setupBody": "Añade una clave de API de OpenAI, Anthropic, Gemini, DeepSeek o de cualquier servicio compatible con OpenAI. Las claves se quedan en este dispositivo.",
+    "setupAction": "Añadir un modelo",
+    "title": "¿En qué te ayudo con esta página?",
+    "actions": {
+      "summarize": "Resumir esta página",
+      "translate": "Traducir la selección o la página",
+      "explain": "Explicar el texto seleccionado"
+    },
+    "tip": "Escribe / para ver comandos y @ para adjuntar la página o tu selección."
+  },
+  "composer": {
+    "placeholder": "Pregunta lo que quieras…",
+    "placeholderNoModel": "Añade un modelo en los ajustes para empezar",
+    "hint": "Intro para enviar · Mayús+Intro para nueva línea",
+    "send": "Enviar",
+    "stop": "Detener",
+    "removeSelection": "Quitar la selección",
+    "defaultPrompt": "Por favor, revisa el contenido adjunto."
+  },
+  "context": {
+    "unavailable": "No se puede leer esta página",
+    "needsAccess": "Haz clic para permitir la lectura de este sitio",
+    "includeHint": "Adjuntar esta página a tu próximo mensaje",
+    "accessDenied": "No se concedió acceso a este sitio, así que no se puede adjuntar la página.",
+    "noSelection": "No hay texto seleccionado en la página.",
+    "captureFailed": "No se pudo leer esta página. Recárgala e inténtalo de nuevo."
+  },
+  "mentions": {
+    "page": "Página actual",
+    "selection": "Texto seleccionado"
+  },
+  "commands": {
+    "summarize": {
+      "label": "Resumir",
+      "description": "Los puntos clave de la página",
+      "prompt": "Resume los puntos clave de esta página."
+    },
+    "translate": {
+      "label": "Traducir",
+      "description": "La selección o toda la página",
+      "prompt": "Traduce el contenido adjunto al {{language}}. Si ya está en {{language}}, tradúcelo al inglés."
+    },
+    "explain": {
+      "label": "Explicar",
+      "description": "El texto seleccionado, con palabras sencillas",
+      "prompt": "Explica el texto seleccionado con palabras sencillas."
+    },
+    "extractTables": {
+      "label": "Extraer tablas",
+      "description": "Datos estructurados como tablas Markdown",
+      "prompt": "Extrae los datos estructurados de esta página (precios, planes, especificaciones, listas) en tablas Markdown."
+    }
+  },
+  "message": {
+    "reasoning": "Razonamiento",
+    "thinking": "Pensando",
+    "stopped": "Detenido",
+    "copy": "Copiar",
+    "copied": "Copiado",
+    "retry": "Reintentar",
+    "truncated": "parcial"
+  },
+  "history": {
+    "title": "Historial",
+    "search": "Buscar conversaciones",
+    "empty": "Todavía no hay conversaciones",
+    "untitled": "Sin título"
+  },
+  "errors": {
+    "auth": "La clave de API fue rechazada. Revísala en los ajustes.",
+    "forbidden": "El proveedor denegó el acceso (403). Revisa los permisos o la región de la clave.",
+    "notFound": "No encontrado (404). Revisa la URL base y el ID del modelo.",
+    "rateLimit": "Se alcanzó el límite de solicitudes o la cuota. Espera un momento o revisa tu saldo.",
+    "badRequest": "El proveedor rechazó la solicitud ({{status}}).",
+    "server": "El proveedor tuvo un error de servidor ({{status}}). Inténtalo más tarde.",
+    "network": "No se pudo contactar con el proveedor. Revisa tu red, la URL base y el acceso al sitio.",
+    "noModel": "No hay ningún modelo seleccionado. Elige uno en los ajustes.",
+    "noKey": "Esta conexión no tiene clave de API. Añade una en los ajustes.",
+    "unknown": "Algo salió mal."
+  },
+  "options": {
+    "subtitle": "Ajustes",
+    "nav": "Secciones de ajustes",
+    "sections": {
+      "providers": "Proveedores de modelos",
+      "models": "Funciones de los modelos",
+      "sites": "Acceso a sitios",
+      "language": "Idioma",
+      "about": "Acerca de"
+    }
+  },
+  "connections": {
+    "title": "Proveedores de modelos",
+    "description": "Añade una conexión por proveedor. Las claves se guardan solo en este dispositivo y solo se envían al proveedor que configures.",
+    "add": "Añadir conexión",
+    "empty": "Todavía no hay conexiones.",
+    "confirmDelete": "¿Eliminar la conexión «{{name}}»? Su clave de API se borrará de este dispositivo.",
+    "modelCount_one": "{{count}} modelo",
+    "modelCount_many": "{{count}} de modelos",
+    "modelCount_other": "{{count}} modelos",
+    "noModelList": "Sin lista de modelos. Escribe los IDs en Funciones de los modelos.",
+    "compatible": "Compatible con OpenAI",
+    "customPreset": "Endpoint personalizado",
+    "fields": {
+      "vendor": "Proveedor",
+      "preset": "Servicio",
+      "name": "Nombre",
+      "baseURL": "URL base",
+      "apiKey": "Clave de API",
+      "apiKeyOptional": "Clave de API (opcional)"
+    },
+    "keyHint": "Consejo: crea una clave aparte con un límite de gasto para esta extensión.",
+    "getKey": "Obtener una clave",
+    "keyKeep": "Guardada. Déjala vacía para conservarla",
+    "showKey": "Mostrar clave",
+    "hideKey": "Ocultar clave",
+    "test": "Probar conexión",
+    "testOk_one": "Conectado. Se encontró {{count}} modelo.",
+    "testOk_many": "Conectado. Se encontraron {{count}} de modelos.",
+    "testOk_other": "Conectado. Se encontraron {{count}} modelos.",
+    "noModelsEndpoint": "Puede que este servicio no ofrezca una lista de modelos. Aun así puedes guardarlo y escribir un ID de modelo en Funciones de los modelos.",
+    "validation": {
+      "baseURL": "Escribe una URL base http(s) válida.",
+      "apiKey": "Escribe una clave de API.",
+      "permission": "Se necesita acceso a este host de API para conectar. Permítelo cuando Chrome lo pida."
+    },
+    "hints": {
+      "region": "Las cuentas de China continental y las internacionales usan direcciones distintas. Cambia la URL base si tu clave es de la otra región.",
+      "ollama": "Ollama bloquea las extensiones de forma predeterminada. Reinícialo con la variable de entorno OLLAMA_ORIGINS=chrome-extension://* y vuelve a intentarlo."
+    }
+  },
+  "slots": {
+    "title": "Funciones de los modelos",
+    "description": "Elige qué modelo se encarga de cada tipo de trabajo. Puedes combinar proveedores libremente.",
+    "noConnections": "Primero añade una conexión con un proveedor.",
+    "addConnection": "Añadir una conexión",
+    "fromMilestone": "Se usa desde {{milestone}}",
+    "connection": "Conexión",
+    "model": "Modelo",
+    "notSet": "Sin definir",
+    "typeModelId": "Esta conexión no tiene lista de modelos. Escribe el ID del modelo.",
+    "modelPlaceholder": "ID del modelo",
+    "chat": {
+      "title": "Modelo de chat",
+      "description": "Responde en el panel lateral."
+    },
+    "fast": {
+      "title": "Modelo rápido",
+      "description": "Trabajo sencillo y barato: resúmenes, extracción, títulos y comprobaciones de riesgo."
+    },
+    "agent": {
+      "title": "Modelo agente",
+      "description": "Planifica y opera páginas web. Necesita llamadas a herramientas. Si no puede leer imágenes (p. ej., DeepSeek), el modelo de visión le sirve de ojos."
+    },
+    "vision": {
+      "title": "Modelo de visión",
+      "description": "Mira capturas de pantalla e imágenes por los modelos que no pueden. Elige un modelo multimodal rápido y barato."
+    }
+  },
+  "sites": {
+    "title": "Acceso a sitios",
+    "description": "Sitios y hosts de API a los que puede acceder esta extensión. No se concede nada al instalarla: el acceso se pide la primera vez que usas un sitio.",
+    "allowAll": "Permitir todos los sitios",
+    "allSites": "Todos los sitios",
+    "none": "Todavía no hay sitios permitidos.",
+    "usedByConnection": "Lo usa la conexión «{{name}}»",
+    "revoke": "Revocar",
+    "policiesComing": "Las reglas por sitio (solo lectura, confirmar cada paso, totalmente automático) llegarán con el agente en M1."
+  },
+  "language": {
+    "title": "Idioma",
+    "description": "Idioma de la interfaz. Las respuestas siguen el idioma en que escribes.",
+    "auto": "Igual que el navegador ({{language}})"
+  },
+  "about": {
+    "title": "Acerca de",
+    "version": "Versión",
+    "cdpDriver": "Controlador CDP (permiso debugger)",
+    "enabled": "Activado",
+    "disabled": "Desactivado",
+    "privacy": "Browser Helper no tiene servidor propio. Las conversaciones se guardan en este navegador y las solicitudes van directamente a los proveedores que configures.",
+    "keys": "Las claves de API se guardan en el almacenamiento de la extensión y nunca se envían a páginas web.",
+    "designDoc": "Documento de diseño del producto"
+  }
+}

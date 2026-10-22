@@ -1,0 +1,205 @@
+{
+  "languageName": "简体中文",
+  "common": {
+    "edit": "编辑",
+    "delete": "删除",
+    "save": "保存",
+    "cancel": "取消",
+    "back": "返回",
+    "dismiss": "关闭",
+    "openSettings": "打开设置"
+  },
+  "header": {
+    "newChat": "新对话",
+    "history": "历史记录",
+    "settings": "设置"
+  },
+  "model": {
+    "choose": "选择模型",
+    "search": "搜索模型",
+    "none": "没有可选的模型。请添加连接，或在设置里手动填写模型 ID。",
+    "manage": "管理模型"
+  },
+  "empty": {
+    "setupTitle": "先连接一个模型",
+    "setupBody": "添加 OpenAI、Anthropic、Gemini、DeepSeek 或任意 OpenAI 兼容服务的 API Key。Key 只保存在这台设备上。",
+    "setupAction": "添加模型",
+    "title": "关于这个页面，需要我做什么？",
+    "actions": {
+      "summarize": "总结此页",
+      "translate": "翻译选中内容或整页",
+      "explain": "解释选中的文字"
+    },
+    "tip": "输入 / 使用指令，输入 @ 附带页面或选中内容。"
+  },
+  "composer": {
+    "placeholder": "有什么想问的…",
+    "placeholderNoModel": "请先在设置中添加模型",
+    "hint": "Enter 发送 · Shift+Enter 换行",
+    "send": "发送",
+    "stop": "停止",
+    "removeSelection": "移除选中内容",
+    "defaultPrompt": "请看附带的内容。"
+  },
+  "context": {
+    "unavailable": "无法读取此页面",
+    "needsAccess": "点击后授权读取此网站",
+    "includeHint": "在下一条消息中附带此页面",
+    "accessDenied": "没有获得此网站的访问授权，无法附带页面。",
+    "noSelection": "页面上没有选中的文字。",
+    "captureFailed": "无法读取此页面，请刷新页面后重试。"
+  },
+  "mentions": {
+    "page": "当前页面",
+    "selection": "选中的文字"
+  },
+  "commands": {
+    "summarize": {
+      "label": "总结",
+      "description": "提炼页面要点",
+      "prompt": "请总结这个页面的要点。"
+    },
+    "translate": {
+      "label": "翻译",
+      "description": "选中内容，或整个页面",
+      "prompt": "请把附带的内容翻译成{{language}}。如果它本来就是{{language}}，请翻译成英文。"
+    },
+    "explain": {
+      "label": "解释",
+      "description": "用通俗的话解释选中内容",
+      "prompt": "请用通俗易懂的话解释选中的内容。"
+    },
+    "extractTables": {
+      "label": "提取表格",
+      "description": "把结构化数据整理成表格",
+      "prompt": "请把这个页面上的结构化数据（价格、套餐、规格、列表等）整理成 Markdown 表格。"
+    }
+  },
+  "message": {
+    "reasoning": "思考过程",
+    "thinking": "思考中",
+    "stopped": "已停止",
+    "copy": "复制",
+    "copied": "已复制",
+    "retry": "重试",
+    "truncated": "部分内容"
+  },
+  "history": {
+    "title": "历史记录",
+    "search": "搜索对话",
+    "empty": "还没有对话",
+    "untitled": "未命名"
+  },
+  "errors": {
+    "auth": "API Key 无效，请在设置中检查。",
+    "forbidden": "服务商拒绝访问（403），请检查 Key 的权限或所属区域。",
+    "notFound": "找不到资源（404），请检查 Base URL 和模型 ID。",
+    "rateLimit": "已触发频率限制或额度不足，请稍后再试或检查账户余额。",
+    "badRequest": "服务商拒绝了请求（{{status}}）。",
+    "server": "服务商出现服务器错误（{{status}}），请稍后重试。",
+    "network": "无法连接到服务商，请检查网络、Base URL 和网站访问授权。",
+    "noModel": "还没有选择模型，请在设置中选择。",
+    "noKey": "这个连接没有 API Key，请在设置中添加。",
+    "unknown": "出了点问题。"
+  },
+  "options": {
+    "subtitle": "设置",
+    "nav": "设置分类",
+    "sections": {
+      "providers": "模型供应商",
+      "models": "能力分配",
+      "sites": "网站权限",
+      "language": "语言",
+      "about": "关于"
+    }
+  },
+  "connections": {
+    "title": "模型供应商",
+    "description": "每个供应商只需添加一次连接。Key 只保存在这台设备上，也只会发送给你配置的供应商。",
+    "add": "添加连接",
+    "empty": "还没有连接。",
+    "confirmDelete": "确定删除连接「{{name}}」吗？它的 API Key 也会从这台设备上移除。",
+    "modelCount_other": "{{count}} 个模型",
+    "noModelList": "没有模型列表，请在「能力分配」中手动填写模型 ID。",
+    "compatible": "OpenAI 兼容接口",
+    "customPreset": "自定义地址",
+    "fields": {
+      "vendor": "供应商",
+      "preset": "服务",
+      "name": "名称",
+      "baseURL": "Base URL",
+      "apiKey": "API Key",
+      "apiKeyOptional": "API Key（可选）"
+    },
+    "keyHint": "建议为本插件单独创建一个设置了额度上限的 Key。",
+    "getKey": "获取 Key",
+    "keyKeep": "已保存，留空则保持不变",
+    "showKey": "显示 Key",
+    "hideKey": "隐藏 Key",
+    "test": "测试连接",
+    "testOk_other": "连接成功，找到 {{count}} 个模型。",
+    "noModelsEndpoint": "这个服务可能不提供模型列表。你仍然可以保存，然后在「能力分配」中手动填写模型 ID。",
+    "validation": {
+      "baseURL": "请输入有效的 http(s) Base URL。",
+      "apiKey": "请输入 API Key。",
+      "permission": "需要允许访问这个 API 地址才能连接，请在 Chrome 弹出提示时选择允许。"
+    },
+    "hints": {
+      "region": "中国大陆版和国际版使用不同的接口地址。如果你的 Key 属于另一个区域，请修改 Base URL。",
+      "ollama": "Ollama 默认拒绝来自浏览器扩展的请求。请设置环境变量 OLLAMA_ORIGINS=chrome-extension://* 后重新启动 Ollama 再试。"
+    }
+  },
+  "slots": {
+    "title": "能力分配",
+    "description": "为每类工作选择由哪个模型来完成，不同供应商可以自由搭配。",
+    "noConnections": "请先添加一个供应商连接。",
+    "addConnection": "添加连接",
+    "fromMilestone": "{{milestone}} 起生效",
+    "connection": "连接",
+    "model": "模型",
+    "notSet": "未设置",
+    "typeModelId": "这个连接没有模型列表，请手动填写模型 ID。",
+    "modelPlaceholder": "模型 ID",
+    "chat": {
+      "title": "对话模型",
+      "description": "在侧边栏里回答你的问题。"
+    },
+    "fast": {
+      "title": "快速模型",
+      "description": "处理便宜、快速的杂活：摘要、数据抽取、生成标题、风险判断。"
+    },
+    "agent": {
+      "title": "Agent 模型",
+      "description": "规划并操作网页，需要支持工具调用。如果它不能看图（比如 DeepSeek），会由视觉模型充当它的「眼睛」。"
+    },
+    "vision": {
+      "title": "视觉模型",
+      "description": "替不能看图的模型查看截图和图片。建议选一个便宜、快速的多模态模型。"
+    }
+  },
+  "sites": {
+    "title": "网站权限",
+    "description": "这个插件可以访问的网站和 API 地址。安装时不申请任何网站，第一次在某个网站使用时才会请求授权。",
+    "allowAll": "允许所有网站",
+    "allSites": "所有网站",
+    "none": "还没有授权任何网站。",
+    "usedByConnection": "连接「{{name}}」正在使用",
+    "revoke": "撤销",
+    "policiesComing": "按网站设置的策略（只读、每步确认、全自动）会在 M1 和 Agent 一起推出。"
+  },
+  "language": {
+    "title": "语言",
+    "description": "界面语言。模型的回复会跟随你提问时使用的语言。",
+    "auto": "跟随浏览器（{{language}}）"
+  },
+  "about": {
+    "title": "关于",
+    "version": "版本",
+    "cdpDriver": "CDP 驱动（debugger 权限）",
+    "enabled": "已开启",
+    "disabled": "已关闭",
+    "privacy": "Browser Helper 没有自己的服务器。对话保存在这个浏览器里，请求直接发给你配置的模型供应商。",
+    "keys": "API Key 保存在这个浏览器的扩展存储中，不会发送给任何网页。",
+    "designDoc": "产品设计文档"
+  }
+}

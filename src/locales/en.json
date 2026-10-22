@@ -1,0 +1,207 @@
+{
+  "languageName": "English",
+  "common": {
+    "edit": "Edit",
+    "delete": "Delete",
+    "save": "Save",
+    "cancel": "Cancel",
+    "back": "Back",
+    "dismiss": "Dismiss",
+    "openSettings": "Open settings"
+  },
+  "header": {
+    "newChat": "New chat",
+    "history": "History",
+    "settings": "Settings"
+  },
+  "model": {
+    "choose": "Choose a model",
+    "search": "Search models",
+    "none": "No models. Add a connection or type a model ID in settings.",
+    "manage": "Manage models"
+  },
+  "empty": {
+    "setupTitle": "Connect a model to get started",
+    "setupBody": "Add an API key from OpenAI, Anthropic, Gemini, DeepSeek or any OpenAI-compatible service. Keys stay on this device.",
+    "setupAction": "Add a model",
+    "title": "How can I help with this page?",
+    "actions": {
+      "summarize": "Summarize this page",
+      "translate": "Translate the selection or page",
+      "explain": "Explain the selected text"
+    },
+    "tip": "Type / for commands, @ to attach the page or your selection."
+  },
+  "composer": {
+    "placeholder": "Ask anything…",
+    "placeholderNoModel": "Add a model in settings to start chatting",
+    "hint": "Enter to send · Shift+Enter for a new line",
+    "send": "Send",
+    "stop": "Stop",
+    "removeSelection": "Remove selection",
+    "defaultPrompt": "Please look at the attached content."
+  },
+  "context": {
+    "unavailable": "This page can't be read",
+    "needsAccess": "Click to allow reading this site",
+    "includeHint": "Attach this page to your next message",
+    "accessDenied": "Access to this site wasn't granted, so the page can't be attached.",
+    "noSelection": "No text is selected on the page.",
+    "captureFailed": "Couldn't read this page. Reload it and try again."
+  },
+  "mentions": {
+    "page": "Current page",
+    "selection": "Selected text"
+  },
+  "commands": {
+    "summarize": {
+      "label": "Summarize",
+      "description": "Key points of the page",
+      "prompt": "Summarize the key points of this page."
+    },
+    "translate": {
+      "label": "Translate",
+      "description": "Selection, or the whole page",
+      "prompt": "Translate the attached content into {{language}}. If it is already in {{language}}, translate it into English."
+    },
+    "explain": {
+      "label": "Explain",
+      "description": "The selected text, in plain words",
+      "prompt": "Explain the selected text in plain words."
+    },
+    "extractTables": {
+      "label": "Extract tables",
+      "description": "Structured data as Markdown tables",
+      "prompt": "Extract the structured data on this page (prices, plans, specs, lists) as Markdown tables."
+    }
+  },
+  "message": {
+    "reasoning": "Reasoning",
+    "thinking": "Thinking",
+    "stopped": "Stopped",
+    "copy": "Copy",
+    "copied": "Copied",
+    "retry": "Retry",
+    "truncated": "partial"
+  },
+  "history": {
+    "title": "History",
+    "search": "Search conversations",
+    "empty": "No conversations yet",
+    "untitled": "Untitled"
+  },
+  "errors": {
+    "auth": "The API key was rejected. Check it in settings.",
+    "forbidden": "Access denied by the provider (403). Check the key's permissions or region.",
+    "notFound": "Not found (404). Check the base URL and model ID.",
+    "rateLimit": "Rate limit or quota reached. Wait a moment or check your balance.",
+    "badRequest": "The provider rejected the request ({{status}}).",
+    "server": "The provider had a server error ({{status}}). Try again later.",
+    "network": "Couldn't reach the provider. Check your network, the base URL, and site access.",
+    "noModel": "No model is selected. Choose one in settings.",
+    "noKey": "This connection has no API key. Add one in settings.",
+    "unknown": "Something went wrong."
+  },
+  "options": {
+    "subtitle": "Settings",
+    "nav": "Settings sections",
+    "sections": {
+      "providers": "Model providers",
+      "models": "Model roles",
+      "sites": "Site access",
+      "language": "Language",
+      "about": "About"
+    }
+  },
+  "connections": {
+    "title": "Model providers",
+    "description": "Add a connection once per provider. Keys are stored only on this device and are sent only to the provider you configure.",
+    "add": "Add connection",
+    "empty": "No connections yet.",
+    "confirmDelete": "Delete the connection “{{name}}”? Its API key will be removed from this device.",
+    "modelCount_one": "{{count}} model",
+    "modelCount_other": "{{count}} models",
+    "noModelList": "No model list. Type model IDs under Model roles.",
+    "compatible": "OpenAI-compatible",
+    "customPreset": "Custom endpoint",
+    "fields": {
+      "vendor": "Provider",
+      "preset": "Service",
+      "name": "Name",
+      "baseURL": "Base URL",
+      "apiKey": "API key",
+      "apiKeyOptional": "API key (optional)"
+    },
+    "keyHint": "Tip: create a separate key with a spending limit for this extension.",
+    "getKey": "Get a key",
+    "keyKeep": "Saved. Leave empty to keep it",
+    "showKey": "Show key",
+    "hideKey": "Hide key",
+    "test": "Test connection",
+    "testOk_one": "Connected. Found {{count}} model.",
+    "testOk_other": "Connected. Found {{count}} models.",
+    "noModelsEndpoint": "This service may not offer a model list. You can still save it and type a model ID under Model roles.",
+    "validation": {
+      "baseURL": "Enter a valid http(s) base URL.",
+      "apiKey": "Enter an API key.",
+      "permission": "Access to this API host is needed to connect. Allow it when Chrome asks."
+    },
+    "hints": {
+      "region": "Mainland China and international accounts use different endpoints. Edit the base URL if your key is for the other region.",
+      "ollama": "Ollama blocks extensions by default. Start it with the environment variable OLLAMA_ORIGINS=chrome-extension://* and try again."
+    }
+  },
+  "slots": {
+    "title": "Model roles",
+    "description": "Choose which model handles each kind of work. You can mix providers freely.",
+    "noConnections": "Add a provider connection first.",
+    "addConnection": "Add a connection",
+    "fromMilestone": "Used from {{milestone}}",
+    "connection": "Connection",
+    "model": "Model",
+    "notSet": "Not set",
+    "typeModelId": "No model list for this connection. Type the model ID.",
+    "modelPlaceholder": "Model ID",
+    "chat": {
+      "title": "Chat model",
+      "description": "Answers in the side panel."
+    },
+    "fast": {
+      "title": "Fast model",
+      "description": "Cheap, quick work: summaries, extraction, titles and risk checks."
+    },
+    "agent": {
+      "title": "Agent model",
+      "description": "Plans and operates web pages. Needs tool calling. If it can't read images (e.g. DeepSeek), the vision model is used as its eyes."
+    },
+    "vision": {
+      "title": "Vision model",
+      "description": "Looks at screenshots and images for models that can't. Pick a cheap, fast multimodal model."
+    }
+  },
+  "sites": {
+    "title": "Site access",
+    "description": "Sites and API hosts this extension may access. Nothing is granted at install time; access is asked for when you first use a site.",
+    "allowAll": "Allow all sites",
+    "allSites": "All sites",
+    "none": "No sites allowed yet.",
+    "usedByConnection": "Used by the connection “{{name}}”",
+    "revoke": "Revoke",
+    "policiesComing": "Per-site policies (read only, confirm each step, fully automatic) arrive with the agent in M1."
+  },
+  "language": {
+    "title": "Language",
+    "description": "Interface language. Replies follow the language you write in.",
+    "auto": "Match the browser ({{language}})"
+  },
+  "about": {
+    "title": "About",
+    "version": "Version",
+    "cdpDriver": "CDP driver (debugger permission)",
+    "enabled": "Enabled",
+    "disabled": "Disabled",
+    "privacy": "There is no Browser Helper server. Conversations are stored in this browser, and requests go straight to the providers you configure.",
+    "keys": "API keys are stored in this browser's extension storage and are never sent to web pages.",
+    "designDoc": "Product design document"
+  }
+}

@@ -1,0 +1,209 @@
+{
+  "languageName": "français",
+  "common": {
+    "edit": "Modifier",
+    "delete": "Supprimer",
+    "save": "Enregistrer",
+    "cancel": "Annuler",
+    "back": "Retour",
+    "dismiss": "Fermer",
+    "openSettings": "Ouvrir les paramètres"
+  },
+  "header": {
+    "newChat": "Nouvelle conversation",
+    "history": "Historique",
+    "settings": "Paramètres"
+  },
+  "model": {
+    "choose": "Choisir un modèle",
+    "search": "Rechercher un modèle",
+    "none": "Aucun modèle. Ajoutez une connexion ou saisissez un identifiant de modèle dans les paramètres.",
+    "manage": "Gérer les modèles"
+  },
+  "empty": {
+    "setupTitle": "Connectez un modèle pour commencer",
+    "setupBody": "Ajoutez une clé API OpenAI, Anthropic, Gemini, DeepSeek ou de tout service compatible OpenAI. Les clés restent sur cet appareil.",
+    "setupAction": "Ajouter un modèle",
+    "title": "Que puis-je faire pour cette page ?",
+    "actions": {
+      "summarize": "Résumer cette page",
+      "translate": "Traduire la sélection ou la page",
+      "explain": "Expliquer le texte sélectionné"
+    },
+    "tip": "Tapez / pour les commandes, @ pour joindre la page ou votre sélection."
+  },
+  "composer": {
+    "placeholder": "Posez votre question…",
+    "placeholderNoModel": "Ajoutez un modèle dans les paramètres pour commencer",
+    "hint": "Entrée pour envoyer · Maj+Entrée pour un saut de ligne",
+    "send": "Envoyer",
+    "stop": "Arrêter",
+    "removeSelection": "Retirer la sélection",
+    "defaultPrompt": "Merci de regarder le contenu joint."
+  },
+  "context": {
+    "unavailable": "Impossible de lire cette page",
+    "needsAccess": "Cliquez pour autoriser la lecture de ce site",
+    "includeHint": "Joindre cette page à votre prochain message",
+    "accessDenied": "L'accès à ce site n'a pas été accordé : impossible de joindre la page.",
+    "noSelection": "Aucun texte n'est sélectionné sur la page.",
+    "captureFailed": "Impossible de lire cette page. Rechargez-la et réessayez."
+  },
+  "mentions": {
+    "page": "Page actuelle",
+    "selection": "Texte sélectionné"
+  },
+  "commands": {
+    "summarize": {
+      "label": "Résumer",
+      "description": "Les points clés de la page",
+      "prompt": "Résume les points clés de cette page."
+    },
+    "translate": {
+      "label": "Traduire",
+      "description": "La sélection, ou toute la page",
+      "prompt": "Traduis le contenu joint en {{language}}. S'il est déjà en {{language}}, traduis-le en anglais."
+    },
+    "explain": {
+      "label": "Expliquer",
+      "description": "Le texte sélectionné, en termes simples",
+      "prompt": "Explique le texte sélectionné en termes simples."
+    },
+    "extractTables": {
+      "label": "Extraire les tableaux",
+      "description": "Les données structurées en tableaux Markdown",
+      "prompt": "Extrais les données structurées de cette page (prix, forfaits, caractéristiques, listes) sous forme de tableaux Markdown."
+    }
+  },
+  "message": {
+    "reasoning": "Raisonnement",
+    "thinking": "Réflexion en cours",
+    "stopped": "Arrêté",
+    "copy": "Copier",
+    "copied": "Copié",
+    "retry": "Réessayer",
+    "truncated": "partiel"
+  },
+  "history": {
+    "title": "Historique",
+    "search": "Rechercher dans les conversations",
+    "empty": "Aucune conversation pour l'instant",
+    "untitled": "Sans titre"
+  },
+  "errors": {
+    "auth": "La clé API a été refusée. Vérifiez-la dans les paramètres.",
+    "forbidden": "Accès refusé par le fournisseur (403). Vérifiez les droits ou la région de la clé.",
+    "notFound": "Introuvable (404). Vérifiez l'URL de base et l'identifiant du modèle.",
+    "rateLimit": "Limite de requêtes ou quota atteint. Patientez un peu ou vérifiez votre solde.",
+    "badRequest": "Le fournisseur a refusé la requête ({{status}}).",
+    "server": "Erreur serveur chez le fournisseur ({{status}}). Réessayez plus tard.",
+    "network": "Impossible de joindre le fournisseur. Vérifiez votre réseau, l'URL de base et l'accès au site.",
+    "noModel": "Aucun modèle n'est sélectionné. Choisissez-en un dans les paramètres.",
+    "noKey": "Cette connexion n'a pas de clé API. Ajoutez-en une dans les paramètres.",
+    "unknown": "Une erreur s'est produite."
+  },
+  "options": {
+    "subtitle": "Paramètres",
+    "nav": "Sections des paramètres",
+    "sections": {
+      "providers": "Fournisseurs de modèles",
+      "models": "Rôles des modèles",
+      "sites": "Accès aux sites",
+      "language": "Langue",
+      "about": "À propos"
+    }
+  },
+  "connections": {
+    "title": "Fournisseurs de modèles",
+    "description": "Ajoutez une connexion par fournisseur. Les clés sont stockées uniquement sur cet appareil et envoyées seulement au fournisseur configuré.",
+    "add": "Ajouter une connexion",
+    "empty": "Aucune connexion pour l'instant.",
+    "confirmDelete": "Supprimer la connexion « {{name}} » ? Sa clé API sera retirée de cet appareil.",
+    "modelCount_one": "{{count}} modèle",
+    "modelCount_many": "{{count}} de modèles",
+    "modelCount_other": "{{count}} modèles",
+    "noModelList": "Pas de liste de modèles. Saisissez les identifiants dans Rôles des modèles.",
+    "compatible": "Compatible OpenAI",
+    "customPreset": "Point d'accès personnalisé",
+    "fields": {
+      "vendor": "Fournisseur",
+      "preset": "Service",
+      "name": "Nom",
+      "baseURL": "URL de base",
+      "apiKey": "Clé API",
+      "apiKeyOptional": "Clé API (facultative)"
+    },
+    "keyHint": "Conseil : créez une clé dédiée avec un plafond de dépenses pour cette extension.",
+    "getKey": "Obtenir une clé",
+    "keyKeep": "Enregistrée. Laissez vide pour la conserver",
+    "showKey": "Afficher la clé",
+    "hideKey": "Masquer la clé",
+    "test": "Tester la connexion",
+    "testOk_one": "Connexion réussie. {{count}} modèle trouvé.",
+    "testOk_many": "Connexion réussie. {{count}} de modèles trouvés.",
+    "testOk_other": "Connexion réussie. {{count}} modèles trouvés.",
+    "noModelsEndpoint": "Ce service ne fournit peut-être pas de liste de modèles. Vous pouvez tout de même l'enregistrer et saisir un identifiant dans Rôles des modèles.",
+    "validation": {
+      "baseURL": "Saisissez une URL de base http(s) valide.",
+      "apiKey": "Saisissez une clé API.",
+      "permission": "L'accès à cet hôte d'API est nécessaire pour se connecter. Autorisez-le quand Chrome le demande."
+    },
+    "hints": {
+      "region": "Les comptes de Chine continentale et internationaux utilisent des adresses différentes. Modifiez l'URL de base si votre clé dépend de l'autre région.",
+      "ollama": "Ollama bloque les extensions par défaut. Relancez-le avec la variable d'environnement OLLAMA_ORIGINS=chrome-extension://* puis réessayez."
+    }
+  },
+  "slots": {
+    "title": "Rôles des modèles",
+    "description": "Choisissez le modèle chargé de chaque type de tâche. Vous pouvez combiner librement les fournisseurs.",
+    "noConnections": "Ajoutez d'abord une connexion à un fournisseur.",
+    "addConnection": "Ajouter une connexion",
+    "fromMilestone": "Utilisé à partir de {{milestone}}",
+    "connection": "Connexion",
+    "model": "Modèle",
+    "notSet": "Non défini",
+    "typeModelId": "Pas de liste de modèles pour cette connexion. Saisissez l'identifiant du modèle.",
+    "modelPlaceholder": "Identifiant du modèle",
+    "chat": {
+      "title": "Modèle de conversation",
+      "description": "Répond dans le panneau latéral."
+    },
+    "fast": {
+      "title": "Modèle rapide",
+      "description": "Tâches simples et peu coûteuses : résumés, extraction, titres et contrôles de risque."
+    },
+    "agent": {
+      "title": "Modèle agent",
+      "description": "Planifie et agit sur les pages web. Doit prendre en charge l'appel d'outils. S'il ne lit pas les images (par ex. DeepSeek), le modèle de vision lui sert d'yeux."
+    },
+    "vision": {
+      "title": "Modèle de vision",
+      "description": "Examine les captures d'écran et les images pour les modèles qui ne le peuvent pas. Choisissez un modèle multimodal rapide et peu coûteux."
+    }
+  },
+  "sites": {
+    "title": "Accès aux sites",
+    "description": "Sites et hôtes d'API auxquels cette extension peut accéder. Rien n'est accordé à l'installation : l'accès est demandé la première fois que vous utilisez un site.",
+    "allowAll": "Autoriser tous les sites",
+    "allSites": "Tous les sites",
+    "none": "Aucun site autorisé pour l'instant.",
+    "usedByConnection": "Utilisé par la connexion « {{name}} »",
+    "revoke": "Révoquer",
+    "policiesComing": "Les règles par site (lecture seule, confirmation à chaque étape, entièrement automatique) arriveront avec l'agent dans M1."
+  },
+  "language": {
+    "title": "Langue",
+    "description": "Langue de l'interface. Les réponses suivent la langue dans laquelle vous écrivez.",
+    "auto": "Comme le navigateur ({{language}})"
+  },
+  "about": {
+    "title": "À propos",
+    "version": "Version",
+    "cdpDriver": "Pilote CDP (autorisation debugger)",
+    "enabled": "Activé",
+    "disabled": "Désactivé",
+    "privacy": "Browser Helper n'a pas de serveur. Les conversations sont stockées dans ce navigateur et les requêtes vont directement aux fournisseurs que vous configurez.",
+    "keys": "Les clés API sont stockées dans l'espace de stockage de l'extension et ne sont jamais envoyées aux pages web.",
+    "designDoc": "Document de conception du produit"
+  }
+}
