@@ -1,4 +1,4 @@
-import { ArrowUp, Check, FileText, Plus, Square, TextQuote, X } from 'lucide-react';
+import { ArrowUp, Bot, Check, FileText, MessageSquare, Plus, Square, TextQuote, X } from 'lucide-react';
 import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { ActiveTab } from '../../src/browser/page-context';
@@ -13,7 +13,13 @@ const MAX_TEXTAREA_HEIGHT = 200;
 
 const preview = (text: string, length = 40) => (text.length > length ? `${text.slice(0, length).trimEnd()}…` : text);
 
+export type ComposerMode = 'ask' | 'act';
+
 export function Composer(props: {
+  mode: ComposerMode;
+  onModeChange: (mode: ComposerMode) => void;
+  /** Replaces the default placeholder, e.g. while the agent asks a question. */
+  placeholder?: string;
   text: string;
   onTextChange: (text: string) => void;
   tab?: ActiveTab;
@@ -51,7 +57,8 @@ export function Composer(props: {
   const mentionLabel = (target: ContextKind) => t(`mentions.${target}`);
 
   let items: MenuItem[] = [];
-  if (dismissedFor !== text) {
+  // Commands and attachments belong to Ask mode; the agent reads pages itself.
+  if (dismissedFor !== text && props.mode === 'ask') {
     if (commandQuery !== undefined) {
       items = matchCommands(commandQuery, commandLabel).map((command) => ({ kind: 'command', command }));
     } else if (mentionQuery !== undefined) {
@@ -104,7 +111,7 @@ export function Composer(props: {
     }
   };
 
-  const canSend = !disabled && (text.trim() || props.selection || props.includePage);
+  const canSend = !disabled && (props.mode === 'act' ? text.trim() : text.trim() || props.selection || props.includePage);
 
   return (
     <div className="border-t border-line bg-bg p-3">
@@ -144,8 +151,12 @@ export function Composer(props: {
 
         <div className="rounded-xl border border-line bg-bg focus-within:border-accent focus-within:ring-2 focus-within:ring-accent/15">
           <div className="flex flex-wrap gap-1.5 px-2.5 pt-2.5">
-            <PageChip tab={props.tab} access={props.access} included={props.includePage} onToggle={props.onTogglePage} />
-            {props.selection && (
+            {props.mode === 'act' ? (
+              <TargetChip tab={props.tab} />
+            ) : (
+              <PageChip tab={props.tab} access={props.access} included={props.includePage} onToggle={props.onTogglePage} />
+            )}
+            {props.mode === 'ask' && props.selection && (
               <span className="flex max-w-full items-center gap-1 rounded-md border border-line bg-subtle px-2 py-1 text-xs">
                 <TextQuote className="h-3.5 w-3.5 shrink-0 text-muted" />
                 <span className="truncate">“{preview(props.selection.content)}”</span>
@@ -161,7 +172,11 @@ export function Composer(props: {
             rows={1}
             value={text}
             disabled={disabled}
-            placeholder={disabled ? t('composer.placeholderNoModel') : t('composer.placeholder')}
+            placeholder={
+              disabled
+                ? t('composer.placeholderNoModel')
+                : (props.placeholder ?? (props.mode === 'act' ? t('composer.placeholderAct') : t('composer.placeholder')))
+            }
             onChange={(e) => {
               onTextChange(e.target.value);
               setCaret(e.target.selectionStart);
@@ -171,7 +186,25 @@ export function Composer(props: {
             className="block w-full resize-none bg-transparent px-3 py-2 text-sm outline-none placeholder:text-muted"
           />
           <div className="flex items-center justify-between px-2 pb-2">
-            <span className="px-1 text-xs text-muted">{t('composer.hint')}</span>
+            <div className="flex rounded-md border border-line p-0.5 text-xs" role="radiogroup" aria-label={t('composer.mode')}>
+              {(['ask', 'act'] as const).map((mode) => (
+                <button
+                  key={mode}
+                  type="button"
+                  role="radio"
+                  aria-checked={props.mode === mode}
+                  data-testid={`mode-${mode}`}
+                  onClick={() => props.onModeChange(mode)}
+                  title={t(`composer.modes.${mode}Hint`)}
+                  className={`flex items-center gap-1 rounded px-2 py-1 ${
+                    props.mode === mode ? 'bg-accent-soft font-medium text-accent' : 'text-muted hover:text-fg'
+                  }`}
+                >
+                  {mode === 'ask' ? <MessageSquare className="h-3.5 w-3.5" /> : <Bot className="h-3.5 w-3.5" />}
+                  {t(`composer.modes.${mode}`)}
+                </button>
+              ))}
+            </div>
             {streaming ? (
               <button
                 type="button"
@@ -233,5 +266,15 @@ function PageChip({ tab, access, included, onToggle }: {
       <span className="truncate">{title}</span>
       {included ? <Check className="h-3.5 w-3.5 shrink-0" /> : <Plus className="h-3.5 w-3.5 shrink-0" />}
     </button>
+  );
+}
+
+function TargetChip({ tab }: { tab?: ActiveTab }) {
+  const { t } = useTranslation();
+  return (
+    <span className="flex max-w-full items-center gap-1.5 rounded-md border border-line bg-subtle px-2 py-1 text-xs text-muted" data-testid="target-chip">
+      <Bot className="h-3.5 w-3.5 shrink-0" />
+      <span className="truncate">{tab ? t('composer.actOn', { title: tab.title || tab.url }) : t('composer.actNewTab')}</span>
+    </span>
   );
 }

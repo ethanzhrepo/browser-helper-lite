@@ -124,6 +124,27 @@ export function useChatSession({ chatSlot, locale }: { chatSlot?: SlotAssignment
     [chatSlot, conversation, messages, generate],
   );
 
+  /**
+   * Appends a user message without asking the chat model (agent goals and
+   * answers). Returns the conversation id, creating the conversation if needed.
+   */
+  const addUserMessage = useCallback(
+    async ({ text, taskId }: { text: string; taskId: string }): Promise<string> => {
+      const current = conversation ?? (await createConversation(deriveTitle(text)));
+      setConversation(current);
+      const user = await appendMessage({ conversationId: current.id, role: 'user', content: text, status: 'done', taskId });
+      setMessages((previous) => [...previous, user]);
+      return current.id;
+    },
+    [conversation],
+  );
+
+  /** Re-reads messages, e.g. after the agent appended its summary. */
+  const reload = useCallback(async () => {
+    if (!conversation) return;
+    setMessages(await getMessages(conversation.id));
+  }, [conversation]);
+
   /** Generates a new reply to the existing history (after an error or a stop). */
   const retry = useCallback(() => {
     if (!conversation || !chatSlot?.modelId || stopRef.current) return;
@@ -146,5 +167,5 @@ export function useChatSession({ chatSlot, locale }: { chatSlot?: SlotAssignment
     setMessages([]);
   }, [stop]);
 
-  return { conversation, messages, streaming, send, retry, stop, open, reset };
+  return { conversation, messages, streaming, send, retry, stop, open, reset, addUserMessage, reload };
 }

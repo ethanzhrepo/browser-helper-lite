@@ -1,17 +1,21 @@
 import { AlertTriangle, Check, Copy, FileText, RotateCcw, Settings2, TextQuote } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import type { AgentClientMessage, AgentTask } from '../../src/agent/types';
 import type { StreamingReply } from '../../src/chat/useChatSession';
 import type { ContextSnapshot, ErrorInfo, MessageRecord } from '../../src/shared/types';
 import { Button, IconButton } from '../../src/ui/Button';
 import { errorSummary, isSettingsError } from '../../src/ui/errors';
 import { Markdown } from '../../src/ui/Markdown';
 import { openOptions } from '../../src/ui/navigation';
+import { AgentRunView } from './AgentRunView';
 
-export function MessageList({ messages, streaming, onRetry }: {
+export function MessageList({ messages, streaming, onRetry, tasks, onAgentSend }: {
   messages: MessageRecord[];
   streaming?: StreamingReply;
   onRetry: () => void;
+  tasks: Record<string, AgentTask>;
+  onAgentSend: (message: AgentClientMessage) => void;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const stickToBottom = useRef(true);
@@ -20,7 +24,7 @@ export function MessageList({ messages, streaming, onRetry }: {
   useEffect(() => {
     const el = scrollRef.current;
     if (el && stickToBottom.current) el.scrollTop = el.scrollHeight;
-  }, [messages, streaming]);
+  }, [messages, streaming, tasks]);
 
   const onScroll = () => {
     const el = scrollRef.current;
@@ -28,14 +32,23 @@ export function MessageList({ messages, streaming, onRetry }: {
   };
 
   const last = messages.at(-1);
-  const canRetry = !streaming && last?.role === 'assistant' && last.status !== 'done';
+  const canRetry = !streaming && last?.role === 'assistant' && last.status !== 'done' && !last.taskId;
+
+  // A task's run view goes after its last user message (the goal, or answers to its questions).
+  const runAfter = new Map<string, string>();
+  for (const message of messages) if (message.role === 'user' && message.taskId) runAfter.set(message.taskId, message.id);
 
   return (
     <div ref={scrollRef} onScroll={onScroll} className="flex-1 overflow-y-auto px-3 py-4" data-testid="message-list">
       <div className="mx-auto flex max-w-3xl flex-col gap-5">
         {messages.map((message) =>
           message.role === 'user' ? (
-            <UserMessage key={message.id} message={message} />
+            <Fragment key={message.id}>
+              <UserMessage message={message} />
+              {message.taskId && runAfter.get(message.taskId) === message.id && tasks[message.taskId] && (
+                <AgentRunView task={tasks[message.taskId]!} onSend={onAgentSend} />
+              )}
+            </Fragment>
           ) : (
             <AssistantMessage
               key={message.id}

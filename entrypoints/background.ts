@@ -1,3 +1,4 @@
+import { registerAgentService } from '../src/background/agent-service';
 import { registerChatService } from '../src/background/chat-service';
 import { registerRuntimeHandlers } from '../src/background/runtime-handlers';
 
@@ -6,4 +7,5 @@ export default defineBackground(() => {
   browser.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(console.error);
   registerChatService();
   registerRuntimeHandlers();
+  registerAgentService();
 });

@@ -30,16 +30,35 @@
       "translate": "翻译选中内容或整页",
       "explain": "解释选中的文字"
     },
-    "tip": "输入 / 使用指令，输入 @ 附带页面或选中内容。"
+    "tip": "输入 / 使用指令，输入 @ 附带页面或选中内容。",
+    "act": {
+      "title": "要我在网页上做什么？",
+      "body": "我会在当前标签页里点击、输入、滚动和跳转。有风险的步骤会先等你确认。",
+      "examples": {
+        "plans": "在 Rogers 官网找出月费 60 加元以内的手机套餐，并用表格对比",
+        "compare": "在 Amazon 和 AliExpress 上搜索 65W USB-C 充电器，对比价格和配送时间",
+        "process": "查一下把手机号转入 Rogers 的办理流程，按步骤列出来"
+      }
+    }
   },
   "composer": {
     "placeholder": "有什么想问的…",
     "placeholderNoModel": "请先在设置中添加模型",
-    "hint": "Enter 发送 · Shift+Enter 换行",
     "send": "发送",
     "stop": "停止",
     "removeSelection": "移除选中内容",
-    "defaultPrompt": "请看附带的内容。"
+    "defaultPrompt": "请看附带的内容。",
+    "placeholderAct": "描述要在网页上完成的任务…",
+    "placeholderAnswer": "回答 Agent 的问题…",
+    "mode": "模式",
+    "modes": {
+      "ask": "问答",
+      "act": "操作",
+      "askHint": "围绕网页对话，不会改动页面",
+      "actHint": "让 Agent 替你操作浏览器"
+    },
+    "actOn": "从这里开始：{{title}}",
+    "actNewTab": "从当前标签页开始"
   },
   "context": {
     "unavailable": "无法读取此页面",
@@ -110,7 +129,8 @@
       "models": "能力分配",
       "sites": "网站权限",
       "language": "语言",
-      "about": "关于"
+      "about": "关于",
+      "agent": "Agent"
     }
   },
   "connections": {
@@ -154,7 +174,6 @@
     "description": "为每类工作选择由哪个模型来完成，不同供应商可以自由搭配。",
     "noConnections": "请先添加一个供应商连接。",
     "addConnection": "添加连接",
-    "fromMilestone": "{{milestone}} 起生效",
     "connection": "连接",
     "model": "模型",
     "notSet": "未设置",
@@ -185,7 +204,19 @@
     "none": "还没有授权任何网站。",
     "usedByConnection": "连接「{{name}}」正在使用",
     "revoke": "撤销",
-    "policiesComing": "按网站设置的策略（只读、每步确认、全自动）会在 M1 和 Agent 一起推出。"
+    "policiesTitle": "按网站设置 Agent 策略",
+    "policiesDescription": "决定 Agent 在每个网站上能做什么。为 example.com 设置的策略也适用于它的子域名。",
+    "noPolicies": "还没有设置任何网站策略。",
+    "hostLabel": "网站",
+    "addPolicy": "添加",
+    "defaultPolicy": "未设置策略的网站：有风险的操作需要确认。付款、删除等高风险操作始终需要你确认。",
+    "policies": {
+      "blocked": "禁止",
+      "readOnly": "只读",
+      "confirmEach": "每步确认",
+      "confirmRisky": "有风险的操作需确认",
+      "auto": "全自动（高风险除外）"
+    }
   },
   "language": {
     "title": "语言",
@@ -201,5 +232,142 @@
     "privacy": "Browser Helper 没有自己的服务器。对话保存在这个浏览器里，请求直接发给你配置的模型供应商。",
     "keys": "API Key 保存在这个浏览器的扩展存储中，不会发送给任何网页。",
     "designDoc": "产品设计文档"
+  },
+  "agent": {
+    "groupTitle": "Browser Helper",
+    "busy": "这个对话里已经有一个任务在进行。请先停止它，或等它完成。",
+    "status": {
+      "running": "正在操作",
+      "paused": "已暂停",
+      "waiting": "需要你处理",
+      "done": "已完成",
+      "failed": "失败",
+      "stopped": "已停止"
+    },
+    "actionCount_other": "{{count}} 个操作",
+    "driverHint": "cdp：真实的鼠标键盘输入 · dom：模拟页面事件",
+    "actions": {
+      "navigate": "打开 {{url}}",
+      "open_tab": "在新标签页打开 {{url}}",
+      "click": "点击 {{target}}",
+      "type": "在 {{target}} 中输入「{{text}}」",
+      "press": "按下 {{keys}}",
+      "hover": "把鼠标移到 {{target}}",
+      "scroll": "向{{direction}}滚动",
+      "select_option": "在 {{target}} 中选择「{{option}}」",
+      "go_back": "返回上一页",
+      "switch_tab": "切换到标签页 {{tab}}",
+      "close_tab": "关闭标签页 {{tab}}",
+      "wait": "等待 {{seconds}} 秒",
+      "extract": "读取页面：{{query}}",
+      "look": "查看屏幕：{{question}}",
+      "web_search": "上网搜索：{{query}}",
+      "ask_user": "询问你：{{question}}",
+      "hand_off": "交给你处理",
+      "done": "完成"
+    },
+    "directions": {
+      "up": "上",
+      "down": "下"
+    },
+    "approval": {
+      "title": "允许执行这个操作吗？",
+      "titleHigh": "高风险操作，确定允许吗？",
+      "body": "Agent 想在 {{site}} 上：",
+      "reason": {
+        "payment": "这看起来是付款或购买。",
+        "destructive": "这看起来难以撤销（删除、取消、修改账户或安全设置）。",
+        "submit": "这会提交、发送或保存内容。",
+        "confirmEach": "你为这个网站设置了每步都要确认。",
+        "sensitiveField": "这涉及敏感信息。"
+      },
+      "allowOnce": "允许一次",
+      "allowTask": "本任务内都允许",
+      "allowSite": "总是允许此网站",
+      "deny": "拒绝"
+    },
+    "permission": {
+      "title": "允许访问这个网站吗？",
+      "body": "Agent 需要读取和操作 {{origin}} 才能继续。",
+      "allowSite": "允许此网站",
+      "allowAll": "允许所有网站",
+      "deny": "不允许"
+    },
+    "handoff": {
+      "title": {
+        "captcha": "请完成人机验证",
+        "login": "请登录",
+        "verification": "请输入验证码",
+        "other": "轮到你了"
+      },
+      "captcha": "{{site}} 要求进行人机验证。请在标签页里完成验证，然后继续。",
+      "login": "请自己在 {{site}} 上登录，然后继续。",
+      "verification": "请在 {{site}} 上输入验证码，然后继续。",
+      "other": "请在 {{site}} 上完成这一步，然后继续。",
+      "autoResume": "验证完成后，任务会自动继续。",
+      "done": "已完成，继续"
+    },
+    "question": {
+      "title": "Agent 想问你：",
+      "hint": "请在下方输入框里回答。"
+    },
+    "controls": {
+      "pause": "暂停",
+      "resume": "继续",
+      "stop": "停止",
+      "takeOver": "我来接管",
+      "progress": "第 {{step}}/{{max}} 步",
+      "tokens_other": "{{formatted}} tokens"
+    },
+    "overlay": {
+      "running": "Browser Helper 正在操作这个标签页",
+      "stop": "停止",
+      "resume": "继续",
+      "continue": "继续",
+      "paused": {
+        "user": "已暂停。准备好后点继续。",
+        "interference": "你操作了页面，任务已暂停。完成后点继续。",
+        "debuggerDetached": "调试提示条被关闭，任务已暂停。继续后将改用模拟事件操作。"
+      },
+      "waiting": {
+        "approval": "正在等你在侧边栏里确认",
+        "question": "Agent 在侧边栏里有问题问你",
+        "handoff": "轮到你了：完成这一步后点继续",
+        "permission": "正在等你在侧边栏里授权访问网站"
+      }
+    },
+    "notification": {
+      "title": {
+        "approval": "需要你确认",
+        "question": "Agent 有问题问你",
+        "handoff": "轮到你了",
+        "permission": "需要网站访问授权"
+      },
+      "approval": "{{site}}：{{target}}",
+      "permission": "允许访问 {{origin}} 吗？"
+    },
+    "maxStepsSummary": "已经执行了 {{count}} 步，任务仍未完成，我先停下了。可以看看上面的步骤，然后给我一个更具体的任务，或者在设置里调高步数上限。",
+    "stoppedSummary": "任务已停止。",
+    "failedSummary": "任务失败：{{message}}"
+  },
+  "agentSettings": {
+    "title": "Agent",
+    "description": "设置 Agent 如何替你操作网页。",
+    "useCdp": "使用真实的鼠标和键盘输入（CDP）",
+    "useCdpHint": "在现代网站上更可靠。任务运行期间，Chrome 顶部会显示「正在调试此浏览器」提示条。",
+    "cdpUnavailable": "不可用：这个版本没有包含 debugger 权限。",
+    "notifications": "任务需要我时发送通知",
+    "notificationsHint": "遇到验证码、登录或需要确认时，发送 Chrome 通知。",
+    "maxSteps": "每个任务的步数上限",
+    "maxStepsHint": "5 到 100 之间。",
+    "searchEngine": "网页搜索引擎",
+    "engines": {
+      "google": "Google",
+      "bing": "Bing",
+      "duckduckgo": "DuckDuckGo",
+      "custom": "自定义"
+    },
+    "customSearchUrl": "自定义搜索地址",
+    "customSearchUrlHint": "用 %s 表示搜索词的位置。"
   }
 }

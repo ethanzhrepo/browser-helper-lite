@@ -30,11 +30,29 @@ export interface SlotAssignment extends ModelRef {
   temperature?: number;
 }
 
+/** Per-site agent policy (§6). Keys of `Settings.sitePolicies` are hostnames; "example.com" also covers subdomains. */
+export type SitePolicy = 'blocked' | 'readOnly' | 'confirmEach' | 'confirmRisky' | 'auto';
+
+export type SearchEngineSetting = 'google' | 'bing' | 'duckduckgo' | 'custom';
+
+export interface AgentSettings {
+  /** Use the CDP driver when this build has the debugger permission. */
+  useCdp: boolean;
+  maxSteps: number;
+  /** Chrome notifications when a task needs you. */
+  notifications: boolean;
+  searchEngine: SearchEngineSetting;
+  /** For the custom engine; `%s` is replaced by the query. */
+  customSearchUrl: string;
+}
+
 export interface Settings {
   schemaVersion: 1;
   connections: Connection[];
   slots: Partial<Record<Capability, SlotAssignment>>;
   language: LanguageSetting;
+  agent: AgentSettings;
+  sitePolicies: Record<string, SitePolicy>;
   updatedAt: number;
 }
 
@@ -92,6 +110,8 @@ export interface MessageRecord {
   error?: ErrorInfo;
   model?: ModelRef;
   usage?: Usage;
+  /** Set on an agent goal (user) and on the task's final summary (assistant). */
+  taskId?: string;
   createdAt: number;
   updatedAt: number;
   deletedAt?: number;

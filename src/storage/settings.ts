@@ -1,5 +1,5 @@
 import { browser } from 'wxt/browser';
-import type { Connection, Settings } from '../shared/types';
+import type { AgentSettings, Connection, Settings } from '../shared/types';
 
 const SETTINGS_KEY = 'settings:v1';
 /**
@@ -10,13 +10,34 @@ const SECRETS_KEY = 'secrets:v1';
 
 type Secrets = Record<string, string>;
 
+export const DEFAULT_AGENT_SETTINGS: AgentSettings = {
+  useCdp: true,
+  maxSteps: 30,
+  notifications: true,
+  searchEngine: 'google',
+  customSearchUrl: '',
+};
+
 export function defaultSettings(): Settings {
-  return { schemaVersion: 1, connections: [], slots: {}, language: 'auto', updatedAt: 0 };
+  return {
+    schemaVersion: 1,
+    connections: [],
+    slots: {},
+    language: 'auto',
+    agent: DEFAULT_AGENT_SETTINGS,
+    sitePolicies: {},
+    updatedAt: 0,
+  };
+}
+
+/** Fills in fields added after the settings were first saved. */
+function withDefaults(stored: Partial<Settings> | undefined): Settings {
+  const defaults = defaultSettings();
+  return { ...defaults, ...stored, agent: { ...defaults.agent, ...stored?.agent } };
 }
 
 export async function loadSettings(): Promise<Settings> {
-  const stored = (await browser.storage.local.get(SETTINGS_KEY))[SETTINGS_KEY] as Partial<Settings> | undefined;
-  return { ...defaultSettings(), ...stored };
+  return withDefaults((await browser.storage.local.get(SETTINGS_KEY))[SETTINGS_KEY] as Partial<Settings> | undefined);
 }
 
 async function saveSettings(settings: Settings): Promise<Settings> {
@@ -32,7 +53,7 @@ export async function updateSettings(mutate: (draft: Settings) => Settings): Pro
 export function watchSettings(listener: (settings: Settings) => void): () => void {
   const onChanged = (changes: Record<string, { newValue?: unknown }>, area: string) => {
     if (area === 'local' && SETTINGS_KEY in changes) {
-      listener({ ...defaultSettings(), ...(changes[SETTINGS_KEY].newValue as Partial<Settings>) });
+      listener(withDefaults(changes[SETTINGS_KEY]!.newValue as Partial<Settings>));
     }
   };
   browser.storage.onChanged.addListener(onChanged);

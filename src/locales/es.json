@@ -30,16 +30,35 @@
       "translate": "Traducir la selección o la página",
       "explain": "Explicar el texto seleccionado"
     },
-    "tip": "Escribe / para ver comandos y @ para adjuntar la página o tu selección."
+    "tip": "Escribe / para ver comandos y @ para adjuntar la página o tu selección.",
+    "act": {
+      "title": "¿Qué hago en la web?",
+      "body": "Trabajo en la pestaña actual: hago clic, escribo, me desplazo y navego. Los pasos con riesgo esperan tu aprobación.",
+      "examples": {
+        "plans": "Busca los planes móviles de Rogers por menos de 60 $ al mes y compáralos en una tabla",
+        "compare": "Busca un cargador USB-C de 65 W en Amazon y AliExpress y compara precio y plazo de entrega",
+        "process": "Averigua paso a paso cómo transferir mi número a Rogers"
+      }
+    }
   },
   "composer": {
     "placeholder": "Pregunta lo que quieras…",
     "placeholderNoModel": "Añade un modelo en los ajustes para empezar",
-    "hint": "Intro para enviar · Mayús+Intro para nueva línea",
     "send": "Enviar",
     "stop": "Detener",
     "removeSelection": "Quitar la selección",
-    "defaultPrompt": "Por favor, revisa el contenido adjunto."
+    "defaultPrompt": "Por favor, revisa el contenido adjunto.",
+    "placeholderAct": "Describe una tarea para hacer en la web…",
+    "placeholderAnswer": "Responde a la pregunta del agente…",
+    "mode": "Modo",
+    "modes": {
+      "ask": "Preguntar",
+      "act": "Actuar",
+      "askHint": "Conversa sobre las páginas; no se cambia nada en la página",
+      "actHint": "Deja que el agente use el navegador por ti"
+    },
+    "actOn": "Empieza en: {{title}}",
+    "actNewTab": "Empieza en la pestaña actual"
   },
   "context": {
     "unavailable": "No se puede leer esta página",
@@ -110,7 +129,8 @@
       "models": "Funciones de los modelos",
       "sites": "Acceso a sitios",
       "language": "Idioma",
-      "about": "Acerca de"
+      "about": "Acerca de",
+      "agent": "Agente"
     }
   },
   "connections": {
@@ -158,7 +178,6 @@
     "description": "Elige qué modelo se encarga de cada tipo de trabajo. Puedes combinar proveedores libremente.",
     "noConnections": "Primero añade una conexión con un proveedor.",
     "addConnection": "Añadir una conexión",
-    "fromMilestone": "Se usa desde {{milestone}}",
     "connection": "Conexión",
     "model": "Modelo",
     "notSet": "Sin definir",
@@ -189,7 +208,19 @@
     "none": "Todavía no hay sitios permitidos.",
     "usedByConnection": "Lo usa la conexión «{{name}}»",
     "revoke": "Revocar",
-    "policiesComing": "Las reglas por sitio (solo lectura, confirmar cada paso, totalmente automático) llegarán con el agente en M1."
+    "policiesTitle": "Reglas del agente por sitio",
+    "policiesDescription": "Decide qué puede hacer el agente en cada sitio. Una regla para example.com también cubre sus subdominios.",
+    "noPolicies": "Todavía no hay reglas.",
+    "hostLabel": "Sitio",
+    "addPolicy": "Añadir",
+    "defaultPolicy": "Sitios sin regla: se confirman las acciones con riesgo. Las acciones de alto riesgo (pagos, eliminaciones) siempre necesitan tu aprobación.",
+    "policies": {
+      "blocked": "Bloqueado",
+      "readOnly": "Solo lectura",
+      "confirmEach": "Confirmar cada acción",
+      "confirmRisky": "Confirmar acciones con riesgo",
+      "auto": "Automático (salvo alto riesgo)"
+    }
   },
   "language": {
     "title": "Idioma",
@@ -205,5 +236,146 @@
     "privacy": "Browser Helper no tiene servidor propio. Las conversaciones se guardan en este navegador y las solicitudes van directamente a los proveedores que configures.",
     "keys": "Las claves de API se guardan en el almacenamiento de la extensión y nunca se envían a páginas web.",
     "designDoc": "Documento de diseño del producto"
+  },
+  "agent": {
+    "groupTitle": "Browser Helper",
+    "busy": "Ya hay una tarea en curso en esta conversación. Detenla o espera a que termine.",
+    "status": {
+      "running": "Trabajando",
+      "paused": "En pausa",
+      "waiting": "Te necesita",
+      "done": "Terminado",
+      "failed": "Falló",
+      "stopped": "Detenido"
+    },
+    "actionCount_one": "{{count}} acción",
+    "actionCount_many": "{{count}} de acciones",
+    "actionCount_other": "{{count}} acciones",
+    "driverHint": "cdp: ratón y teclado reales · dom: eventos simulados",
+    "actions": {
+      "navigate": "Abrir {{url}}",
+      "open_tab": "Abrir {{url}} en una pestaña nueva",
+      "click": "Hacer clic en {{target}}",
+      "type": "Escribir «{{text}}» en {{target}}",
+      "press": "Pulsar {{keys}}",
+      "hover": "Pasar el ratón por {{target}}",
+      "scroll": "Desplazar hacia {{direction}}",
+      "select_option": "Elegir «{{option}}» en {{target}}",
+      "go_back": "Volver atrás",
+      "switch_tab": "Cambiar a la pestaña {{tab}}",
+      "close_tab": "Cerrar la pestaña {{tab}}",
+      "wait": "Esperar {{seconds}} s",
+      "extract": "Leer la página: {{query}}",
+      "look": "Mirar la pantalla: {{question}}",
+      "web_search": "Buscar en la web: {{query}}",
+      "ask_user": "Preguntarte: {{question}}",
+      "hand_off": "Pasarte el control",
+      "done": "Terminar"
+    },
+    "directions": {
+      "up": "arriba",
+      "down": "abajo"
+    },
+    "approval": {
+      "title": "¿Permitir esta acción?",
+      "titleHigh": "Acción de alto riesgo: ¿permitirla?",
+      "body": "En {{site}}, el agente quiere:",
+      "reason": {
+        "payment": "Parece un pago o una compra.",
+        "destructive": "Parece difícil de deshacer (eliminar, cancelar, cambios en la cuenta o la seguridad).",
+        "submit": "Esto envía o guarda algo.",
+        "confirmEach": "Tu regla para este sitio pide confirmar cada paso.",
+        "sensitiveField": "Esto implica información sensible."
+      },
+      "allowOnce": "Permitir una vez",
+      "allowTask": "Permitir en esta tarea",
+      "allowSite": "Permitir siempre en este sitio",
+      "deny": "Denegar"
+    },
+    "permission": {
+      "title": "¿Permitir el acceso a este sitio?",
+      "body": "El agente necesita leer y usar {{origin}} para continuar.",
+      "allowSite": "Permitir este sitio",
+      "allowAll": "Permitir todos los sitios",
+      "deny": "No permitir"
+    },
+    "handoff": {
+      "title": {
+        "captcha": "Completa la verificación",
+        "login": "Inicia sesión",
+        "verification": "Introduce el código",
+        "other": "Te toca a ti"
+      },
+      "captcha": "{{site}} pide una verificación humana. Complétala en la pestaña y luego continúa.",
+      "login": "Inicia sesión tú mismo en {{site}} y luego continúa.",
+      "verification": "Introduce el código de verificación en {{site}} y luego continúa.",
+      "other": "Termina este paso en {{site}} y luego continúa.",
+      "autoResume": "La tarea sigue sola cuando desaparece la verificación.",
+      "done": "Listo, continuar"
+    },
+    "question": {
+      "title": "El agente pregunta:",
+      "hint": "Responde en el cuadro de abajo."
+    },
+    "controls": {
+      "pause": "Pausar",
+      "resume": "Reanudar",
+      "stop": "Detener",
+      "takeOver": "Tomar el control",
+      "progress": "Paso {{step}}/{{max}}",
+      "tokens_one": "{{formatted}} token",
+      "tokens_many": "{{formatted}} de tokens",
+      "tokens_other": "{{formatted}} tokens"
+    },
+    "overlay": {
+      "running": "Browser Helper está trabajando en esta pestaña",
+      "stop": "Detener",
+      "resume": "Reanudar",
+      "continue": "Continuar",
+      "paused": {
+        "user": "En pausa. Reanuda cuando quieras.",
+        "interference": "En pausa porque usaste la página. Reanuda cuando termines.",
+        "debuggerDetached": "En pausa: se cerró la barra de depuración. Reanuda para seguir con eventos simulados."
+      },
+      "waiting": {
+        "approval": "Esperando tu aprobación en el panel lateral",
+        "question": "El agente tiene una pregunta en el panel lateral",
+        "handoff": "Te toca: termina este paso y pulsa Continuar",
+        "permission": "Esperando acceso al sitio en el panel lateral"
+      }
+    },
+    "notification": {
+      "title": {
+        "approval": "Se necesita tu aprobación",
+        "question": "El agente tiene una pregunta",
+        "handoff": "Te toca a ti",
+        "permission": "Se necesita acceso al sitio"
+      },
+      "approval": "{{site}}: {{target}}",
+      "permission": "¿Permitir el acceso a {{origin}}?"
+    },
+    "maxStepsSummary": "Me detuve tras {{count}} pasos sin terminar. Revisa los pasos de arriba y dame una tarea más concreta o sube el límite de pasos en los ajustes.",
+    "stoppedSummary": "La tarea se detuvo.",
+    "failedSummary": "La tarea falló: {{message}}"
+  },
+  "agentSettings": {
+    "title": "Agente",
+    "description": "Cómo usa el agente las páginas web por ti.",
+    "useCdp": "Usar ratón y teclado reales (CDP)",
+    "useCdpHint": "Más fiable en sitios modernos. Chrome muestra la barra «ha empezado a depurar este navegador» mientras se ejecuta una tarea.",
+    "cdpUnavailable": "No disponible: esta versión no incluye el permiso debugger.",
+    "notifications": "Avisarme cuando una tarea me necesite",
+    "notificationsHint": "Notificaciones de Chrome para CAPTCHA, inicios de sesión y aprobaciones.",
+    "maxSteps": "Límite de pasos por tarea",
+    "maxStepsHint": "Entre 5 y 100.",
+    "searchEngine": "Motor de búsqueda",
+    "engines": {
+      "google": "Google",
+      "bing": "Bing",
+      "duckduckgo": "DuckDuckGo",
+      "custom": "Personalizado"
+    },
+    "customSearchUrl": "URL de búsqueda personalizada",
+    "customSearchUrlHint": "Usa %s donde va la búsqueda."
   }
 }

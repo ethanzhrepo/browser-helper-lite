@@ -1,19 +1,21 @@
-import { Info, Languages, Plug, ShieldCheck, SlidersHorizontal } from 'lucide-react';
+import { Bot, Info, Languages, Plug, ShieldCheck, SlidersHorizontal } from 'lucide-react';
 import { useEffect, useState, type ComponentType, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { Settings } from '../../src/shared/types';
 import { useSettings } from '../../src/ui/useSettings';
 import { AboutSection } from './AboutSection';
+import { AgentSection } from './AgentSection';
 import { ConnectionsSection } from './ConnectionsSection';
 import { LanguageSection } from './LanguageSection';
 import { SitesSection } from './SitesSection';
 import { SlotsSection } from './SlotsSection';
 
-type SectionId = 'providers' | 'models' | 'sites' | 'language' | 'about';
+type SectionId = 'providers' | 'models' | 'agent' | 'sites' | 'language' | 'about';
 
 const SECTIONS: { id: SectionId; icon: ComponentType<{ className?: string }>; render: (s: Settings) => ReactNode }[] = [
   { id: 'providers', icon: Plug, render: (s) => <ConnectionsSection settings={s} /> },
   { id: 'models', icon: SlidersHorizontal, render: (s) => <SlotsSection settings={s} /> },
+  { id: 'agent', icon: Bot, render: (s) => <AgentSection settings={s} /> },
   { id: 'sites', icon: ShieldCheck, render: (s) => <SitesSection settings={s} /> },
   { id: 'language', icon: Languages, render: (s) => <LanguageSection settings={s} /> },
   { id: 'about', icon: Info, render: () => <AboutSection /> },

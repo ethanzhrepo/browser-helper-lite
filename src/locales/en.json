@@ -30,16 +30,35 @@
       "translate": "Translate the selection or page",
       "explain": "Explain the selected text"
     },
-    "tip": "Type / for commands, @ to attach the page or your selection."
+    "tip": "Type / for commands, @ to attach the page or your selection.",
+    "act": {
+      "title": "What should I do on the web?",
+      "body": "I'll work in the current tab: click, type, scroll and navigate. Risky steps wait for your approval.",
+      "examples": {
+        "plans": "Find the Rogers mobile plans under $60/month and compare them in a table",
+        "compare": "Search Amazon and AliExpress for a 65W USB-C charger and compare price and delivery",
+        "process": "Find out how to transfer my phone number to Rogers, step by step"
+      }
+    }
   },
   "composer": {
     "placeholder": "Ask anything…",
     "placeholderNoModel": "Add a model in settings to start chatting",
-    "hint": "Enter to send · Shift+Enter for a new line",
     "send": "Send",
     "stop": "Stop",
     "removeSelection": "Remove selection",
-    "defaultPrompt": "Please look at the attached content."
+    "defaultPrompt": "Please look at the attached content.",
+    "placeholderAct": "Describe a task to do on the web…",
+    "placeholderAnswer": "Answer the agent's question…",
+    "mode": "Mode",
+    "modes": {
+      "ask": "Ask",
+      "act": "Act",
+      "askHint": "Chat about pages; nothing on the page is changed",
+      "actHint": "Let the agent operate the browser for you"
+    },
+    "actOn": "Starts on: {{title}}",
+    "actNewTab": "Starts on the current tab"
   },
   "context": {
     "unavailable": "This page can't be read",
@@ -110,7 +129,8 @@
       "models": "Model roles",
       "sites": "Site access",
       "language": "Language",
-      "about": "About"
+      "about": "About",
+      "agent": "Agent"
     }
   },
   "connections": {
@@ -156,7 +176,6 @@
     "description": "Choose which model handles each kind of work. You can mix providers freely.",
     "noConnections": "Add a provider connection first.",
     "addConnection": "Add a connection",
-    "fromMilestone": "Used from {{milestone}}",
     "connection": "Connection",
     "model": "Model",
     "notSet": "Not set",
@@ -187,7 +206,19 @@
     "none": "No sites allowed yet.",
     "usedByConnection": "Used by the connection “{{name}}”",
     "revoke": "Revoke",
-    "policiesComing": "Per-site policies (read only, confirm each step, fully automatic) arrive with the agent in M1."
+    "policiesTitle": "Agent policies per site",
+    "policiesDescription": "Decide what the agent may do on each site. An entry for example.com also covers its subdomains.",
+    "noPolicies": "No site policies yet.",
+    "hostLabel": "Site",
+    "addPolicy": "Add",
+    "defaultPolicy": "Sites without a policy: confirm risky actions. High-risk actions (payments, deletions) always need your approval.",
+    "policies": {
+      "blocked": "Blocked",
+      "readOnly": "Read only",
+      "confirmEach": "Confirm every action",
+      "confirmRisky": "Confirm risky actions",
+      "auto": "Automatic (except high risk)"
+    }
   },
   "language": {
     "title": "Language",
@@ -203,5 +234,144 @@
     "privacy": "There is no Browser Helper server. Conversations are stored in this browser, and requests go straight to the providers you configure.",
     "keys": "API keys are stored in this browser's extension storage and are never sent to web pages.",
     "designDoc": "Product design document"
+  },
+  "agent": {
+    "groupTitle": "Browser Helper",
+    "busy": "A task is already running in this conversation. Stop it or wait for it to finish.",
+    "status": {
+      "running": "Working",
+      "paused": "Paused",
+      "waiting": "Needs you",
+      "done": "Finished",
+      "failed": "Failed",
+      "stopped": "Stopped"
+    },
+    "actionCount_one": "{{count}} action",
+    "actionCount_other": "{{count}} actions",
+    "driverHint": "cdp: real mouse and keyboard input · dom: simulated page events",
+    "actions": {
+      "navigate": "Open {{url}}",
+      "open_tab": "Open {{url}} in a new tab",
+      "click": "Click {{target}}",
+      "type": "Type “{{text}}” into {{target}}",
+      "press": "Press {{keys}}",
+      "hover": "Point at {{target}}",
+      "scroll": "Scroll {{direction}}",
+      "select_option": "Choose “{{option}}” in {{target}}",
+      "go_back": "Go back",
+      "switch_tab": "Switch to tab {{tab}}",
+      "close_tab": "Close tab {{tab}}",
+      "wait": "Wait {{seconds}} s",
+      "extract": "Read the page: {{query}}",
+      "look": "Look at the screen: {{question}}",
+      "web_search": "Search the web: {{query}}",
+      "ask_user": "Ask you: {{question}}",
+      "hand_off": "Hand over to you",
+      "done": "Finish"
+    },
+    "directions": {
+      "up": "up",
+      "down": "down"
+    },
+    "approval": {
+      "title": "Approve this action?",
+      "titleHigh": "High-risk action — approve?",
+      "body": "On {{site}}, the agent wants to:",
+      "reason": {
+        "payment": "This looks like a payment or purchase.",
+        "destructive": "This looks hard to undo (delete, cancel, account or security change).",
+        "submit": "This submits, sends or saves something.",
+        "confirmEach": "Your policy for this site asks to confirm every step.",
+        "sensitiveField": "This involves sensitive information."
+      },
+      "allowOnce": "Allow once",
+      "allowTask": "Allow for this task",
+      "allowSite": "Always allow on this site",
+      "deny": "Deny"
+    },
+    "permission": {
+      "title": "Allow access to this site?",
+      "body": "The agent needs to read and operate {{origin}} to continue.",
+      "allowSite": "Allow this site",
+      "allowAll": "Allow all sites",
+      "deny": "Don't allow"
+    },
+    "handoff": {
+      "title": {
+        "captcha": "Please solve the verification",
+        "login": "Please sign in",
+        "verification": "Please enter the code",
+        "other": "Your turn"
+      },
+      "captcha": "{{site}} is asking for a human check. Solve it in the tab, then continue.",
+      "login": "Sign in on {{site}} yourself, then continue.",
+      "verification": "Enter the verification code on {{site}}, then continue.",
+      "other": "Finish this step on {{site}}, then continue.",
+      "autoResume": "The task continues by itself once the check is gone.",
+      "done": "Done, continue"
+    },
+    "question": {
+      "title": "The agent asks:",
+      "hint": "Answer in the box below."
+    },
+    "controls": {
+      "pause": "Pause",
+      "resume": "Resume",
+      "stop": "Stop",
+      "takeOver": "Take over",
+      "progress": "Step {{step}}/{{max}}",
+      "tokens_one": "{{formatted}} token",
+      "tokens_other": "{{formatted}} tokens"
+    },
+    "overlay": {
+      "running": "Browser Helper is working in this tab",
+      "stop": "Stop",
+      "resume": "Resume",
+      "continue": "Continue",
+      "paused": {
+        "user": "Paused. Resume when you are ready.",
+        "interference": "Paused because you used the page. Resume when you are done.",
+        "debuggerDetached": "Paused: the debugging bar was closed. Resume to continue with simulated events."
+      },
+      "waiting": {
+        "approval": "Waiting for your approval in the side panel",
+        "question": "The agent has a question for you in the side panel",
+        "handoff": "Your turn: finish this step, then click Continue",
+        "permission": "Waiting for site access in the side panel"
+      }
+    },
+    "notification": {
+      "title": {
+        "approval": "Approval needed",
+        "question": "The agent has a question",
+        "handoff": "Your turn",
+        "permission": "Site access needed"
+      },
+      "approval": "{{site}}: {{target}}",
+      "permission": "Allow access to {{origin}}?"
+    },
+    "maxStepsSummary": "I stopped after {{count}} steps without finishing. Review the steps above, then give me a narrower task or raise the step limit in settings.",
+    "stoppedSummary": "The task was stopped.",
+    "failedSummary": "The task failed: {{message}}"
+  },
+  "agentSettings": {
+    "title": "Agent",
+    "description": "How the agent operates web pages for you.",
+    "useCdp": "Use real mouse and keyboard input (CDP)",
+    "useCdpHint": "More reliable on modern sites. Chrome shows a “started debugging this browser” bar while a task runs.",
+    "cdpUnavailable": "Not available: this build does not include the debugger permission.",
+    "notifications": "Notify me when a task needs me",
+    "notificationsHint": "Chrome notifications for CAPTCHAs, sign-ins and approvals.",
+    "maxSteps": "Step limit per task",
+    "maxStepsHint": "Between 5 and 100.",
+    "searchEngine": "Web search engine",
+    "engines": {
+      "google": "Google",
+      "bing": "Bing",
+      "duckduckgo": "DuckDuckGo",
+      "custom": "Custom"
+    },
+    "customSearchUrl": "Custom search URL",
+    "customSearchUrlHint": "Use %s where the query goes."
   }
 }

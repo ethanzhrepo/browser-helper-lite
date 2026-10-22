@@ -1,10 +1,9 @@
 import { streamText } from 'ai';
 import { browser, type Browser } from 'wxt/browser';
-import { ConfigError, toErrorInfo } from '../providers/errors';
-import { createLanguageModel, providerOptionsFor } from '../providers/language-model';
-import { vendorRequiresKey } from '../providers/vendors';
+import { toErrorInfo } from '../providers/errors';
+import { resolveModelRef } from '../providers/resolve';
 import { CHAT_PORT_NAME, type ChatClientMessage, type ChatServerMessage } from '../shared/protocol';
-import { getApiKey, loadSettings } from '../storage/settings';
+import { loadSettings } from '../storage/settings';
 
 type StartMessage = Extract<ChatClientMessage, { type: 'start' }>;
 
@@ -40,20 +39,14 @@ export function registerChatService(): void {
 
 async function streamChat(request: StartMessage, post: (message: ChatServerMessage) => void, signal: AbortSignal) {
   try {
-    const settings = await loadSettings();
-    const connection = settings.connections.find((c) => c.id === request.model.connectionId);
-    if (!connection) throw new ConfigError('noModel', `Unknown connection ${request.model.connectionId}`);
-    const apiKey = await getApiKey(connection.id);
-    if (!apiKey && vendorRequiresKey(connection.vendor, connection.presetId)) {
-      throw new ConfigError('noKey', connection.name);
-    }
+    const { model, providerOptions } = await resolveModelRef(await loadSettings(), request.model);
 
     const result = streamText({
-      model: createLanguageModel(connection, apiKey, request.model.modelId),
+      model,
       instructions: request.system,
       messages: request.messages,
       temperature: request.temperature,
-      providerOptions: providerOptionsFor(connection),
+      providerOptions,
       maxRetries: 1,
       abortSignal: signal,
     });

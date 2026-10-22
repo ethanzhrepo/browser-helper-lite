@@ -1,16 +1,20 @@
 import { History, Settings as SettingsIcon, SquarePen, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { ACTIVE_STATUSES } from '../../src/agent/types';
+import { useAgentTasks } from '../../src/agent/useAgentTasks';
 import { capturePage, captureSelection } from '../../src/browser/page-context';
 import { SLASH_COMMANDS, type SlashCommand } from '../../src/chat/commands';
 import { useChatSession } from '../../src/chat/useChatSession';
 import { requestHostAccess } from '../../src/permissions/hosts';
 import type { ContextKind, ContextSnapshot, Locale } from '../../src/shared/types';
+import { newId } from '../../src/storage/db';
 import { IconButton } from '../../src/ui/Button';
 import { openOptions } from '../../src/ui/navigation';
 import { useActiveTab } from '../../src/ui/useActiveTab';
 import { useSettings } from '../../src/ui/useSettings';
-import { Composer } from './Composer';
+import { AgentControls } from './AgentControls';
+import { Composer, type ComposerMode } from './Composer';
 import { EmptyState } from './EmptyState';
 import { HistoryPanel } from './HistoryPanel';
 import { MessageList } from './MessageList';
@@ -23,12 +27,25 @@ export function App() {
   const chatSlot = settings?.slots.chat?.modelId ? settings.slots.chat : undefined;
   const locale = i18n.language as Locale;
   const session = useChatSession({ chatSlot, locale });
+  const agent = useAgentTasks(session.conversation?.id, () => void session.reload());
+  const agentSlot = settings?.slots.agent?.modelId ? settings.slots.agent : chatSlot;
+  const activeTask = Object.values(agent.tasks).find(
+    (task) => task.conversationId === session.conversation?.id && ACTIVE_STATUSES.includes(task.status),
+  );
+  const question = activeTask?.waiting?.kind === 'question' ? activeTask : undefined;
 
+  const [mode, setMode] = useState<ComposerMode>('ask');
   const [view, setView] = useState<'chat' | 'history'>('chat');
   const [text, setText] = useState('');
   const [includePage, setIncludePage] = useState(false);
   const [selection, setSelection] = useState<ContextSnapshot>();
   const [notice, setNotice] = useState<string>();
+
+  // Opening the panel while a task runs (e.g. from its notification) shows that task.
+  const runningConversation = Object.values(agent.tasks).find((task) => ACTIVE_STATUSES.includes(task.status))?.conversationId;
+  useEffect(() => {
+    if (runningConversation && !session.conversation) void session.open(runningConversation);
+  }, [runningConversation]);
 
   // A page toggle only applies to the tab it was turned on for.
   useEffect(() => setIncludePage(false), [tab?.id, tab?.url]);
@@ -85,7 +102,29 @@ export function App() {
     await session.send({ text: prompt, contexts });
   };
 
+  /** Act mode: start a task on the current tab, or answer the agent's question. */
+  const startTask = async () => {
+    const goal = text.trim();
+    if (!goal) return;
+    if (question) {
+      setText('');
+      await session.addUserMessage({ text: goal, taskId: question.id });
+      agent.send({ type: 'respond', taskId: question.id, response: { kind: 'answer', text: goal } });
+      return;
+    }
+    if (activeTask) return setNotice(t('agent.busy'));
+    if (!tab) return setNotice(t('context.unavailable'));
+    // Pages the extension cannot read (e.g. a new tab) are fine: the agent navigates away.
+    if (access === 'missing' && !(await ensureAccess())) return accessNotice();
+    setNotice(undefined);
+    setText('');
+    const taskId = newId();
+    const conversationId = await session.addUserMessage({ text: goal, taskId });
+    agent.send({ type: 'start', taskId, conversationId, goal, tabId: tab.id });
+  };
+
   const handleSend = async () => {
+    if (mode === 'act' || question) return startTask();
     if (!chatSlot || session.streaming) return;
     const contexts: ContextSnapshot[] = [];
     if (includePage && tab) {
@@ -164,9 +203,20 @@ export function App() {
       ) : (
         <>
           {showEmpty ? (
-            <EmptyState hasModel={hasModel} onQuickAction={(id) => void runQuickAction(id)} />
+            <EmptyState
+              hasModel={mode === 'act' ? Boolean(agentSlot) : hasModel}
+              mode={mode}
+              onQuickAction={(id) => void runQuickAction(id)}
+              onExample={setText}
+            />
           ) : (
-            <MessageList messages={session.messages} streaming={session.streaming} onRetry={session.retry} />
+            <MessageList
+              messages={session.messages}
+              streaming={session.streaming}
+              onRetry={session.retry}
+              tasks={agent.tasks}
+              onAgentSend={agent.send}
+            />
           )}
           {notice && (
             <div className="mx-3 mb-1 flex items-start gap-2 rounded-md bg-warning-soft px-3 py-2 text-xs" role="status">
@@ -176,7 +226,11 @@ export function App() {
               </button>
             </div>
           )}
+          {activeTask && <AgentControls task={activeTask} onSend={agent.send} />}
           <Composer
+            mode={question ? 'act' : mode}
+            onModeChange={setMode}
+            placeholder={question ? t('composer.placeholderAnswer') : undefined}
             text={text}
             onTextChange={setText}
             tab={tab}
@@ -190,7 +244,7 @@ export function App() {
             onSend={() => void handleSend()}
             onStop={session.stop}
             streaming={Boolean(session.streaming)}
-            disabled={!hasModel}
+            disabled={mode === 'act' ? !agentSlot : !hasModel}
           />
         </>
       )}

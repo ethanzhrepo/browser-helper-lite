@@ -1,4 +1,4 @@
-import { FileText, Languages, Plug, TextQuote } from 'lucide-react';
+import { Bot, FileText, Languages, Plug, TextQuote } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { SlashCommand } from '../../src/chat/commands';
 import { Button } from '../../src/ui/Button';
@@ -10,11 +10,32 @@ const QUICK_ACTIONS: { id: SlashCommand['id']; icon: typeof FileText }[] = [
   { id: 'explain', icon: TextQuote },
 ];
 
-export function EmptyState({ hasModel, onQuickAction }: {
+const AGENT_EXAMPLES = ['plans', 'compare', 'process'] as const;
+
+export function EmptyState({ hasModel, mode, onQuickAction, onExample }: {
   hasModel: boolean;
+  mode: 'ask' | 'act';
   onQuickAction: (id: SlashCommand['id']) => void;
+  onExample: (text: string) => void;
 }) {
   const { t } = useTranslation();
+
+  if (hasModel && mode === 'act') {
+    return (
+      <div className="flex flex-1 flex-col items-center justify-center gap-4 px-6 text-center" data-testid="agent-empty">
+        <Bot className="h-10 w-10 text-accent" />
+        <h2 className="text-base font-semibold">{t('empty.act.title')}</h2>
+        <p className="max-w-xs text-sm text-muted">{t('empty.act.body')}</p>
+        <div className="flex w-full max-w-xs flex-col gap-2">
+          {AGENT_EXAMPLES.map((id) => (
+            <Button key={id} onClick={() => onExample(t(`empty.act.examples.${id}`))} className="justify-start text-left">
+              {t(`empty.act.examples.${id}`)}
+            </Button>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   if (!hasModel) {
     return (

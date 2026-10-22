@@ -5,12 +5,7 @@ import type { Capability, Settings, SlotAssignment } from '../../src/shared/type
 import { updateSettings } from '../../src/storage/settings';
 import { Card, Field, inputClass, Section } from './Section';
 
-const SLOTS: { id: Capability; fromMilestone?: string }[] = [
-  { id: 'chat' },
-  { id: 'fast' },
-  { id: 'agent', fromMilestone: 'M1' },
-  { id: 'vision', fromMilestone: 'M1' },
-];
+const SLOTS: Capability[] = ['chat', 'fast', 'agent', 'vision'];
 
 async function saveSlot(capability: Capability, slot: SlotAssignment | undefined) {
   await updateSettings((settings) => {
@@ -33,18 +28,14 @@ export function SlotsSection({ settings }: { settings: Settings }) {
           </a>
         </Card>
       )}
-      {SLOTS.map(({ id, fromMilestone }) => (
-        <SlotCard key={id} capability={id} settings={settings} fromMilestone={fromMilestone} />
+      {SLOTS.map((id) => (
+        <SlotCard key={id} capability={id} settings={settings} />
       ))}
     </Section>
   );
 }
 
-function SlotCard({ capability, settings, fromMilestone }: {
-  capability: Capability;
-  settings: Settings;
-  fromMilestone?: string;
-}) {
+function SlotCard({ capability, settings }: { capability: Capability; settings: Settings }) {
   const { t } = useTranslation();
   const slot = settings.slots[capability];
   const connection = settings.connections.find((c) => c.id === slot?.connectionId);
@@ -70,14 +61,7 @@ function SlotCard({ capability, settings, fromMilestone }: {
   const listId = `models-${capability}`;
   return (
     <Card>
-      <div className="mb-3 flex flex-wrap items-center gap-2">
-        <h3 className="font-medium">{t(`slots.${capability}.title`)}</h3>
-        {fromMilestone && (
-          <span className="rounded-full bg-accent-soft px-2 py-0.5 text-xs text-accent">
-            {t('slots.fromMilestone', { milestone: fromMilestone })}
-          </span>
-        )}
-      </div>
+      <h3 className="mb-3 font-medium">{t(`slots.${capability}.title`)}</h3>
       <p className="mb-3 text-sm text-muted">{t(`slots.${capability}.description`)}</p>
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label={t('slots.connection')} htmlFor={`connection-${capability}`}>

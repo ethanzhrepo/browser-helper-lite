@@ -1,16 +1,21 @@
 import Dexie, { type Table } from 'dexie';
 import { monotonicFactory } from 'ulid';
+import { ACTIVE_STATUSES, type AgentTask } from '../agent/types';
 import type { ConversationRecord, MessageRecord } from '../shared/types';
 
 class HelperDatabase extends Dexie {
   conversations!: Table<ConversationRecord, string>;
   messages!: Table<MessageRecord, string>;
+  tasks!: Table<AgentTask, string>;
 
   constructor() {
     super('browser-helper');
     this.version(1).stores({
       conversations: 'id, updatedAt',
       messages: 'id, conversationId',
+    });
+    this.version(2).stores({
+      tasks: 'id, conversationId, status',
     });
   }
 }
@@ -19,6 +24,8 @@ export const db = new HelperDatabase();
 
 // Monotonic so messages created within the same millisecond keep their order.
 const ulid = monotonicFactory();
+
+export const newId = (): string => ulid();
 
 const TITLE_MAX = 60;
 
@@ -67,4 +74,28 @@ export async function getMessages(conversationId: string): Promise<MessageRecord
 export async function deleteConversation(id: string): Promise<void> {
   const now = Date.now();
   await db.conversations.update(id, { deletedAt: now, updatedAt: now });
+}
+
+/** Agent tasks are mutable run records (unlike messages); the final summary is appended as a message. */
+export async function saveTask(task: AgentTask): Promise<void> {
+  await db.tasks.put(task);
+}
+
+export async function getTasks(conversationId: string): Promise<AgentTask[]> {
+  return db.tasks.where('conversationId').equals(conversationId).toArray();
+}
+
+/** A service worker restart loses running tasks; mark them as stopped. */
+export async function markInterruptedTasks(): Promise<AgentTask[]> {
+  const interrupted = await db.tasks.where('status').anyOf(ACTIVE_STATUSES).toArray();
+  const now = Date.now();
+  for (const task of interrupted) {
+    await db.tasks.update(task.id, {
+      status: 'stopped',
+      waiting: undefined,
+      error: { code: 'unknown', message: 'Interrupted: the extension was restarted.' },
+      updatedAt: now,
+    });
+  }
+  return interrupted;
 }

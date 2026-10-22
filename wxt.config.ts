@@ -31,6 +31,8 @@ export default defineConfig({
       'scripting',
       'activeTab',
       'tabs',
+      'tabGroups',
+      'notifications',
       ...(enableCdpDriver ? ['debugger'] : []),
     ],
     // Site access is requested at runtime, per site or for all sites (§6).

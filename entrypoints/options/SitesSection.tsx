@@ -1,4 +1,4 @@
-import { Globe } from 'lucide-react';
+import { Globe, Plus, Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { browser } from 'wxt/browser';
@@ -9,9 +9,92 @@ import {
   requestHostAccess,
   revokeOrigin,
 } from '../../src/permissions/hosts';
-import type { Settings } from '../../src/shared/types';
-import { Button } from '../../src/ui/Button';
-import { Card, Section } from './Section';
+import type { Settings, SitePolicy } from '../../src/shared/types';
+import { updateSettings } from '../../src/storage/settings';
+import { Button, IconButton } from '../../src/ui/Button';
+import { Card, inputClass, Section } from './Section';
+
+const POLICIES: SitePolicy[] = ['blocked', 'readOnly', 'confirmEach', 'confirmRisky', 'auto'];
+
+/** "https://www.Example.com/path" → "www.example.com". */
+export function normalizeHost(input: string): string {
+  const trimmed = input.trim().toLowerCase();
+  try {
+    return new URL(trimmed.includes('://') ? trimmed : `https://${trimmed}`).hostname.replace(/^\*\./, '');
+  } catch {
+    return '';
+  }
+}
+
+function setPolicy(host: string, policy: SitePolicy | undefined) {
+  void updateSettings((s) => {
+    const sitePolicies = { ...s.sitePolicies };
+    if (policy) sitePolicies[host] = policy;
+    else delete sitePolicies[host];
+    return { ...s, sitePolicies };
+  });
+}
+
+function SitePolicies({ settings }: { settings: Settings }) {
+  const { t } = useTranslation();
+  const [host, setHost] = useState('');
+  const [policy, setNewPolicy] = useState<SitePolicy>('readOnly');
+  const entries = Object.entries(settings.sitePolicies).sort(([a], [b]) => a.localeCompare(b));
+
+  const add = () => {
+    const normalized = normalizeHost(host);
+    if (!normalized) return;
+    setPolicy(normalized, policy);
+    setHost('');
+  };
+
+  const policySelect = (value: SitePolicy, onChange: (next: SitePolicy) => void, id?: string) => (
+    <select id={id} className={`${inputClass} sm:w-56`} value={value} onChange={(e) => onChange(e.target.value as SitePolicy)}>
+      {POLICIES.map((p) => (
+        <option key={p} value={p}>
+          {t(`sites.policies.${p}`)}
+        </option>
+      ))}
+    </select>
+  );
+
+  return (
+    <div className="space-y-3 pt-4" data-testid="site-policies">
+      <div>
+        <h3 className="font-medium">{t('sites.policiesTitle')}</h3>
+        <p className="mt-1 text-sm text-muted">{t('sites.policiesDescription')}</p>
+      </div>
+      <Card className="space-y-2">
+        {entries.length === 0 && <p className="text-sm text-muted">{t('sites.noPolicies')}</p>}
+        {entries.map(([site, value]) => (
+          <div key={site} className="flex flex-wrap items-center gap-2">
+            <span className="min-w-0 flex-1 truncate font-mono text-sm">{site}</span>
+            {policySelect(value, (next) => setPolicy(site, next))}
+            <IconButton label={t('common.delete')} onClick={() => setPolicy(site, undefined)}>
+              <Trash2 className="h-4 w-4" />
+            </IconButton>
+          </div>
+        ))}
+        <div className="flex flex-wrap items-center gap-2 border-t border-line pt-3">
+          <input
+            aria-label={t('sites.hostLabel')}
+            className={`${inputClass} min-w-0 flex-1`}
+            placeholder="rogers.com"
+            value={host}
+            onChange={(e) => setHost(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && add()}
+          />
+          {policySelect(policy, setNewPolicy, 'new-policy')}
+          <Button onClick={add} disabled={!normalizeHost(host)}>
+            <Plus className="h-4 w-4" />
+            {t('sites.addPolicy')}
+          </Button>
+        </div>
+      </Card>
+      <p className="text-xs text-muted">{t('sites.defaultPolicy')}</p>
+    </div>
+  );
+}
 
 export function SitesSection({ settings }: { settings: Settings }) {
   const { t } = useTranslation();
@@ -70,7 +153,7 @@ export function SitesSection({ settings }: { settings: Settings }) {
           </Button>
         </Card>
       ))}
-      <p className="text-xs text-muted">{t('sites.policiesComing')}</p>
+      <SitePolicies settings={settings} />
     </Section>
   );
 }
