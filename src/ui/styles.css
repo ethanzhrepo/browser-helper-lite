@@ -1,62 +1,62 @@
 @import "tailwindcss";
 
 /*
- * Design tokens. Warm neutrals with an iris accent that matches the icon's
- * indigo → violet gradient. Dark mode follows the system setting.
+ * Design tokens. Warm paper neutrals with a deep pine-green accent (the icon
+ * uses the same green). Dark mode follows the system setting.
  */
 :root {
-  --bg: #f7f7f5;
-  --surface: #ffffff;
-  --bg-subtle: #f1f1ee;
-  --bg-hover: #eaeae6;
-  --border: #e6e5e1;
-  --border-strong: #d4d3ce;
-  --text: #19191c;
-  --text-muted: #66666e;
-  --text-faint: #9b9ba3;
-  --accent: #5b4ff0;
-  --accent-hover: #4b3fe0;
-  --accent-soft: #f0eeff;
-  --accent-soft-strong: #e2deff;
+  --bg: #f6f5f1;
+  --surface: #fefefc;
+  --bg-subtle: #efeee9;
+  --bg-hover: #e8e7e1;
+  --border: #e3e1da;
+  --border-strong: #cfccc3;
+  --text: #1b1f1d;
+  --text-muted: #5f6662;
+  --text-faint: #979d99;
+  --accent: #1f6b57;
+  --accent-hover: #185747;
+  --accent-soft: #e8f1ec;
+  --accent-soft-strong: #d4e6dc;
   --accent-fg: #ffffff;
-  --brand-from: #6366f1;
-  --brand-to: #8b5cf6;
-  --danger: #d4372c;
-  --danger-soft: #fdeeec;
-  --success: #1b8a4f;
-  --success-soft: #e7f6ed;
-  --warning: #b25e09;
-  --warning-soft: #fff4e2;
-  --shadow-sm: 0 1px 2px rgb(24 24 27 / 0.05);
-  --shadow-md: 0 1px 2px rgb(24 24 27 / 0.04), 0 4px 16px -4px rgb(24 24 27 / 0.08);
-  --shadow-lg: 0 2px 4px rgb(24 24 27 / 0.04), 0 12px 32px -8px rgb(24 24 27 / 0.16);
+  --brand-from: #2a7d66;
+  --brand-to: #1f6b57;
+  --danger: #c2412d;
+  --danger-soft: #fbebe7;
+  --success: #2e7d4f;
+  --success-soft: #e6f3ea;
+  --warning: #a8650c;
+  --warning-soft: #fbf1e1;
+  --shadow-sm: 0 1px 2px rgb(28 32 30 / 0.05);
+  --shadow-md: 0 1px 2px rgb(28 32 30 / 0.04), 0 4px 16px -4px rgb(28 32 30 / 0.08);
+  --shadow-lg: 0 2px 4px rgb(28 32 30 / 0.04), 0 12px 32px -8px rgb(28 32 30 / 0.16);
   color-scheme: light;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #111113;
-    --surface: #19191c;
-    --bg-subtle: #202024;
-    --bg-hover: #29292e;
-    --border: #2a2a2f;
-    --border-strong: #3a3a41;
-    --text: #ececef;
-    --text-muted: #a0a0a9;
-    --text-faint: #6f6f78;
-    --accent: #9d93ff;
-    --accent-hover: #b3abff;
-    --accent-soft: rgb(157 147 255 / 0.13);
-    --accent-soft-strong: rgb(157 147 255 / 0.22);
-    --accent-fg: #14121f;
-    --brand-from: #7c7ff5;
-    --brand-to: #a57cf7;
-    --danger: #ff8178;
-    --danger-soft: rgb(255 129 120 / 0.12);
-    --success: #5fd391;
-    --success-soft: rgb(95 211 145 / 0.12);
-    --warning: #f5b453;
-    --warning-soft: rgb(245 180 83 / 0.12);
+    --bg: #121413;
+    --surface: #191c1b;
+    --bg-subtle: #202422;
+    --bg-hover: #282d2a;
+    --border: #2a2f2c;
+    --border-strong: #3a403c;
+    --text: #e8ece9;
+    --text-muted: #9ca5a0;
+    --text-faint: #6c7570;
+    --accent: #6cc3a6;
+    --accent-hover: #86d0b7;
+    --accent-soft: rgb(108 195 166 / 0.12);
+    --accent-soft-strong: rgb(108 195 166 / 0.2);
+    --accent-fg: #0e1f19;
+    --brand-from: #74c9ac;
+    --brand-to: #5fb597;
+    --danger: #f08a7a;
+    --danger-soft: rgb(240 138 122 / 0.12);
+    --success: #6fcf8f;
+    --success-soft: rgb(111 207 143 / 0.12);
+    --warning: #e8b45a;
+    --warning-soft: rgb(232 180 90 / 0.12);
     --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.3);
     --shadow-md: 0 1px 2px rgb(0 0 0 / 0.3), 0 6px 20px -6px rgb(0 0 0 / 0.5);
     --shadow-lg: 0 2px 4px rgb(0 0 0 / 0.3), 0 16px 40px -8px rgb(0 0 0 / 0.6);

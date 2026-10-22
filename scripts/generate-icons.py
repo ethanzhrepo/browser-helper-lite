@@ -12,9 +12,9 @@ OUT_DIR = Path(__file__).resolve().parent.parent / "public" / "icon"
 
 def draw_master() -> Image.Image:
     img = Image.new("RGBA", (SIZE, SIZE), (0, 0, 0, 0))
-    # Vertical indigo → violet gradient inside a rounded square.
+    # Vertical pine-green gradient inside a rounded square.
     gradient = Image.new("RGBA", (SIZE, SIZE))
-    top, bottom = (79, 70, 229), (124, 58, 237)
+    top, bottom = (46, 139, 110), (24, 92, 74)
     for y in range(SIZE):
         t = y / (SIZE - 1)
         color = tuple(round(a + (b - a) * t) for a, b in zip(top, bottom)) + (255,)

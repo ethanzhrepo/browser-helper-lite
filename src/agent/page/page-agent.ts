@@ -238,7 +238,7 @@ export function createPageAgent(): PageAgentApi {
   root.innerHTML = `
     <style>
       .frame { position: fixed; inset: 0; pointer-events: none; border-radius: 0;
-        box-shadow: inset 0 0 0 2px rgba(124,108,242,.9), inset 0 0 36px rgba(124,108,242,.28);
+        box-shadow: inset 0 0 0 2px rgba(31,107,87,.85), inset 0 0 36px rgba(31,107,87,.22);
         animation: breathe 2.4s ease-in-out infinite; }
       .frame.waiting { box-shadow: inset 0 0 0 2px rgba(234,152,40,.95), inset 0 0 36px rgba(234,152,40,.28); }
       @keyframes breathe { 50% { opacity: .55; } }
@@ -250,29 +250,29 @@ export function createPageAgent(): PageAgentApi {
         box-shadow: 0 10px 30px rgba(0,0,0,.28), 0 1px 2px rgba(0,0,0,.2); pointer-events: auto;
         animation: drop .3s cubic-bezier(.2,.7,.3,1); }
       @keyframes drop { from { opacity: 0; transform: translate(-50%, -8px); } }
-      .dot { width: 8px; height: 8px; flex: none; border-radius: 50%; background: linear-gradient(135deg, #6366f1, #a78bfa);
-        box-shadow: 0 0 0 3px rgba(124,108,242,.25); animation: blink 1.4s ease-in-out infinite; }
+      .dot { width: 8px; height: 8px; flex: none; border-radius: 50%; background: #3a9a7c;
+        box-shadow: 0 0 0 3px rgba(58,154,124,.28); animation: blink 1.4s ease-in-out infinite; }
       .waiting-bar .dot { background: #f0a43a; box-shadow: 0 0 0 3px rgba(240,164,58,.25); }
       @keyframes blink { 50% { opacity: .4; } }
       .bar span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-right: 2px; }
       .bar button { all: unset; cursor: pointer; padding: 5px 12px; border-radius: 999px; background: rgba(255,255,255,.1);
         color: #fff; font-weight: 600; white-space: nowrap; transition: background .15s; }
       .bar button:hover { background: rgba(255,255,255,.18); }
-      .bar button.primary { background: linear-gradient(135deg, #6366f1, #8b5cf6); }
+      .bar button.primary { background: #1f6b57; }
       .bar button.primary:hover { filter: brightness(1.1); }
       .cursor { position: fixed; left: 0; top: 0; width: 24px; height: 24px; pointer-events: none; display: none;
         transition: transform .35s cubic-bezier(.2,.7,.3,1); filter: drop-shadow(0 2px 4px rgba(0,0,0,.3)); }
       .ripple { position: fixed; width: 30px; height: 30px; margin: -15px 0 0 -15px; border-radius: 50%;
-        border: 2px solid #7c6cf2; background: rgba(124,108,242,.15); pointer-events: none; animation: ripple .55s ease-out forwards; }
+        border: 2px solid #1f6b57; background: rgba(31,107,87,.14); pointer-events: none; animation: ripple .55s ease-out forwards; }
       @keyframes ripple { from { transform: scale(.3); opacity: 1; } to { transform: scale(1.5); opacity: 0; } }
-      .box { position: fixed; border: 1.5px solid #7c6cf2; border-radius: 4px; background: rgba(124,108,242,.06); pointer-events: none; }
-      .box b { position: absolute; top: -1px; left: -1px; transform: translateY(-100%); background: #6d5efc; color: #fff;
+      .box { position: fixed; border: 1.5px solid #1f6b57; border-radius: 4px; background: rgba(31,107,87,.06); pointer-events: none; }
+      .box b { position: absolute; top: -1px; left: -1px; transform: translateY(-100%); background: #1f6b57; color: #fff;
         font: 700 11px/1 ui-sans-serif, system-ui, sans-serif; padding: 2px 5px; border-radius: 4px 4px 4px 0; }
       [hidden] { display: none !important; }
     </style>
     <div class="frame" hidden></div>
     <div class="bar" hidden><i class="dot"></i><span></span><button class="primary" data-action="continue" hidden></button><button data-action="stop"></button></div>
-    <svg class="cursor" viewBox="0 0 24 24"><defs><linearGradient id="bh-g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6366f1"/><stop offset="1" stop-color="#8b5cf6"/></linearGradient></defs><path d="M4 2l15 11-6.5 1 4 7.5-3 1.5-4-7.5L4 20z" fill="url(#bh-g)" stroke="#fff" stroke-width="1.6" stroke-linejoin="round"/></svg>
+    <svg class="cursor" viewBox="0 0 24 24"><defs><linearGradient id="bh-g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2a7d66"/><stop offset="1" stop-color="#185747"/></linearGradient></defs><path d="M4 2l15 11-6.5 1 4 7.5-3 1.5-4-7.5L4 20z" fill="url(#bh-g)" stroke="#fff" stroke-width="1.6" stroke-linejoin="round"/></svg>
     <div class="boxes"></div>`;
   const frame = root.querySelector<HTMLDivElement>('.frame')!;
   const bar = root.querySelector<HTMLDivElement>('.bar')!;

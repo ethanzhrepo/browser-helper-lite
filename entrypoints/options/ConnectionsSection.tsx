@@ -14,7 +14,7 @@ const VENDOR_COLORS: Record<Connection['vendor'], string> = {
   anthropic: '#c96442',
   google: '#3b82f6',
   deepseek: '#4f6bed',
-  'openai-compatible': '#7c6cf2',
+  'openai-compatible': '#5f6b73',
 };
 
 function Monogram({ connection }: { connection: Connection }) {
