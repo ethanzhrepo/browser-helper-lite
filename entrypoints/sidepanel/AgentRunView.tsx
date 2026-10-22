@@ -12,6 +12,7 @@ import {
   ShieldAlert,
   Square,
   X,
+  XCircle,
 } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -77,6 +78,7 @@ export function AgentRunView({ task, onSend }: { task: AgentTask; onSend: (messa
   const actionCount = task.steps.reduce((n, step) => n + step.actions.length, 0);
   const status = STATUS_STYLE[task.status];
   const StatusIcon = status.icon;
+  const openedTabs = task.openedTabs?.length ?? 0;
 
   return (
     <div
@@ -97,13 +99,16 @@ export function AgentRunView({ task, onSend }: { task: AgentTask; onSend: (messa
         </span>
         <span className="font-semibold tracking-tight">{t(`agent.status.${task.status}`)}</span>
         <span className="text-xs text-faint">{t('agent.actionCount', { count: actionCount })}</span>
-        <span
-          className="ml-auto rounded-md border border-line px-1.5 py-px font-mono text-[10px] tracking-wide text-faint uppercase"
-          title={t('agent.driverHint')}
-          data-testid="driver-badge"
-        >
-          {task.driver}
-        </span>
+        <span className="ml-auto" />
+        {task.driver && (
+          <span
+            className="rounded-md border border-line px-1.5 py-px font-mono text-[10px] tracking-wide text-faint uppercase"
+            title={t('agent.driverHint')}
+            data-testid="driver-badge"
+          >
+            {task.driver}
+          </span>
+        )}
         {!active && <ChevronDown className={`h-4 w-4 text-faint transition-transform ${expanded ? 'rotate-180' : ''}`} />}
       </button>
 
@@ -138,6 +143,9 @@ export function AgentRunView({ task, onSend }: { task: AgentTask; onSend: (messa
                         >
                           {actionLabel(t, action)}
                         </span>
+                        {action.tool === 'web_search' && action.target && (
+                          <span className="ml-1.5 rounded bg-subtle px-1 py-px text-[10px] text-faint">{action.target}</span>
+                        )}
                         {(action.status === 'error' || action.status === 'rejected') && action.result && (
                           <p className="mt-0.5 text-xs text-muted">{clip(action.result, 160)}</p>
                         )}
@@ -157,6 +165,14 @@ export function AgentRunView({ task, onSend }: { task: AgentTask; onSend: (messa
         </ol>
       )}
 
+      {!active && openedTabs > 0 && expanded && (
+        <div className="flex justify-end border-t border-line px-3 py-2">
+          <Button size="sm" variant="ghost" onClick={() => onSend({ type: 'closeTabs', taskId: task.id })}>
+            <XCircle className="h-3.5 w-3.5" />
+            {t('agent.closeTabs', { count: openedTabs })}
+          </Button>
+        </div>
+      )}
       {task.status === 'paused' && (
         <p className="flex items-center gap-2 border-t border-line bg-subtle/60 px-3.5 py-2.5 text-xs text-muted">
           <Pause className="h-3.5 w-3.5 shrink-0" />

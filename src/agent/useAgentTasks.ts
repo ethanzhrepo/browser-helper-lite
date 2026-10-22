@@ -12,6 +12,8 @@ const KEEPALIVE_MS = 20_000;
 export function useAgentTasks(conversationId: string | undefined, onFinished: (task: AgentTask) => void) {
   const [tasks, setTasks] = useState<Record<string, AgentTask>>({});
   const portRef = useRef<Browser.runtime.Port | undefined>(undefined);
+  /** Messages sent while the port was reconnecting. */
+  const queueRef = useRef<AgentClientMessage[]>([]);
   const onFinishedRef = useRef(onFinished);
   onFinishedRef.current = onFinished;
 
@@ -32,13 +34,15 @@ export function useAgentTasks(conversationId: string | undefined, onFinished: (t
       });
       // The service worker restarted: reconnect so updates keep flowing.
       port.onDisconnect.addListener(() => {
+        if (portRef.current === port) portRef.current = undefined;
         if (!disposed) retry = setTimeout(connect, 1000);
       });
       port.postMessage({ type: 'subscribe' } satisfies AgentClientMessage);
+      for (const message of queueRef.current.splice(0)) port.postMessage(message);
     };
     connect();
     // Keeps the service worker awake while the panel waits on a task.
-    const keepalive = setInterval(() => portRef.current?.postMessage({ type: 'ping' }), KEEPALIVE_MS);
+    const keepalive = setInterval(() => send({ type: 'ping' }), KEEPALIVE_MS);
 
     return () => {
       disposed = true;
@@ -60,7 +64,15 @@ export function useAgentTasks(conversationId: string | undefined, onFinished: (t
     );
   }, [conversationId]);
 
-  const send = useCallback((message: AgentClientMessage) => portRef.current?.postMessage(message), []);
+  const send = useCallback((message: AgentClientMessage) => {
+    try {
+      if (!portRef.current) throw new Error('disconnected');
+      portRef.current.postMessage(message);
+    } catch {
+      // Delivered once the port reconnects.
+      if (message.type !== 'ping') queueRef.current.push(message);
+    }
+  }, []);
 
   return { tasks, send };
 }

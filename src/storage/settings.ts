@@ -1,5 +1,5 @@
 import { browser } from 'wxt/browser';
-import type { AgentSettings, Connection, Settings } from '../shared/types';
+import type { AgentSettings, Connection, SearchProviderId, SearchSettings, Settings, VoiceSettings } from '../shared/types';
 
 const SETTINGS_KEY = 'settings:v1';
 /**
@@ -11,11 +11,24 @@ const SECRETS_KEY = 'secrets:v1';
 type Secrets = Record<string, string>;
 
 export const DEFAULT_AGENT_SETTINGS: AgentSettings = {
+  mode: 'auto',
   useCdp: true,
   maxSteps: 30,
   notifications: true,
-  searchEngine: 'google',
-  customSearchUrl: '',
+};
+
+export const DEFAULT_SEARCH_SETTINGS: SearchSettings = {
+  provider: 'browser',
+  engine: 'google',
+  customUrl: '',
+  cloudflare: { accountId: '', gatewayId: 'default', source: 'ceramic' },
+  fallbackToBrowser: true,
+};
+
+export const DEFAULT_VOICE_SETTINGS: VoiceSettings = {
+  engine: 'browser',
+  language: 'auto',
+  autoSend: false,
 };
 
 export function defaultSettings(): Settings {
@@ -25,19 +38,47 @@ export function defaultSettings(): Settings {
     slots: {},
     language: 'auto',
     agent: DEFAULT_AGENT_SETTINGS,
+    search: DEFAULT_SEARCH_SETTINGS,
+    voice: DEFAULT_VOICE_SETTINGS,
     sitePolicies: {},
     updatedAt: 0,
   };
 }
 
-/** Fills in fields added after the settings were first saved. */
-function withDefaults(stored: Partial<Settings> | undefined): Settings {
+/** Settings as saved by older versions. */
+type StoredSettings = Partial<Settings> & {
+  agent?: Partial<AgentSettings> & { searchEngine?: SearchSettings['engine']; customSearchUrl?: string };
+  slots?: Record<string, unknown>;
+};
+
+/** Fills in fields added after the settings were first saved, and migrates old ones. */
+export function withDefaults(stored: StoredSettings | undefined): Settings {
   const defaults = defaultSettings();
-  return { ...defaults, ...stored, agent: { ...defaults.agent, ...stored?.agent } };
+  // M1 kept the browser search engine with the agent settings.
+  const { searchEngine, customSearchUrl, ...agent } = stored?.agent ?? {};
+  const legacySearch: Partial<SearchSettings> = {
+    ...(searchEngine ? { engine: searchEngine } : {}),
+    ...(customSearchUrl ? { customUrl: customSearchUrl } : {}),
+  };
+  // M1's separate agent model now follows the current model.
+  const { agent: _agentSlot, ...slots } = (stored?.slots ?? {}) as Settings['slots'] & { agent?: unknown };
+  return {
+    ...defaults,
+    ...stored,
+    slots,
+    agent: { ...defaults.agent, ...agent },
+    search: {
+      ...defaults.search,
+      ...legacySearch,
+      ...stored?.search,
+      cloudflare: { ...defaults.search.cloudflare, ...stored?.search?.cloudflare },
+    },
+    voice: { ...defaults.voice, ...stored?.voice },
+  };
 }
 
 export async function loadSettings(): Promise<Settings> {
-  return withDefaults((await browser.storage.local.get(SETTINGS_KEY))[SETTINGS_KEY] as Partial<Settings> | undefined);
+  return withDefaults((await browser.storage.local.get(SETTINGS_KEY))[SETTINGS_KEY] as StoredSettings | undefined);
 }
 
 async function saveSettings(settings: Settings): Promise<Settings> {
@@ -53,7 +94,7 @@ export async function updateSettings(mutate: (draft: Settings) => Settings): Pro
 export function watchSettings(listener: (settings: Settings) => void): () => void {
   const onChanged = (changes: Record<string, { newValue?: unknown }>, area: string) => {
     if (area === 'local' && SETTINGS_KEY in changes) {
-      listener(withDefaults(changes[SETTINGS_KEY]!.newValue as Partial<Settings>));
+      listener(withDefaults(changes[SETTINGS_KEY]!.newValue as StoredSettings));
     }
   };
   browser.storage.onChanged.addListener(onChanged);
@@ -77,6 +118,30 @@ async function writeApiKey(connectionId: string, apiKey: string | undefined): Pr
 
 export async function hasApiKey(connectionId: string): Promise<boolean> {
   return Boolean(await getApiKey(connectionId));
+}
+
+/** Search API keys share the secrets store, under `search:<provider>`. */
+const searchKeyId = (provider: SearchProviderId) => `search:${provider}`;
+
+export function getSearchKey(provider: SearchProviderId): Promise<string | undefined> {
+  return getApiKey(searchKeyId(provider));
+}
+
+export function saveSearchKey(provider: SearchProviderId, key: string): Promise<void> {
+  return writeApiKey(searchKeyId(provider), key.trim() || undefined);
+}
+
+/** Stars or unstars a model of a connection. */
+export async function toggleFavoriteModel(connectionId: string, modelId: string): Promise<Settings> {
+  return updateSettings((settings) => ({
+    ...settings,
+    connections: settings.connections.map((c) => {
+      if (c.id !== connectionId) return c;
+      const favorites = c.favoriteModels ?? [];
+      const next = favorites.includes(modelId) ? favorites.filter((m) => m !== modelId) : [...favorites, modelId];
+      return { ...c, favoriteModels: next };
+    }),
+  }));
 }
 
 /**

@@ -18,27 +18,31 @@
     "choose": "Choose a model",
     "search": "Search models",
     "none": "No models. Add a connection or type a model ID in settings.",
-    "manage": "Manage models"
+    "manage": "Manage models",
+    "favorite": "Add to favorites",
+    "unfavorite": "Remove from favorites",
+    "showMore_one": "Show {{count}} more model",
+    "showMore_other": "Show {{count}} more models",
+    "showAll": "Show all models",
+    "showFavorites": "Favorites only"
   },
   "empty": {
     "setupTitle": "Connect a model to get started",
     "setupBody": "Add an API key from OpenAI, Anthropic, Gemini, DeepSeek or any OpenAI-compatible service. Keys stay on this device.",
     "setupAction": "Add a model",
-    "title": "How can I help with this page?",
+    "title": "How can I help?",
     "actions": {
       "summarize": "Summarize this page",
       "translate": "Translate the selection or page",
       "explain": "Explain the selected text"
     },
     "tip": "Type / for commands, @ to attach the page or your selection.",
-    "act": {
-      "title": "What should I do on the web?",
-      "body": "I'll work in the current tab: click, type, scroll and navigate. Risky steps wait for your approval.",
-      "examples": {
-        "plans": "Find the Rogers mobile plans under $60/month and compare them in a table",
-        "compare": "Search Amazon and AliExpress for a 65W USB-C charger and compare price and delivery",
-        "process": "Find out how to transfer my phone number to Rogers, step by step"
-      }
+    "body": "Ask anything. I can also read this page, search the web and work in your tabs.",
+    "tasksTitle": "Or give me a task",
+    "examples": {
+      "plans": "Find the Rogers mobile plans under $60/month and compare them in a table",
+      "compare": "Search Amazon and AliExpress for a 65W USB-C charger and compare price and delivery",
+      "process": "Find out how to transfer my phone number to Rogers, step by step"
     }
   },
   "composer": {
@@ -48,17 +52,16 @@
     "stop": "Stop",
     "removeSelection": "Remove selection",
     "defaultPrompt": "Please look at the attached content.",
-    "placeholderAct": "Describe a task to do on the web…",
-    "placeholderAnswer": "Answer the agent's question…",
+    "placeholderAnswer": "Answer the assistant's question…",
     "mode": "Mode",
     "modes": {
-      "ask": "Ask",
-      "act": "Act",
-      "askHint": "Chat about pages; nothing on the page is changed",
-      "actHint": "Let the agent operate the browser for you"
-    },
-    "actOn": "Starts on: {{title}}",
-    "actNewTab": "Starts on the current tab"
+      "query": "Query",
+      "auto": "Auto",
+      "manual": "Manual approval",
+      "queryHint": "Reads pages, searches and follows links. Never clicks buttons, fills in forms or submits anything.",
+      "autoHint": "Reads and operates pages by itself. Only high-risk steps (payments, deletions, account changes) wait for you.",
+      "manualHint": "Reads, scrolls and searches by itself. Every action that changes a page waits for your approval."
+    }
   },
   "context": {
     "unavailable": "This page can't be read",
@@ -101,7 +104,9 @@
     "copy": "Copy",
     "copied": "Copied",
     "retry": "Retry",
-    "truncated": "partial"
+    "truncated": "partial",
+    "diagramError": "This diagram couldn't be drawn. Here is its source.",
+    "copySvg": "Copy SVG"
   },
   "history": {
     "title": "History",
@@ -130,7 +135,9 @@
       "sites": "Site access",
       "language": "Language",
       "about": "About",
-      "agent": "Agent"
+      "agent": "Agent",
+      "search": "Search",
+      "voice": "Voice input"
     }
   },
   "connections": {
@@ -183,20 +190,21 @@
     "typeModelId": "No model list for this connection. Type the model ID.",
     "modelPlaceholder": "Model ID",
     "chat": {
-      "title": "Chat model",
-      "description": "Answers in the side panel."
+      "title": "Current model",
+      "description": "Answers and works in the side panel, including operating pages (needs tool calling). Switch it from the panel header."
     },
     "fast": {
       "title": "Fast model",
-      "description": "Cheap, quick work: summaries, extraction, titles and risk checks."
-    },
-    "agent": {
-      "title": "Agent model",
-      "description": "Plans and operates web pages. Needs tool calling. If it can't read images (e.g. DeepSeek), the vision model is used as its eyes."
+      "description": "Cheap, quick work: extracting information from long pages."
     },
     "vision": {
       "title": "Vision model",
-      "description": "Looks at screenshots and images for models that can't. Pick a cheap, fast multimodal model."
+      "description": "Looks at screenshots for models that can't see images (e.g. DeepSeek). Pick a cheap, fast multimodal model."
+    },
+    "stt": {
+      "title": "Speech-to-text model",
+      "description": "Transcribes voice input when Voice input uses a speech-to-text model.",
+      "modelHint": "For example gpt-4o-transcribe or whisper-1 (OpenAI), whisper-large-v3 (Groq), gemini-2.5-flash (Gemini)."
     }
   },
   "sites": {
@@ -212,7 +220,7 @@
     "noPolicies": "No site policies yet.",
     "hostLabel": "Site",
     "addPolicy": "Add",
-    "defaultPolicy": "Sites without a policy: confirm risky actions. High-risk actions (payments, deletions) always need your approval.",
+    "defaultPolicy": "Sites without a policy follow the mode chosen in the side panel. When a site policy and the mode disagree, the stricter one wins; \"Automatic\" sites also skip Manual approval. High-risk actions always need your approval.",
     "policies": {
       "blocked": "Blocked",
       "readOnly": "Read only",
@@ -268,7 +276,8 @@
       "web_search": "Search the web: {{query}}",
       "ask_user": "Ask you: {{question}}",
       "hand_off": "Hand over to you",
-      "done": "Finish"
+      "read_page": "Read the page",
+      "view_page": "Look at the page"
     },
     "directions": {
       "up": "up",
@@ -283,7 +292,8 @@
         "destructive": "This looks hard to undo (delete, cancel, account or security change).",
         "submit": "This submits, sends or saves something.",
         "confirmEach": "Your policy for this site asks to confirm every step.",
-        "sensitiveField": "This involves sensitive information."
+        "sensitiveField": "This involves sensitive information.",
+        "manualMode": "Manual approval mode is on."
       },
       "allowOnce": "Allow once",
       "allowTask": "Allow for this task",
@@ -312,7 +322,7 @@
       "done": "Done, continue"
     },
     "question": {
-      "title": "The agent asks:",
+      "title": "The assistant asks:",
       "hint": "Answer in the box below."
     },
     "controls": {
@@ -352,11 +362,14 @@
     "maxStepsSummary": "I stopped after {{count}} steps without finishing. Review the steps above, then give me a narrower task or raise the step limit in settings.",
     "stoppedSummary": "The task was stopped.",
     "failedSummary": "The task failed: {{message}}",
-    "thinking": "Thinking…"
+    "thinking": "Thinking…",
+    "emptyAnswer": "(No answer.)",
+    "closeTabs_one": "Close the tab I opened",
+    "closeTabs_other": "Close the {{count}} tabs I opened"
   },
   "agentSettings": {
     "title": "Agent",
-    "description": "How the agent operates web pages for you.",
+    "description": "How the assistant works on web pages for you.",
     "useCdp": "Use real mouse and keyboard input (CDP)",
     "useCdpHint": "More reliable on modern sites. Chrome shows a “started debugging this browser” bar while a task runs.",
     "cdpUnavailable": "Not available: this build does not include the debugger permission.",
@@ -364,14 +377,115 @@
     "notificationsHint": "Chrome notifications for CAPTCHAs, sign-ins and approvals.",
     "maxSteps": "Step limit per task",
     "maxStepsHint": "Between 5 and 100.",
-    "searchEngine": "Web search engine",
+    "mode": "Default mode",
+    "modeHint": "You can also switch the mode below the message box at any time; it applies to a running task right away."
+  },
+  "voice": {
+    "start": "Voice input",
+    "stop": "Stop listening",
+    "transcribing": "Transcribing…",
+    "listening": "Listening…",
+    "problems": {
+      "permission": "Allow the microphone in the tab that just opened, then click the microphone again.",
+      "unsupported": "This browser doesn't support speech recognition. Choose a speech-to-text model under Voice input.",
+      "network": "Chrome's speech recognition couldn't reach Google's service. Check your network, or use a speech-to-text model.",
+      "transcribe": "Couldn't transcribe the recording."
+    },
+    "permission": {
+      "title": "Microphone access",
+      "askingTitle": "Allow the microphone",
+      "askingBody": "Chrome is asking whether Browser Helper may use your microphone. It is only used while you hold a voice input open.",
+      "grantedTitle": "Microphone allowed",
+      "grantedBody": "You can use voice input in the side panel now. This tab closes by itself.",
+      "deniedTitle": "Microphone blocked",
+      "deniedBody": "Allow it with the icon at the right of the address bar, or in Chrome settings under Privacy and security › Site settings › Microphone, then try again.",
+      "retry": "Try again"
+    },
+    "title": "Voice input",
+    "description": "Speak instead of typing: click the microphone in the message box, and click again (or pause for two seconds) to finish.",
+    "engine": "Recognition",
+    "engines": {
+      "browser": {
+        "title": "Chrome's speech recognition",
+        "description": "Free and real time. The audio is sent to Google’s speech service."
+      },
+      "stt": {
+        "title": "Speech-to-text model",
+        "description": "Records, then sends the audio to the speech-to-text model under Model roles. More accurate, good with mixed languages."
+      }
+    },
+    "setSttModel": "Choose a speech-to-text model",
+    "language": "Language spoken",
+    "languageAuto": "Same as the interface",
+    "autoSend": "Send when I stop speaking",
+    "autoSendHint": "Otherwise the text stays in the box so you can edit it.",
+    "microphone": "Microphone",
+    "micHint": "Side panels cannot ask for the microphone, so a tab opens once to ask.",
+    "micGranted": "Browser Helper may use the microphone.",
+    "micAllowed": "Allowed",
+    "allowMic": "Allow microphone"
+  },
+  "search": {
+    "title": "Search",
+    "description": "How the assistant searches the web when a page does not have the answer.",
+    "provider": "Search provider",
+    "providers": {
+      "browser": {
+        "title": "Browser search",
+        "description": "Google, Bing or DuckDuckGo in a background tab. Free, may meet CAPTCHAs."
+      },
+      "deepseek": {
+        "title": "DeepSeek Search API",
+        "description": "Uses the key of your DeepSeek connection. Results come with summaries written for models."
+      },
+      "cloudflare": {
+        "title": "Cloudflare Web Search",
+        "description": "Through your AI Gateway, billed to your Cloudflare account. Sources: Ceramic, Exa, Linkup."
+      },
+      "tavily": {
+        "title": "Tavily",
+        "description": "Search API built for AI agents."
+      },
+      "brave": {
+        "title": "Brave Search",
+        "description": "Independent web index."
+      },
+      "exa": {
+        "title": "Exa",
+        "description": "Semantic search with highlights from each page."
+      },
+      "native": {
+        "title": "The model's own search",
+        "description": "OpenAI, Anthropic and Gemini search the web on their side, with the current model."
+      }
+    },
+    "engine": "Browser search engine",
+    "engineFallbackHint": "Used when the API fails, if allowed below.",
     "engines": {
       "google": "Google",
       "bing": "Bing",
       "duckduckgo": "DuckDuckGo",
       "custom": "Custom"
     },
-    "customSearchUrl": "Custom search URL",
-    "customSearchUrlHint": "Use %s where the query goes."
+    "customUrl": "Custom search URL",
+    "customUrlHint": "Use %s where the query goes.",
+    "deepseekNoConnection": "DeepSeek search uses the API key of a DeepSeek connection, and you have none yet.",
+    "deepseekConnection": "DeepSeek connection",
+    "deepseekHint": "Its API key and base URL are used for /v1/tools/search.",
+    "cloudflareAccount": "Account ID",
+    "cloudflareGateway": "AI Gateway ID",
+    "cloudflareSource": "Search source",
+    "cloudflareToken": "API token",
+    "cloudflareTokenHint": "Needs the Workers AI Read and AI Gateway Read permissions.",
+    "keyHint": "Stored only on this device.",
+    "nativeHint": "Uses the current model's connection, which must be OpenAI, Anthropic or Gemini. Each search is an extra model request.",
+    "fallback": "Search in the browser when the API fails",
+    "fallbackHint": "For example when the key is wrong or the quota is used up.",
+    "test": "Test search",
+    "testQuery": "Test query",
+    "testOk_one": "Works. {{count}} result:",
+    "testOk_other": "Works. {{count}} results:",
+    "testOkText": "Works. The model answered:",
+    "verifyNote": "Whatever the provider, the assistant is asked to check facts on the source pages and to cite them."
   }
 }

@@ -70,7 +70,7 @@ export function isNavigationLink(target: TargetInfo): boolean {
   }
 }
 
-const READ_ONLY_TOOLS = new Set(['scroll', 'wait', 'extract', 'look', 'web_search', 'hover', 'switch_tab', 'ask_user', 'hand_off', 'done']);
+const READ_ONLY_TOOLS = new Set(['read_page', 'view_page', 'scroll', 'wait', 'extract', 'look', 'web_search', 'hover', 'switch_tab', 'ask_user', 'hand_off']);
 
 export function classifyAction(tool: string, args: Record<string, unknown>, target?: TargetInfo): Classification {
   if (READ_ONLY_TOOLS.has(tool)) return { risk: 0 };

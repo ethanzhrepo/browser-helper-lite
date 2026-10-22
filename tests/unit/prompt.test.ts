@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildSystemPrompt, renderContext, toChatTurns } from '../../src/chat/prompt';
+import { buildHistory, renderContext } from '../../src/chat/prompt';
 import type { ContextSnapshot, MessageRecord } from '../../src/shared/types';
 
 const context = (overrides: Partial<ContextSnapshot> = {}): ContextSnapshot => ({
@@ -23,15 +23,6 @@ const message = (overrides: Partial<MessageRecord>): MessageRecord => ({
   ...overrides,
 });
 
-describe('buildSystemPrompt', () => {
-  it('names the fallback reply language and the date', () => {
-    const prompt = buildSystemPrompt({ locale: 'fr', now: new Date('2026-10-22T12:00:00Z') });
-    expect(prompt).toContain('reply in French');
-    expect(prompt).toContain('2026-10-22');
-    expect(prompt).toContain('untrusted data');
-  });
-});
-
 describe('renderContext', () => {
   it('escapes attributes and neutralizes closing tags inside page text', () => {
     const rendered = renderContext(
@@ -48,17 +39,41 @@ describe('renderContext', () => {
   });
 });
 
-describe('toChatTurns', () => {
+describe('buildHistory', () => {
   it('puts attachments before the user text and skips failed replies', () => {
-    const turns = toChatTurns([
+    const turns = buildHistory([
       message({ role: 'user', content: 'Summarize', contexts: [context()] }),
       message({ role: 'assistant', content: '', status: 'error' }),
       message({ role: 'assistant', content: '', status: 'aborted' }),
       message({ role: 'assistant', content: 'Partial answer', status: 'aborted' }),
+      message({ role: 'user', content: 'More' }),
       message({ role: 'assistant', content: 'Full answer', status: 'done' }),
+      message({ role: 'user', content: 'Thanks' }),
     ]);
-    expect(turns.map((t) => t.role)).toEqual(['user', 'assistant', 'assistant']);
+    expect(turns.map((t) => t.role)).toEqual(['user', 'assistant', 'user', 'assistant', 'user']);
     expect(turns[0]!.content).toMatch(/^<context type="page"[\s\S]*<\/context>\n\nSummarize$/);
     expect(turns[1]!.content).toBe('Partial answer');
+  });
+
+  it('merges answers to the assistant\'s questions into the request', () => {
+    const turns = buildHistory([
+      message({ role: 'user', content: 'Book a day pass', taskId: 't1' }),
+      message({ role: 'user', content: 'Nov 3', taskId: 't1' }),
+    ]);
+    expect(turns).toEqual([{ role: 'user', content: 'Book a day pass\n\nNov 3' }]);
+  });
+
+  it('drops replies after the last request when retrying', () => {
+    const turns = buildHistory([
+      message({ role: 'user', content: 'Hi' }),
+      message({ role: 'assistant', content: 'Half a rep', status: 'aborted' }),
+    ]);
+    expect(turns).toEqual([{ role: 'user', content: 'Hi' }]);
+  });
+
+  it('never starts with an assistant turn', () => {
+    expect(buildHistory([message({ role: 'assistant', content: 'Hello' }), message({ role: 'user', content: 'Hi' })])).toEqual([
+      { role: 'user', content: 'Hi' },
+    ]);
   });
 });

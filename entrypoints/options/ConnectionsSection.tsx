@@ -1,39 +1,12 @@
 import { Pencil, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { findPreset, VENDORS } from '../../src/providers/vendors';
 import type { Connection, Settings } from '../../src/shared/types';
 import { deleteConnection } from '../../src/storage/settings';
 import { Button, IconButton } from '../../src/ui/Button';
+import { VendorMark, vendorLabel } from '../../src/ui/VendorMark';
 import { ConnectionForm } from './ConnectionForm';
 import { Card, Section } from './Section';
-
-/** Colored monogram per vendor (no logos). */
-const VENDOR_COLORS: Record<Connection['vendor'], string> = {
-  openai: '#10a37f',
-  anthropic: '#c96442',
-  google: '#3b82f6',
-  deepseek: '#4f6bed',
-  'openai-compatible': '#5f6b73',
-};
-
-function Monogram({ connection }: { connection: Connection }) {
-  const initial = (connection.name.trim()[0] ?? '?').toUpperCase();
-  return (
-    <span
-      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-sm font-semibold text-white shadow-soft"
-      style={{ background: VENDOR_COLORS[connection.vendor] }}
-      aria-hidden
-    >
-      {initial}
-    </span>
-  );
-}
-
-export function vendorLabel(connection: Pick<Connection, 'vendor' | 'presetId'>): string {
-  const preset = connection.vendor === 'openai-compatible' ? findPreset(connection.presetId) : undefined;
-  return preset && preset.id !== 'custom' ? preset.label : VENDORS[connection.vendor].label;
-}
 
 export function ConnectionsSection({ settings }: { settings: Settings }) {
   const { t } = useTranslation();
@@ -72,7 +45,7 @@ export function ConnectionsSection({ settings }: { settings: Settings }) {
           />
         ) : (
           <Card key={connection.id} className="flex items-center gap-3.5 transition-shadow hover:shadow-card">
-            <Monogram connection={connection} />
+            <VendorMark connection={connection} />
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
                 <span className="text-[15px] font-semibold tracking-tight">{connection.name}</span>

@@ -1,8 +1,7 @@
 import { AlertTriangle, Brain, Check, ChevronRight, Copy, FileText, RotateCcw, Settings2, Square, TextQuote } from 'lucide-react';
 import { Fragment, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { AgentClientMessage, AgentTask } from '../../src/agent/types';
-import type { StreamingReply } from '../../src/chat/useChatSession';
+import { ACTIVE_STATUSES, type AgentClientMessage, type AgentTask } from '../../src/agent/types';
 import type { ContextSnapshot, ErrorInfo, MessageRecord } from '../../src/shared/types';
 import { Button, IconButton } from '../../src/ui/Button';
 import { errorSummary, isSettingsError } from '../../src/ui/errors';
@@ -10,11 +9,26 @@ import { Markdown } from '../../src/ui/Markdown';
 import { openOptions } from '../../src/ui/navigation';
 import { AgentRunView } from './AgentRunView';
 
-export function MessageList({ messages, streaming, onRetry, tasks, onAgentSend }: {
+/** After which message each turn's view goes: its anchor, or a later answer to one of its questions. */
+function turnPositions(messages: MessageRecord[], tasks: AgentTask[]): Map<string, AgentTask[]> {
+  const ids = new Set(messages.map((m) => m.id));
+  const positions = new Map<string, AgentTask[]>();
+  for (const task of tasks) {
+    let after = task.anchorMessageId && ids.has(task.anchorMessageId) ? task.anchorMessageId : undefined;
+    for (const message of messages) {
+      if (message.role === 'user' && message.taskId === task.id && (!after || message.id > after)) after = message.id;
+    }
+    if (after) positions.set(after, [...(positions.get(after) ?? []), task].sort((a, b) => a.createdAt - b.createdAt));
+  }
+  return positions;
+}
+
+export function MessageList({ messages, tasks, pendingTaskId, onRetry, onAgentSend }: {
   messages: MessageRecord[];
-  streaming?: StreamingReply;
-  onRetry: () => void;
   tasks: Record<string, AgentTask>;
+  /** A request was sent and its turn has not reported back yet. */
+  pendingTaskId?: string;
+  onRetry: () => void;
   onAgentSend: (message: AgentClientMessage) => void;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -24,53 +38,61 @@ export function MessageList({ messages, streaming, onRetry, tasks, onAgentSend }
   useEffect(() => {
     const el = scrollRef.current;
     if (el && stickToBottom.current) el.scrollTop = el.scrollHeight;
-  }, [messages, streaming, tasks]);
+  }, [messages, tasks, pendingTaskId]);
 
   const onScroll = () => {
     const el = scrollRef.current;
     if (el) stickToBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 48;
   };
 
+  const conversationId = messages[0]?.conversationId;
+  const conversationTasks = Object.values(tasks).filter((task) => task.conversationId === conversationId);
+  const active = conversationTasks.some((task) => ACTIVE_STATUSES.includes(task.status));
   const last = messages.at(-1);
-  const canRetry = !streaming && last?.role === 'assistant' && last.status !== 'done' && !last.taskId;
-
-  // A task's run view goes after its last user message (the goal, or answers to its questions).
-  const runAfter = new Map<string, string>();
-  for (const message of messages) if (message.role === 'user' && message.taskId) runAfter.set(message.taskId, message.id);
+  const canRetry = !active && !pendingTaskId && last?.role === 'assistant' && last.status !== 'done';
+  const positions = turnPositions(messages, conversationTasks);
+  const replied = new Set(messages.filter((m) => m.role === 'assistant' && m.taskId).map((m) => m.taskId));
 
   return (
     <div ref={scrollRef} onScroll={onScroll} className="flex-1 overflow-y-auto px-3.5 pb-2 pt-5" data-testid="message-list">
       <div className="mx-auto flex max-w-3xl flex-col gap-6">
-        {messages.map((message) =>
-          message.role === 'user' ? (
-            <Fragment key={message.id}>
+        {messages.map((message) => (
+          <Fragment key={message.id}>
+            {message.role === 'user' ? (
               <UserMessage message={message} />
-              {message.taskId && runAfter.get(message.taskId) === message.id && tasks[message.taskId] && (
-                <AgentRunView task={tasks[message.taskId]!} onSend={onAgentSend} />
-              )}
-            </Fragment>
-          ) : (
-            <AssistantMessage
-              key={message.id}
-              content={message.content}
-              reasoning={message.reasoning}
-              modelId={message.model?.modelId}
-              aborted={message.status === 'aborted'}
-              error={message.status === 'error' ? message.error : undefined}
-              onRetry={canRetry && message.id === last?.id ? onRetry : undefined}
-            />
-          ),
-        )}
-        {streaming && (
-          <AssistantMessage
-            content={streaming.content}
-            reasoning={streaming.reasoning}
-            modelId={streaming.model.modelId}
-            streaming
-          />
-        )}
+            ) : (
+              <AssistantMessage
+                content={message.content}
+                reasoning={message.reasoning}
+                modelId={message.model?.modelId}
+                aborted={message.status === 'aborted'}
+                error={message.status === 'error' ? message.error : undefined}
+                onRetry={canRetry && message.id === last?.id ? onRetry : undefined}
+              />
+            )}
+            {positions.get(message.id)?.map((task) => (
+              <TurnView key={task.id} task={task} replied={replied.has(task.id)} onSend={onAgentSend} />
+            ))}
+          </Fragment>
+        ))}
+        {pendingTaskId && !tasks[pendingTaskId] && <AssistantMessage content="" streaming />}
       </div>
     </div>
+  );
+}
+
+/** A turn in progress: its tool steps, then the reply as it streams in. */
+function TurnView({ task, replied, onSend }: { task: AgentTask; replied: boolean; onSend: (message: AgentClientMessage) => void }) {
+  const active = ACTIVE_STATUSES.includes(task.status);
+  const hasActions = task.steps.some((step) => step.actions.length > 0);
+  return (
+    <>
+      {hasActions && <AgentRunView task={task} onSend={onSend} />}
+      {!replied && (task.draft || (active && !task.waiting)) && (
+        // A finished turn without a stored reply was cut off (e.g. the extension restarted).
+        <AssistantMessage content={task.draft} modelId={task.model.modelId} streaming={active} aborted={!active && task.status !== 'done'} />
+      )}
+    </>
   );
 }
 
@@ -134,7 +156,7 @@ function AssistantMessage({ content, reasoning, modelId, streaming, aborted, err
           <div className="mt-2 whitespace-pre-wrap leading-relaxed">{reasoning}</div>
         </details>
       )}
-      {content && <Markdown text={content} />}
+      {content && <Markdown text={content} streaming={streaming} />}
       {streaming && !content && !reasoning && (
         <div className="flex gap-1 py-1.5" aria-label={t('message.thinking')}>
           {[0, 1, 2].map((i) => (

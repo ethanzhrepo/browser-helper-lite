@@ -3,21 +3,23 @@ import { browser, type Browser } from 'wxt/browser';
 import { z } from 'zod';
 import { AgentRunner } from '../agent/runtime';
 import {
+  ACTIVE_STATUSES,
   AGENT_PORT_NAME,
   type AgentClientMessage,
   type AgentServerMessage,
   type AgentTask,
   type OverlayMessage,
 } from '../agent/types';
-import { resolveLocale } from '../i18n/resources';
+import { LOCALES, resolveLocale, resources } from '../i18n/resources';
 import { createTranslator } from '../i18n/translator';
 import { pickSlot } from '../providers/resolve';
 import type { Locale, Settings } from '../shared/types';
-import { appendMessage, markInterruptedTasks, saveTask } from '../storage/db';
-import { loadSettings, updateSettings } from '../storage/settings';
+import { appendMessage, db, getMessages, getTasks, markInterruptedTasks, saveTask } from '../storage/db';
+import { loadSettings, updateSettings, watchSettings } from '../storage/settings';
 
 const runners = new Map<string, AgentRunner>();
 const ports = new Set<Browser.runtime.Port>();
+const saveTimers = new Map<string, ReturnType<typeof setTimeout>>();
 let keepalive: ReturnType<typeof setInterval> | undefined;
 
 /**
@@ -42,6 +44,26 @@ function broadcast(task: AgentTask) {
       ports.delete(port);
     }
   }
+}
+
+/** Streaming updates are frequent; the stored copy is written at most twice a second. */
+function persist(task: AgentTask, { now = false } = {}) {
+  const pending = saveTimers.get(task.id);
+  if (now) {
+    clearTimeout(pending);
+    saveTimers.delete(task.id);
+    return saveTask(structuredClone(task));
+  }
+  if (!pending) {
+    saveTimers.set(
+      task.id,
+      setTimeout(() => {
+        saveTimers.delete(task.id);
+        void saveTask(structuredClone(task));
+      }, 500),
+    );
+  }
+  return Promise.resolve();
 }
 
 function runnerForTab(tabId: number | undefined): AgentRunner | undefined {
@@ -75,15 +97,23 @@ async function notifyWaiting(task: AgentTask, settings: Settings, t: TFunction) 
     .catch(() => undefined);
 }
 
-async function finishTask(task: AgentTask, t: TFunction) {
+/** Stores the turn's reply: the final answer, or what was streamed before a stop or an error. */
+async function finishTask(runner: AgentRunner, t: TFunction) {
+  const task = runner.task;
   await browser.notifications?.clear(notificationId(task.id)).catch(() => undefined);
-  const summary =
-    task.result?.summary ??
-    (task.status === 'stopped' ? t('agent.stoppedSummary') : t('agent.failedSummary', { message: task.error?.message ?? '' }));
+  const partial = task.draft.trim();
+  const content =
+    task.status === 'done'
+      ? (task.result?.summary ?? '')
+      : task.status === 'stopped'
+        ? partial || (task.steps.length > 0 ? t('agent.stoppedSummary') : '')
+        : partial;
+  task.draft = '';
   await appendMessage({
     conversationId: task.conversationId,
     role: 'assistant',
-    content: summary,
+    content,
+    reasoning: runner.reasoning || undefined,
     status: task.status === 'failed' ? 'error' : task.status === 'stopped' ? 'aborted' : 'done',
     error: task.status === 'failed' ? task.error : undefined,
     model: task.model,
@@ -97,28 +127,32 @@ async function startTask(message: Extract<AgentClientMessage, { type: 'start' }>
   const settings = await loadSettings();
   const locale: Locale = resolveLocale(settings.language, browser.i18n.getUILanguage());
   const t = await createTranslator(locale);
+  const history = await getMessages(message.conversationId);
+  const tabId =
+    message.tabId ?? (await browser.tabs.query({ active: true, lastFocusedWindow: true }).catch(() => []))[0]?.id ?? -1;
   const now = Date.now();
-  const model = pickSlot(settings, ['agent', 'chat']);
   const task: AgentTask = {
     id: message.taskId,
     conversationId: message.conversationId,
-    goal: message.goal,
+    goal: (history.findLast((m) => m.role === 'user')?.content ?? '').slice(0, 300),
+    anchorMessageId: message.anchorMessageId,
     status: 'running',
     steps: [],
+    draft: '',
     usage: {},
-    driver: 'dom',
-    model: model ?? { connectionId: '', modelId: '' },
-    startTabId: message.tabId,
+    model: pickSlot(settings, ['chat']) ?? { connectionId: '', modelId: '' },
+    mode: settings.agent.mode,
+    startTabId: tabId,
     maxSteps: settings.agent.maxSteps,
     createdAt: now,
     updatedAt: now,
   };
 
-  const runner = new AgentRunner(task, settings, locale, {
+  const runner = new AgentRunner(task, settings, locale, history, {
     t,
     update: (next) => {
       broadcast(next);
-      void saveTask(structuredClone(next));
+      void persist(next);
     },
     onWaiting: (next) => void notifyWaiting(next, settings, t),
     saveSitePolicy: async (host, policy) => {
@@ -129,7 +163,9 @@ async function startTask(message: Extract<AgentClientMessage, { type: 'start' }>
   updateKeepalive();
   try {
     await runner.run();
-    await finishTask(runner.task, t);
+    await finishTask(runner, t);
+    await persist(runner.task, { now: true });
+    // Sent after the reply is stored, so the panel can reload it.
     broadcast(runner.task);
   } finally {
     runners.delete(task.id);
@@ -137,16 +173,47 @@ async function startTask(message: Extract<AgentClientMessage, { type: 'start' }>
   }
 }
 
+/** Titles our tab groups may have, in every UI language. */
+const GROUP_TITLES = new Set(LOCALES.map((locale) => resources[locale].translation.agent.groupTitle));
+
+/** A new chat puts the tabs grouped by this conversation back as they were (M1.5 A4). */
+async function releaseTabs(conversationId: string) {
+  const tasks = await getTasks(conversationId);
+  if (tasks.some((task) => ACTIVE_STATUSES.includes(task.status))) return;
+  for (const task of tasks) {
+    for (const tabId of task.groupedTabs ?? []) {
+      const tab = await browser.tabs.get(tabId).catch(() => undefined);
+      if (!tab || tab.groupId === undefined || tab.groupId < 0) continue;
+      const group = await browser.tabGroups.get(tab.groupId).catch(() => undefined);
+      if (group?.title && GROUP_TITLES.has(group.title)) await browser.tabs.ungroup(tabId).catch(() => undefined);
+    }
+  }
+}
+
+async function closeTabs(taskId: string) {
+  const task = runners.get(taskId)?.task ?? (await db.tasks.get(taskId));
+  if (!task) return;
+  const tabs = (task.openedTabs ?? []).filter((id) => id !== task.startTabId);
+  await Promise.all(tabs.map((id) => browser.tabs.remove(id).catch(() => undefined)));
+}
+
 function handleClientMessage(message: AgentClientMessage, port: Browser.runtime.Port) {
-  if (message.type === 'start') {
-    void startTask(message);
-    return;
+  switch (message.type) {
+    case 'start':
+      void startTask(message);
+      return;
+    case 'subscribe':
+      for (const runner of runners.values()) port.postMessage({ type: 'task', task: runner.task } satisfies AgentServerMessage);
+      return;
+    case 'release':
+      void releaseTabs(message.conversationId);
+      return;
+    case 'closeTabs':
+      void closeTabs(message.taskId);
+      return;
+    case 'ping':
+      return;
   }
-  if (message.type === 'subscribe') {
-    for (const runner of runners.values()) port.postMessage({ type: 'task', task: runner.task } satisfies AgentServerMessage);
-    return;
-  }
-  if (message.type === 'ping') return;
   const runner = runners.get(message.taskId);
   if (!runner) return;
   switch (message.type) {
@@ -178,6 +245,11 @@ export function registerAgentService(): void {
     ports.add(port);
     port.onDisconnect.addListener(() => ports.delete(port));
     port.onMessage.addListener((message: AgentClientMessage) => handleClientMessage(message, port));
+  });
+
+  // Switching the mode (or a site policy) applies to running turns at once.
+  watchSettings((settings) => {
+    for (const runner of runners.values()) runner.applySettings(settings);
   });
 
   browser.runtime.onMessage.addListener((message: OverlayMessage, sender) => {

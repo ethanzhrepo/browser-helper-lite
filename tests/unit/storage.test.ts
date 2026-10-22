@@ -10,7 +10,17 @@ import {
   getMessages,
   listConversations,
 } from '../../src/storage/db';
-import { deleteConnection, getApiKey, loadSettings, saveConnection, updateSettings } from '../../src/storage/settings';
+import {
+  deleteConnection,
+  getApiKey,
+  getSearchKey,
+  loadSettings,
+  saveConnection,
+  saveSearchKey,
+  toggleFavoriteModel,
+  updateSettings,
+  withDefaults,
+} from '../../src/storage/settings';
 
 const connection = (id: string): Connection => ({
   id,
@@ -53,6 +63,44 @@ describe('settings and secrets', () => {
     expect(settings.slots.chat).toBeUndefined();
     expect(settings.slots.fast?.connectionId).toBe('b');
     expect(await getApiKey('a')).toBeUndefined();
+  });
+});
+
+describe('settings defaults and migration', () => {
+  beforeEach(() => fakeBrowser.reset());
+
+  it('defaults to Auto mode, browser search and Chrome speech recognition', async () => {
+    const settings = await loadSettings();
+    expect(settings.agent.mode).toBe('auto');
+    expect(settings.search.provider).toBe('browser');
+    expect(settings.voice.engine).toBe('browser');
+  });
+
+  it('moves the M1 search engine out of the agent settings and drops the agent slot', () => {
+    const migrated = withDefaults({
+      agent: { useCdp: false, maxSteps: 20, notifications: true, searchEngine: 'custom', customSearchUrl: 'https://s.example/?q=%s' },
+      slots: { chat: { connectionId: 'a', modelId: 'm' }, agent: { connectionId: 'b', modelId: 'n' } },
+    } as never);
+    expect(migrated.agent).toEqual({ mode: 'auto', useCdp: false, maxSteps: 20, notifications: true });
+    expect(migrated.search.engine).toBe('custom');
+    expect(migrated.search.customUrl).toBe('https://s.example/?q=%s');
+    expect(Object.keys(migrated.slots)).toEqual(['chat']);
+  });
+
+  it('stores search keys with the other secrets, outside the settings', async () => {
+    await saveSearchKey('tavily', ' tvly-key ');
+    expect(await getSearchKey('tavily')).toBe('tvly-key');
+    expect(JSON.stringify(await loadSettings())).not.toContain('tvly-key');
+    await saveSearchKey('tavily', '');
+    expect(await getSearchKey('tavily')).toBeUndefined();
+  });
+
+  it('stars and unstars models', async () => {
+    await saveConnection(connection('a'));
+    await toggleFavoriteModel('a', 'gpt-5-mini');
+    expect((await loadSettings()).connections[0]!.favoriteModels).toEqual(['gpt-5-mini']);
+    await toggleFavoriteModel('a', 'gpt-5-mini');
+    expect((await loadSettings()).connections[0]!.favoriteModels).toEqual([]);
   });
 });
 

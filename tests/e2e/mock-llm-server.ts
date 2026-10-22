@@ -24,14 +24,21 @@ export const TEST_PAGE_HTML = `<!doctype html>
 <p id="selectable">Roaming in the US is included with Plan B.</p>
 </article></main></body></html>`;
 
-type Content = string | { type: string; text?: string; image_url?: { url: string } }[];
+type Content = string | null | { type: string; text?: string; image_url?: { url: string } }[];
+
+export interface ChatMessage {
+  role: string;
+  content: Content;
+  tool_calls?: { id: string; function: { name: string; arguments: string } }[];
+  tool_call_id?: string;
+}
 
 export interface ChatRequest {
   model: string;
   stream?: boolean;
-  tools?: unknown[];
+  tools?: { function: { name: string } }[];
   tool_choice?: unknown;
-  messages: { role: string; content: Content }[];
+  messages: ChatMessage[];
 }
 
 export const SHOP_HTML = `<!doctype html>
@@ -100,83 +107,142 @@ interface ToolCall {
   args: Record<string, unknown>;
 }
 
-const textOf = (content: Content | undefined): string =>
-  typeof content === 'string' ? content : (content ?? []).map((part) => part.text ?? '').join('\n');
+/** The assistant's next move: text to stream, then tool calls (none = final answer). */
+interface Reply {
+  text: string;
+  calls: ToolCall[];
+}
 
-const section = (prompt: string, name: string) => new RegExp(`<${name}>\\n([\\s\\S]*?)\\n</${name}>`).exec(prompt)?.[1] ?? '';
+export const textOf = (content: Content | undefined): string =>
+  typeof content === 'string' ? content : (content ?? []).map((part) => part.text ?? '').join('\n');
 
 function indexOf(state: string, pattern: RegExp): number {
   const match = pattern.exec(state);
-  if (!match) throw new Error(`Mock agent: no element matching ${pattern} in state:\n${state}`);
+  if (!match) throw new Error(`Mock agent: no element matching ${pattern} in view:\n${state}`);
   return Number(match[1]);
 }
 
-/** Scripted agent: picks the next tool call from the task, history and state. */
-export function scriptedAgent(prompt: string): { thought: string; calls: ToolCall[] } {
-  const task = section(prompt, 'task');
-  const history = section(prompt, 'history');
-  const state = section(prompt, 'state');
-  const call = (thought: string, name: string, args: Record<string, unknown> = {}) => ({ thought, calls: [{ name, args }] });
-
-  if (task.includes('TEST-SHOP')) {
-    if (!history.includes('- web_search')) return call('I will check reviews first.', 'web_search', { query: 'best usb-c cable' });
-    if (!history.includes('- type ')) {
-      return call('Searching the shop.', 'type', { index: indexOf(state, /\[(\d+)\]<input[^\n]*placeholder="Search products"/), text: 'usb-c cable', submit: true });
+/** The request, the tools used in this turn so far (`- name {args} → result`) and the latest page view. */
+export function readTurn(messages: ChatMessage[]) {
+  const lastUser = messages.findLastIndex((m) => m.role === 'user' && !textOf(m.content).startsWith('You have reached the step limit'));
+  const request = textOf(messages[lastUser]?.content);
+  const names = new Map<string, string>();
+  const lines: string[] = [];
+  const results: string[] = [];
+  let view = '';
+  for (const message of messages.slice(lastUser + 1)) {
+    for (const call of message.tool_calls ?? []) {
+      names.set(call.id, call.function.name);
+      lines.push(`- ${call.function.name} ${call.function.arguments}`);
     }
-    if (!history.includes('- extract ')) return call('Reading prices.', 'extract', { query: 'product names and prices' });
-    if (!history.includes('- look ')) return call('Checking the pictures.', 'look', { question: 'Which cable looks braided?' });
-    if (!/- click \[\d+\] button "Add Cable B to cart" → ok/.test(history)) {
-      return call('Adding the cheapest braided cable.', 'click', { index: indexOf(state, /\[(\d+)\]<button[^\n]*aria-label="Add Cable B to cart"/) });
+    if (message.role === 'tool') {
+      const result = textOf(message.content);
+      results.push(result);
+      const name = names.get(message.tool_call_id ?? '') ?? '?';
+      const index = lines.findLastIndex((line) => line.startsWith(`- ${name} `) && !line.includes(' → '));
+      const summary = result.split('\n')[0] ?? '';
+      if (index >= 0) lines[index] += ` → ${summary}`;
+      if (result.includes('<page_view>')) view = result;
     }
-    return call('Done.', 'done', {
-      success: true,
-      summary: 'Added **Cable B** ($5.49) to the cart.\n\n| Cable | Price |\n|---|---|\n| Cable A | $9.99 |\n| Cable B | $5.49 |',
-    });
   }
-
-  if (task.includes('TEST-PARK')) {
-    if (!history.includes('- ask_user')) return call('I need a date.', 'ask_user', { question: 'Which date would you like: Nov 2 or Nov 3?' });
-    const answer = /The user answered: (.+)/.exec(history)?.[1]?.trim() ?? 'Nov 3';
-    if (!history.includes('- select_option')) {
-      return call('Choosing the date.', 'select_option', { index: indexOf(state, /\[(\d+)\]<select/), option: answer });
-    }
-    if (!/button "Continue" → ok/.test(history)) {
-      return call('Continuing.', 'click', { index: indexOf(state, /\[(\d+)\]<button[^\n]*>Continue<\/button>/) });
-    }
-    if (!history.includes('rejected')) {
-      return call('Trying to pay.', 'click', { index: indexOf(state, /\[(\d+)\]<button[^\n]*>Pay now<\/button>/) });
-    }
-    return call('Stopping before payment.', 'done', {
-      success: true,
-      summary: `Your day pass for **${answer}** costs $25. I stopped at the payment step; please pay yourself.`,
-    });
-  }
-
-  // TEST-STOP and anything else: keep waiting until stopped.
-  return call('Waiting.', 'wait', { seconds: 1 });
+  return { request, history: lines.join('\n'), results: results.join('\n'), view };
 }
 
-function completion(content: string | null, calls: ToolCall[] = []) {
+const say = (text: string, name?: string, args: Record<string, unknown> = {}): Reply => ({ text, calls: name ? [{ name, args }] : [] });
+
+/** Scripted assistant: picks the next step from the request, the tools used so far and the view. */
+export function scriptedAssistant(messages: ChatMessage[]): Reply {
+  const { request, history, results, view } = readTurn(messages);
+  const used = (tool: string) => history.includes(`- ${tool} `);
+
+  if (request.includes('TEST-SHOP')) {
+    if (!used('web_search')) return say('I will check reviews first.', 'web_search', { query: 'best usb-c cable' });
+    if (!used('view_page')) return say('Looking at the shop.', 'view_page');
+    if (!used('type')) {
+      return say('Searching the shop.', 'type', { index: indexOf(view, /\[(\d+)\]<input[^\n]*placeholder="Search products"/), text: 'usb-c cable', submit: true });
+    }
+    if (!used('extract')) return say('Reading prices.', 'extract', { query: 'product names and prices' });
+    if (!used('look')) return say('Checking the pictures.', 'look', { question: 'Which cable looks braided?' });
+    if (!/- click \S+ → ok/.test(history)) {
+      return say('Adding the cheapest braided cable.', 'click', { index: indexOf(view, /\[(\d+)\]<button[^\n]*aria-label="Add Cable B to cart"/) });
+    }
+    return say('Added **Cable B** ($5.49) to the cart.\n\n| Cable | Price |\n|---|---|\n| Cable A | $9.99 |\n| Cable B | $5.49 |');
+  }
+
+  if (request.includes('TEST-PARK')) {
+    if (!used('view_page')) return say('Opening the booking page.', 'view_page');
+    if (!used('ask_user')) return say('I need a date.', 'ask_user', { question: 'Which date would you like: Nov 2 or Nov 3?' });
+    const answer = /The user answered: (.+)/.exec(history)?.[1]?.trim() ?? 'Nov 3';
+    if (!used('select_option')) return say('Choosing the date.', 'select_option', { index: indexOf(view, /\[(\d+)\]<select/), option: answer });
+    if (!/- click \S+ → ok/.test(history)) {
+      return say('Continuing.', 'click', { index: indexOf(view, /\[(\d+)\]<button[^\n]*>Continue<\/button>/) });
+    }
+    if (!history.includes('rejected')) return say('Trying to pay.', 'click', { index: indexOf(view, /\[(\d+)\]<button[^\n]*>Pay now<\/button>/) });
+    return say(`Your day pass for **${answer}** costs $25. I stopped at the payment step; please pay yourself.`);
+  }
+
+  if (request.includes('TEST-QUERY')) {
+    if (!used('view_page')) return say('Looking at the shop.', 'view_page');
+    if (!used('click')) return say('Searching.', 'click', { index: indexOf(view, /\[(\d+)\]<button[^\n]*>Search<\/button>/) });
+    return say('Query mode is on, so I did not press the button.');
+  }
+
+  if (request.includes('TEST-STOP')) return say('Waiting.', 'wait', { seconds: 1 });
+
+  if (request.includes('TEST-SEARCH')) {
+    if (!used('web_search')) return say('Searching.', 'web_search', { query: 'braided cable durability' });
+    const top = /1\. (.+?) —/.exec(results)?.[1] ?? 'nothing';
+    return say(`The top result is **${top}**.`);
+  }
+
+  if (request.includes('TEST-RICH')) {
+    return say(
+      [
+        'Here is the flow:\n\n```mermaid\nflowchart LR\n  A[Ask] --> B{Tools?}\n  B -->|yes| C[Act]\n  B -->|no| D[Answer]\n```\n\n',
+        'Energy: $E = mc^2$, and\n\n$$\\sum_{i=1}^{n} i = \\frac{n(n+1)}{2}$$\n\n',
+        '```ts\nconst answer: number = 42;\nconsole.log(`answer ${answer}`);\n```\n',
+      ].join(''),
+    );
+  }
+
+  // Plain questions: attached content is enough; otherwise read the page first.
+  const typed = request.replace(/<current_tab[^>]*\/>/g, '');
+  if (!typed.includes('<context ') && !used('read_page') && /page|plan/i.test(typed)) return say('', 'read_page');
+  return say(MOCK_REPLY.join(''));
+}
+
+function completion(content: string | null) {
   return JSON.stringify({
     id: 'c1',
     object: 'chat.completion',
     created: 1,
     model: MOCK_MODEL,
-    choices: [
-      {
-        index: 0,
-        message: {
-          role: 'assistant',
-          content,
-          ...(calls.length > 0
-            ? { tool_calls: calls.map((c, i) => ({ id: `call_${Date.now()}_${i}`, type: 'function', function: { name: c.name, arguments: JSON.stringify(c.args) } })) }
-            : {}),
-        },
-        finish_reason: calls.length > 0 ? 'tool_calls' : 'stop',
-      },
-    ],
+    choices: [{ index: 0, message: { role: 'assistant', content }, finish_reason: 'stop' }],
     usage: { prompt_tokens: 120, completion_tokens: 20, total_tokens: 140 },
   });
+}
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/** Streams a reply as OpenAI-compatible SSE: text in pieces, then tool calls. */
+async function streamReply(res: import('node:http').ServerResponse, reply: Reply) {
+  res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' });
+  const chunk = (delta: object, finish: string | null = null) =>
+    `data: ${JSON.stringify({ id: 'c1', object: 'chat.completion.chunk', created: 1, model: MOCK_MODEL, choices: [{ index: 0, delta, finish_reason: finish }] })}\n\n`;
+  res.write(chunk({ role: 'assistant', content: '' }));
+  const pieces = reply.text.match(/[\s\S]{1,24}/g) ?? [];
+  for (const piece of pieces) {
+    res.write(chunk({ content: piece }));
+    await sleep(15);
+  }
+  reply.calls.forEach((call, index) => {
+    const id = `call_${Date.now()}_${index}`;
+    res.write(chunk({ tool_calls: [{ index, id, type: 'function', function: { name: call.name, arguments: '' } }] }));
+    res.write(chunk({ tool_calls: [{ index, function: { arguments: JSON.stringify(call.args) } }] }));
+  });
+  res.write(chunk({}, reply.calls.length > 0 ? 'tool_calls' : 'stop'));
+  res.write(`data: ${JSON.stringify({ id: 'c1', object: 'chat.completion.chunk', created: 1, model: MOCK_MODEL, choices: [], usage: { prompt_tokens: 42, completion_tokens: 5, total_tokens: 47 } })}\n\n`);
+  res.end('data: [DONE]\n\n');
 }
 
 /**
@@ -186,20 +252,23 @@ function completion(content: string | null, calls: ToolCall[] = []) {
  */
 export async function startMockServer() {
   const chatRequests: ChatRequest[] = [];
-  const agentRequests: ChatRequest[] = [];
   const extractRequests: ChatRequest[] = [];
   const lookRequests: ChatRequest[] = [];
+  const searchRequests: { query: string; count?: number }[] = [];
+  const transcriptions: { bytes: number; contentType: string }[] = [];
 
   const readBody = (req: IncomingMessage) =>
-    new Promise<string>((resolve) => {
-      let body = '';
-      req.on('data', (chunk) => (body += chunk));
-      req.on('end', () => resolve(body));
+    new Promise<Buffer>((resolve) => {
+      const chunks: Buffer[] = [];
+      req.on('data', (chunk: Buffer) => chunks.push(chunk));
+      req.on('end', () => resolve(Buffer.concat(chunks)));
     });
 
   const server: Server = createServer(async (req, res) => {
     const authorized = req.headers.authorization === `Bearer ${MOCK_KEY}`;
     const html = (body: string) => res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }).end(body);
+    const json = (body: unknown, status = 200) => res.writeHead(status, { 'content-type': 'application/json' }).end(JSON.stringify(body));
+    const unauthorized = () => json({ error: { message: 'Invalid API key' } }, 401);
     if (req.url === '/page.html') return void html(TEST_PAGE_HTML);
     if (req.url === '/shop.html') return void html(SHOP_HTML);
     if (req.url === '/park.html') return void html(PARK_HTML);
@@ -209,40 +278,41 @@ export async function startMockServer() {
       return void html(searchHtml(`http://${req.headers.host}`, query));
     }
     if (req.url === '/v1/models' && req.method === 'GET') {
-      if (!authorized) return void res.writeHead(401, { 'content-type': 'application/json' }).end('{"error":{"message":"Invalid API key"}}');
-      res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ data: [{ id: MOCK_MODEL }] }));
-      return;
+      if (!authorized) return void unauthorized();
+      return void json({ data: [{ id: MOCK_MODEL }] });
+    }
+    // DeepSeek's search tool.
+    if (req.url === '/v1/tools/search' && req.method === 'POST') {
+      if (!authorized) return void unauthorized();
+      const body = JSON.parse((await readBody(req)).toString()) as { query: string; count?: number };
+      searchRequests.push(body);
+      return void json({
+        results: [
+          { title: 'Braided cables last longer – Lab test', url: `http://${req.headers.host}/review.html`, snippet: 'short', summary: 'Braided cables survived 10x more bends.', rerank_score: 2.4 },
+          { title: 'Cable buying guide', url: `http://${req.headers.host}/shop.html`, snippet: 'Cables from $5.' },
+        ],
+      });
+    }
+    if (req.url === '/v1/audio/transcriptions' && req.method === 'POST') {
+      if (!authorized) return void unauthorized();
+      const body = await readBody(req);
+      transcriptions.push({ bytes: body.length, contentType: String(req.headers['content-type']) });
+      return void json({ text: 'What does this page say about roaming?' });
     }
     if (req.url === '/v1/chat/completions' && req.method === 'POST') {
-      if (!authorized) return void res.writeHead(401, { 'content-type': 'application/json' }).end('{"error":{"message":"Invalid API key"}}');
-      const body = JSON.parse(await readBody(req)) as ChatRequest;
-      const json = (text: string) => res.writeHead(200, { 'content-type': 'application/json' }).end(text);
-      if (body.tools) {
-        agentRequests.push(body);
-        const { thought, calls } = scriptedAgent(textOf(body.messages.at(-1)?.content));
-        return void json(completion(thought, calls));
-      }
+      if (!authorized) return void unauthorized();
+      const body = JSON.parse((await readBody(req)).toString()) as ChatRequest;
+      if (body.tools && body.model === 'mock-notools') return void json({ error: { message: 'tools are not supported by this model' } }, 400);
       if (textOf(body.messages[0]?.content).includes('You extract information')) {
         extractRequests.push(body);
-        return void json(completion('Cable A: $9.99 (plain white). Cable B: $5.49 (braided black).'));
+        return void res.writeHead(200, { 'content-type': 'application/json' }).end(completion('Cable A: $9.99 (plain white). Cable B: $5.49 (braided black).'));
       }
       if (body.messages.some((m) => Array.isArray(m.content) && m.content.some((part) => part.type === 'image_url'))) {
         lookRequests.push(body);
-        return void json(completion('The product with the braided black cable is Cable B.'));
+        return void res.writeHead(200, { 'content-type': 'application/json' }).end(completion('The product with the braided black cable is Cable B.'));
       }
       chatRequests.push(body);
-      res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' });
-      const chunk = (delta: object, finish: string | null = null) =>
-        `data: ${JSON.stringify({ id: 'c1', object: 'chat.completion.chunk', created: 1, model: MOCK_MODEL, choices: [{ index: 0, delta, finish_reason: finish }] })}\n\n`;
-      res.write(chunk({ role: 'assistant', content: '' }));
-      for (const piece of MOCK_REPLY) {
-        res.write(chunk({ content: piece }));
-        await new Promise((resolve) => setTimeout(resolve, 30));
-      }
-      res.write(chunk({}, 'stop'));
-      res.write(`data: ${JSON.stringify({ id: 'c1', object: 'chat.completion.chunk', created: 1, model: MOCK_MODEL, choices: [], usage: { prompt_tokens: 42, completion_tokens: 5, total_tokens: 47 } })}\n\n`);
-      res.end('data: [DONE]\n\n');
-      return;
+      return void (await streamReply(res, body.tools ? scriptedAssistant(body.messages) : { text: MOCK_REPLY.join(''), calls: [] }));
     }
     res.writeHead(404).end();
   });
@@ -252,9 +322,10 @@ export async function startMockServer() {
   return {
     origin: `http://127.0.0.1:${port}`,
     chatRequests,
-    agentRequests,
     extractRequests,
     lookRequests,
+    searchRequests,
+    transcriptions,
     close: () => new Promise<void>((resolve) => server.close(() => resolve())),
   };
 }

@@ -41,11 +41,30 @@ type ApiReturn<M extends ApiMethod> = ReturnType<PageAgentApi[M]>;
  * The agent's hands in the browser: which tab it works in, how it reaches the
  * page script, and which driver performs input (§7.4).
  */
+export type GroupStatus = 'running' | 'waiting' | 'finished';
+
+const GROUP_COLORS: Record<GroupStatus, `${Browser.tabGroups.Color}`> = {
+  running: 'green',
+  waiting: 'yellow',
+  finished: 'grey',
+};
+
+const NO_GROUP = -1;
+
+/**
+ * The agent's hands in the browser: which tab it works in, how it reaches the
+ * page script, and which driver performs input (§7.4).
+ */
 export class AgentBrowser {
   currentTabId: number;
   readonly tabs = new Set<number>();
+  /** Tabs this turn moved into its group, and tabs it opened. */
+  readonly groupedTabs = new Set<number>();
+  readonly openedTabs = new Set<number>();
   private groupId: number | undefined;
+  private groupStatus: GroupStatus | undefined;
   private cdp: CdpDriver | undefined;
+  private usedInput = false;
   private overlay: OverlayState = { mode: 'hidden', message: '', stopLabel: '' };
 
   constructor(
@@ -56,24 +75,22 @@ export class AgentBrowser {
     this.tabs.add(startTabId);
   }
 
-  get driver(): 'cdp' | 'dom' {
+  /** The input driver, once the turn has operated a page. */
+  get driver(): 'cdp' | 'dom' | undefined {
+    if (!this.usedInput) return undefined;
     return this.cdp ? 'cdp' : 'dom';
   }
 
   /**
-   * Prefers the CDP driver. Attaching happens on first use per tab, so a task
-   * may start on a page Chrome protects (e.g. a new tab) and navigate away.
+   * Prefers the CDP driver. The debugger attaches on the first input event, so
+   * turns that only read never show Chrome's debugging bar.
    */
-  async init(useCdp: boolean): Promise<void> {
+  init(useCdp: boolean): void {
     if (!useCdp || !browser.debugger) return;
     this.cdp = new CdpDriver((_tabId, reason) => {
       this.cdp = undefined;
       this.options.onDebuggerDetached(reason);
     });
-    const tab = await browser.tabs.get(this.currentTabId).catch(() => undefined);
-    if (tab?.url && /^https?:/.test(tab.url)) {
-      await this.cdp.attach(this.currentTabId).catch((error: unknown) => this.dropCdp(error));
-    }
   }
 
   private dropCdp(error: unknown) {
@@ -84,6 +101,7 @@ export class AgentBrowser {
 
   /** Runs input through CDP when available; if CDP fails, falls back to DOM events for good. */
   private async input(viaCdp: (cdp: CdpDriver) => Promise<void>, viaDom: () => Promise<void>): Promise<void> {
+    this.usedInput = true;
     const cdp = this.cdp;
     if (cdp) {
       try {
@@ -178,19 +196,58 @@ export class AgentBrowser {
     return infos;
   }
 
-  private async adopt(tabId: number): Promise<void> {
-    this.tabs.add(tabId);
+  /**
+   * Puts a tab into the turn's tab group (M1.5 A4). A tab already in one of
+   * the user's groups stays there; an earlier turn's group is reused.
+   */
+  private async joinGroup(tabId: number, { respectUserGroups }: { respectUserGroups: boolean }): Promise<void> {
     try {
-      // Tabs the agent opens are kept together in one group.
+      const tab = await browser.tabs.get(tabId);
+      if (tab.groupId !== undefined && tab.groupId !== NO_GROUP) {
+        if (tab.groupId === this.groupId) return;
+        const group = await browser.tabGroups.get(tab.groupId);
+        if (group.title === this.options.groupTitle) {
+          this.groupId ??= tab.groupId;
+          if (this.groupId === tab.groupId) return void (await this.paintGroup());
+        }
+        if (respectUserGroups) return;
+      }
       if (this.groupId === undefined) {
-        this.groupId = await browser.tabs.group({ tabIds: [tabId] });
-        await browser.tabGroups.update(this.groupId, { title: this.options.groupTitle, color: 'purple' });
+        this.groupId = await browser.tabs.group({ tabIds: [tabId], createProperties: { windowId: tab.windowId } });
       } else {
         await browser.tabs.group({ groupId: this.groupId, tabIds: [tabId] });
       }
+      this.groupedTabs.add(tabId);
+      await this.paintGroup();
     } catch {
-      // Grouping is cosmetic.
+      // Grouping is cosmetic (pinned tabs, for one, cannot be grouped).
     }
+  }
+
+  private async paintGroup(): Promise<void> {
+    if (this.groupId === undefined) return;
+    await browser.tabGroups
+      .update(this.groupId, { title: this.options.groupTitle, color: GROUP_COLORS[this.groupStatus ?? 'running'] })
+      .catch(() => undefined);
+  }
+
+  /** Called when the turn first operates a page: groups the tab it works in. */
+  async engage(): Promise<void> {
+    await this.joinGroup(this.currentTabId, { respectUserGroups: true });
+  }
+
+  /** Group color shows the turn's state: green working, yellow needs you, grey finished. */
+  async setGroupStatus(status: GroupStatus): Promise<void> {
+    if (status === this.groupStatus) return;
+    this.groupStatus = status;
+    await this.paintGroup();
+  }
+
+  private async adopt(tabId: number): Promise<void> {
+    this.tabs.add(tabId);
+    this.openedTabs.add(tabId);
+    // Tabs the agent opens always go into its group.
+    await this.joinGroup(tabId, { respectUserGroups: false });
   }
 
   async switchTo(tabId: number, activate = true): Promise<void> {
@@ -202,7 +259,8 @@ export class AgentBrowser {
     await this.refreshOverlay();
   }
 
-  async openTab(url: string, { active = true } = {}): Promise<number> {
+  /** Opens a tab for the agent. A `scratch` tab (e.g. for a search) is closed again soon and not grouped. */
+  async openTab(url: string, { active = true, scratch = false } = {}): Promise<number> {
     const opener = await browser.tabs.get(this.currentTabId).catch(() => undefined);
     const tab = await browser.tabs.create({
       url,
@@ -210,7 +268,8 @@ export class AgentBrowser {
       openerTabId: opener?.id,
       index: opener ? opener.index + 1 : undefined,
     });
-    await this.adopt(tab.id!);
+    if (scratch) this.tabs.add(tab.id!);
+    else await this.adopt(tab.id!);
     return tab.id!;
   }
 
@@ -341,15 +400,22 @@ export class AgentBrowser {
     await this.call(tabId, 'highlight', true).catch(() => undefined);
     await sleep(150);
     try {
-      if (this.cdp) {
+      // Only reuse an attached debugger; attaching just for a screenshot would show Chrome's debugging bar.
+      if (this.cdp && this.usedInput) {
         try {
           return await this.cdp.screenshot(tabId);
         } catch (error) {
           this.dropCdp(error);
         }
       }
-      const dataUrl = await browser.tabs.captureVisibleTab(tab!.windowId, { format: 'jpeg', quality: 70 });
-      return dataUrl.slice(dataUrl.indexOf(',') + 1);
+      try {
+        const dataUrl = await browser.tabs.captureVisibleTab(tab!.windowId, { format: 'jpeg', quality: 70 });
+        return dataUrl.slice(dataUrl.indexOf(',') + 1);
+      } catch (error) {
+        // captureVisibleTab needs access to all sites; the debugger works with a single site.
+        if (this.cdp) return await this.cdp.screenshot(tabId);
+        throw error;
+      }
     } finally {
       await this.call(tabId, 'highlight', false).catch(() => undefined);
     }

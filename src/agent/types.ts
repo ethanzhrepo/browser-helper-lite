@@ -1,4 +1,4 @@
-import type { ErrorInfo, ModelRef, Usage } from '../shared/types';
+import type { AgentMode, ErrorInfo, ModelRef, Usage } from '../shared/types';
 
 /** 0 read-only · 1 reversible · 2 has effects · 3 high risk (§8.1). */
 export type RiskLevel = 0 | 1 | 2 | 3;
@@ -21,6 +21,7 @@ export interface AgentAction {
   result?: string;
 }
 
+/** One model call that used tools: the text it wrote first, then its tool calls. */
 export interface AgentStep {
   index: number;
   url?: string;
@@ -36,24 +37,41 @@ export type WaitReason =
   | { kind: 'handoff'; reason: HandoffReason; message?: string; site: string }
   | { kind: 'permission'; origin: string; url: string };
 
-export type RiskReason = 'payment' | 'destructive' | 'submit' | 'confirmEach' | 'sensitiveField';
+export type RiskReason = 'payment' | 'destructive' | 'submit' | 'confirmEach' | 'manualMode' | 'sensitiveField';
 
 export type PauseReason = 'user' | 'interference' | 'debuggerDetached';
 
+/**
+ * One assistant turn: the reply to a user message. It may answer right away
+ * or use tools (read the page, search, operate the browser) first (M1.5).
+ */
 export interface AgentTask {
   id: string;
   conversationId: string;
+  /** The user's request, for notifications. */
   goal: string;
+  /** The turn's view goes after this message (the request, or the last message when retrying). */
+  anchorMessageId: string;
   status: AgentStatus;
   steps: AgentStep[];
+  /** Text of the model call in progress, streamed to the panel. */
+  draft: string;
   waiting?: WaitReason;
   pauseReason?: PauseReason;
   result?: { success: boolean; summary: string };
   error?: ErrorInfo;
   usage: Usage;
-  driver: 'cdp' | 'dom';
+  /** Input driver, set once the turn has operated a page. */
+  driver?: 'cdp' | 'dom';
   model: ModelRef;
+  mode: AgentMode;
+  /** The model rejected tools, so this turn is plain chat. */
+  chatOnly?: boolean;
   startTabId: number;
+  /** Tabs this turn moved into its tab group (restored on a new chat). */
+  groupedTabs?: number[];
+  /** Tabs this turn opened. */
+  openedTabs?: number[];
   maxSteps: number;
   createdAt: number;
   updatedAt: number;
@@ -71,7 +89,10 @@ export type WaitResponse =
 export const AGENT_PORT_NAME = 'agent';
 
 export type AgentClientMessage =
-  | { type: 'start'; taskId: string; conversationId: string; goal: string; tabId: number }
+  | { type: 'start'; taskId: string; conversationId: string; anchorMessageId: string; tabId?: number }
+  /** A new chat: put tabs grouped by this conversation's turns back as they were. */
+  | { type: 'release'; conversationId: string }
+  | { type: 'closeTabs'; taskId: string }
   | { type: 'subscribe' }
   | { type: 'pause'; taskId: string }
   | { type: 'resume'; taskId: string }

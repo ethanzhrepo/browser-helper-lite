@@ -1,4 +1,4 @@
-import { Bot, Eye, MessageSquare, Zap, type LucideIcon } from 'lucide-react';
+import { AudioLines, Eye, MessageSquare, Zap, type LucideIcon } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { suggestChatModel } from '../../src/providers/suggest';
@@ -6,13 +6,13 @@ import type { Capability, Settings, SlotAssignment } from '../../src/shared/type
 import { updateSettings } from '../../src/storage/settings';
 import { Card, Field, IconBadge, inputClass, Section } from './Section';
 
-const SLOTS: Capability[] = ['chat', 'fast', 'agent', 'vision'];
+const SLOTS: Capability[] = ['chat', 'fast', 'vision', 'stt'];
 
 const SLOT_ICONS: Record<Capability, LucideIcon> = {
   chat: MessageSquare,
   fast: Zap,
-  agent: Bot,
   vision: Eye,
+  stt: AudioLines,
 };
 
 async function saveSlot(capability: Capability, slot: SlotAssignment | undefined) {
@@ -95,7 +95,7 @@ function SlotCard({ capability, settings }: { capability: Capability; settings: 
         <Field
           label={t('slots.model')}
           htmlFor={`model-${capability}`}
-          hint={connection && connection.models.length === 0 ? t('slots.typeModelId') : undefined}
+          hint={capability === 'stt' ? t('slots.stt.modelHint') : connection && connection.models.length === 0 ? t('slots.typeModelId') : undefined}
         >
           <input
             id={`model-${capability}`}
@@ -104,7 +104,7 @@ function SlotCard({ capability, settings }: { capability: Capability; settings: 
             value={modelId}
             disabled={!slot}
             spellCheck={false}
-            placeholder={t('slots.modelPlaceholder')}
+            placeholder={capability === 'stt' ? 'gpt-4o-transcribe' : t('slots.modelPlaceholder')}
             onChange={(e) => setModelId(e.target.value)}
             onBlur={commitModel}
             onKeyDown={(e) => e.key === 'Enter' && commitModel()}

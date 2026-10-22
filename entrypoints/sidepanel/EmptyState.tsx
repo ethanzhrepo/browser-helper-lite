@@ -1,4 +1,4 @@
-import { ArrowRight, Bot, FileText, Languages, Plug, Sparkles, TextQuote } from 'lucide-react';
+import { ArrowRight, FileText, Languages, Plug, Sparkles, TextQuote } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { SlashCommand } from '../../src/chat/commands';
@@ -39,9 +39,8 @@ function Suggestion({ icon: Icon, children, onClick }: { icon: typeof FileText; 
   );
 }
 
-export function EmptyState({ hasModel, mode, onQuickAction, onExample }: {
+export function EmptyState({ hasModel, onQuickAction, onExample }: {
   hasModel: boolean;
-  mode: 'ask' | 'act';
   onQuickAction: (id: SlashCommand['id']) => void;
   onExample: (text: string) => void;
 }) {
@@ -65,45 +64,32 @@ export function EmptyState({ hasModel, mode, onQuickAction, onExample }: {
     );
   }
 
-  if (mode === 'act') {
-    return (
-      <div className="flex flex-1 animate-fade-in flex-col justify-center gap-5 overflow-y-auto px-4 py-6" data-testid="agent-empty">
+  return (
+    // my-auto centers the content when it fits and lets it scroll from the top when it does not.
+    <div className="flex flex-1 animate-fade-in flex-col overflow-y-auto px-4 py-6" data-testid="empty-state">
+      <div className="my-auto flex flex-col gap-5">
         <div className="flex flex-col items-center gap-3 text-center">
           <Hero>
-            <span className="flex h-14 w-14 items-center justify-center rounded-2xl text-white shadow-card brand-gradient">
-              <Bot className="h-7 w-7" />
-            </span>
+            <BrandMark size="lg" />
           </Hero>
-          <h2 className="text-lg font-semibold tracking-tight">{t('empty.act.title')}</h2>
-          <p className="max-w-xs text-sm leading-relaxed text-muted">{t('empty.act.body')}</p>
+          <h2 className="text-lg font-semibold tracking-tight">{t('empty.title')}</h2>
+          <p className="max-w-xs text-sm leading-relaxed text-muted">{t('empty.body')}</p>
         </div>
         <div className="mx-auto flex w-full max-w-sm flex-col gap-2">
+          {QUICK_ACTIONS.map(({ id, icon }) => (
+            <Suggestion key={id} icon={icon} onClick={() => onQuickAction(id)}>
+              {t(`empty.actions.${id}`)}
+            </Suggestion>
+          ))}
+          <p className="px-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-faint">{t('empty.tasksTitle')}</p>
           {AGENT_EXAMPLES.map((id) => (
-            <Suggestion key={id} icon={Sparkles} onClick={() => onExample(t(`empty.act.examples.${id}`))}>
-              {t(`empty.act.examples.${id}`)}
+            <Suggestion key={id} icon={Sparkles} onClick={() => onExample(t(`empty.examples.${id}`))}>
+              {t(`empty.examples.${id}`)}
             </Suggestion>
           ))}
         </div>
+        <p className="text-center text-xs text-faint">{t('empty.tip')}</p>
       </div>
-    );
-  }
-
-  return (
-    <div className="flex flex-1 animate-fade-in flex-col justify-center gap-5 overflow-y-auto px-4 py-6">
-      <div className="flex flex-col items-center gap-3 text-center">
-        <Hero>
-          <BrandMark size="lg" />
-        </Hero>
-        <h2 className="text-lg font-semibold tracking-tight">{t('empty.title')}</h2>
-      </div>
-      <div className="mx-auto flex w-full max-w-sm flex-col gap-2">
-        {QUICK_ACTIONS.map(({ id, icon }) => (
-          <Suggestion key={id} icon={icon} onClick={() => onQuickAction(id)}>
-            {t(`empty.actions.${id}`)}
-          </Suggestion>
-        ))}
-      </div>
-      <p className="text-center text-xs text-faint">{t('empty.tip')}</p>
     </div>
   );
 }

@@ -18,27 +18,32 @@
     "choose": "Elegir un modelo",
     "search": "Buscar modelos",
     "none": "No hay modelos. Añade una conexión o escribe un ID de modelo en los ajustes.",
-    "manage": "Gestionar modelos"
+    "manage": "Gestionar modelos",
+    "favorite": "Añadir a favoritos",
+    "unfavorite": "Quitar de favoritos",
+    "showMore_one": "Mostrar {{count}} modelo más",
+    "showMore_many": "Mostrar {{count}} modelos más",
+    "showMore_other": "Mostrar {{count}} modelos más",
+    "showAll": "Mostrar todos los modelos",
+    "showFavorites": "Solo favoritos"
   },
   "empty": {
     "setupTitle": "Conecta un modelo para empezar",
     "setupBody": "Añade una clave de API de OpenAI, Anthropic, Gemini, DeepSeek o de cualquier servicio compatible con OpenAI. Las claves se quedan en este dispositivo.",
     "setupAction": "Añadir un modelo",
-    "title": "¿En qué te ayudo con esta página?",
+    "title": "¿En qué te ayudo?",
     "actions": {
       "summarize": "Resumir esta página",
       "translate": "Traducir la selección o la página",
       "explain": "Explicar el texto seleccionado"
     },
     "tip": "Escribe / para ver comandos y @ para adjuntar la página o tu selección.",
-    "act": {
-      "title": "¿Qué hago en la web?",
-      "body": "Trabajo en la pestaña actual: hago clic, escribo, me desplazo y navego. Los pasos con riesgo esperan tu aprobación.",
-      "examples": {
-        "plans": "Busca los planes móviles de Rogers por menos de 60 $ al mes y compáralos en una tabla",
-        "compare": "Busca un cargador USB-C de 65 W en Amazon y AliExpress y compara precio y plazo de entrega",
-        "process": "Averigua paso a paso cómo transferir mi número a Rogers"
-      }
+    "body": "Pregunta lo que quieras. También puedo leer esta página, buscar en la web y trabajar en tus pestañas.",
+    "tasksTitle": "O encárgame una tarea",
+    "examples": {
+      "plans": "Busca los planes móviles de Rogers por menos de 60 $ al mes y compáralos en una tabla",
+      "compare": "Busca un cargador USB-C de 65 W en Amazon y AliExpress y compara precio y plazo de entrega",
+      "process": "Averigua paso a paso cómo transferir mi número a Rogers"
     }
   },
   "composer": {
@@ -48,17 +53,16 @@
     "stop": "Detener",
     "removeSelection": "Quitar la selección",
     "defaultPrompt": "Por favor, revisa el contenido adjunto.",
-    "placeholderAct": "Describe una tarea para hacer en la web…",
-    "placeholderAnswer": "Responde a la pregunta del agente…",
+    "placeholderAnswer": "Responde a la pregunta del asistente…",
     "mode": "Modo",
     "modes": {
-      "ask": "Preguntar",
-      "act": "Actuar",
-      "askHint": "Conversa sobre las páginas; no se cambia nada en la página",
-      "actHint": "Deja que el agente use el navegador por ti"
-    },
-    "actOn": "Empieza en: {{title}}",
-    "actNewTab": "Empieza en la pestaña actual"
+      "query": "Consulta",
+      "auto": "Automático",
+      "manual": "Aprobación manual",
+      "queryHint": "Lee páginas, busca y sigue enlaces. Nunca pulsa botones, rellena formularios ni envía nada.",
+      "autoHint": "Lee y opera las páginas por su cuenta. Solo los pasos de alto riesgo (pagos, eliminaciones, cambios de cuenta) esperan tu aprobación.",
+      "manualHint": "Lee, se desplaza y busca por su cuenta. Cada acción que cambia una página espera tu aprobación."
+    }
   },
   "context": {
     "unavailable": "No se puede leer esta página",
@@ -101,7 +105,9 @@
     "copy": "Copiar",
     "copied": "Copiado",
     "retry": "Reintentar",
-    "truncated": "parcial"
+    "truncated": "parcial",
+    "diagramError": "No se pudo dibujar este diagrama. Aquí está su código.",
+    "copySvg": "Copiar SVG"
   },
   "history": {
     "title": "Historial",
@@ -130,7 +136,9 @@
       "sites": "Acceso a sitios",
       "language": "Idioma",
       "about": "Acerca de",
-      "agent": "Agente"
+      "agent": "Agente",
+      "search": "Búsqueda",
+      "voice": "Entrada de voz"
     }
   },
   "connections": {
@@ -185,20 +193,21 @@
     "typeModelId": "Esta conexión no tiene lista de modelos. Escribe el ID del modelo.",
     "modelPlaceholder": "ID del modelo",
     "chat": {
-      "title": "Modelo de chat",
-      "description": "Responde en el panel lateral."
+      "title": "Modelo actual",
+      "description": "Responde y trabaja en el panel lateral, también operando páginas (necesita llamadas a herramientas). Cámbialo desde la cabecera del panel."
     },
     "fast": {
       "title": "Modelo rápido",
-      "description": "Trabajo sencillo y barato: resúmenes, extracción, títulos y comprobaciones de riesgo."
-    },
-    "agent": {
-      "title": "Modelo agente",
-      "description": "Planifica y opera páginas web. Necesita llamadas a herramientas. Si no puede leer imágenes (p. ej., DeepSeek), el modelo de visión le sirve de ojos."
+      "description": "Trabajo sencillo y barato: extraer información de páginas largas."
     },
     "vision": {
       "title": "Modelo de visión",
-      "description": "Mira capturas de pantalla e imágenes por los modelos que no pueden. Elige un modelo multimodal rápido y barato."
+      "description": "Mira capturas de pantalla por los modelos que no ven imágenes (p. ej., DeepSeek). Elige un modelo multimodal rápido y barato."
+    },
+    "stt": {
+      "title": "Modelo de voz a texto",
+      "description": "Transcribe la entrada de voz cuando esta usa un modelo de voz a texto.",
+      "modelHint": "Por ejemplo gpt-4o-transcribe o whisper-1 (OpenAI), whisper-large-v3 (Groq), gemini-2.5-flash (Gemini)."
     }
   },
   "sites": {
@@ -214,7 +223,7 @@
     "noPolicies": "Todavía no hay reglas.",
     "hostLabel": "Sitio",
     "addPolicy": "Añadir",
-    "defaultPolicy": "Sitios sin regla: se confirman las acciones con riesgo. Las acciones de alto riesgo (pagos, eliminaciones) siempre necesitan tu aprobación.",
+    "defaultPolicy": "Los sitios sin regla siguen el modo elegido en el panel. Si una regla de sitio y el modo no coinciden, gana la más estricta; los sitios «Automático» tampoco piden aprobación manual. Las acciones de alto riesgo siempre necesitan tu aprobación.",
     "policies": {
       "blocked": "Bloqueado",
       "readOnly": "Solo lectura",
@@ -271,7 +280,8 @@
       "web_search": "Buscar en la web: {{query}}",
       "ask_user": "Preguntarte: {{question}}",
       "hand_off": "Pasarte el control",
-      "done": "Terminar"
+      "read_page": "Leer la página",
+      "view_page": "Mirar la página"
     },
     "directions": {
       "up": "arriba",
@@ -286,7 +296,8 @@
         "destructive": "Parece difícil de deshacer (eliminar, cancelar, cambios en la cuenta o la seguridad).",
         "submit": "Esto envía o guarda algo.",
         "confirmEach": "Tu regla para este sitio pide confirmar cada paso.",
-        "sensitiveField": "Esto implica información sensible."
+        "sensitiveField": "Esto implica información sensible.",
+        "manualMode": "El modo de aprobación manual está activado."
       },
       "allowOnce": "Permitir una vez",
       "allowTask": "Permitir en esta tarea",
@@ -315,7 +326,7 @@
       "done": "Listo, continuar"
     },
     "question": {
-      "title": "El agente pregunta:",
+      "title": "El asistente pregunta:",
       "hint": "Responde en el cuadro de abajo."
     },
     "controls": {
@@ -355,11 +366,15 @@
     "maxStepsSummary": "Me detuve tras {{count}} pasos sin terminar. Revisa los pasos de arriba y dame una tarea más concreta o sube el límite de pasos en los ajustes.",
     "stoppedSummary": "La tarea se detuvo.",
     "failedSummary": "La tarea falló: {{message}}",
-    "thinking": "Pensando…"
+    "thinking": "Pensando…",
+    "emptyAnswer": "(Sin respuesta.)",
+    "closeTabs_one": "Cerrar la pestaña que abrí",
+    "closeTabs_many": "Cerrar las {{count}} pestañas que abrí",
+    "closeTabs_other": "Cerrar las {{count}} pestañas que abrí"
   },
   "agentSettings": {
     "title": "Agente",
-    "description": "Cómo usa el agente las páginas web por ti.",
+    "description": "Cómo usa el asistente las páginas web por ti.",
     "useCdp": "Usar ratón y teclado reales (CDP)",
     "useCdpHint": "Más fiable en sitios modernos. Chrome muestra la barra «ha empezado a depurar este navegador» mientras se ejecuta una tarea.",
     "cdpUnavailable": "No disponible: esta versión no incluye el permiso debugger.",
@@ -367,14 +382,116 @@
     "notificationsHint": "Notificaciones de Chrome para CAPTCHA, inicios de sesión y aprobaciones.",
     "maxSteps": "Límite de pasos por tarea",
     "maxStepsHint": "Entre 5 y 100.",
-    "searchEngine": "Motor de búsqueda",
+    "mode": "Modo predeterminado",
+    "modeHint": "También puedes cambiar de modo en cualquier momento bajo el cuadro de mensaje; se aplica al instante a una tarea en curso."
+  },
+  "voice": {
+    "start": "Entrada de voz",
+    "stop": "Dejar de escuchar",
+    "transcribing": "Transcribiendo…",
+    "listening": "Escuchando…",
+    "problems": {
+      "permission": "Permite el micrófono en la pestaña que se acaba de abrir y vuelve a pulsar el micrófono.",
+      "unsupported": "Este navegador no admite reconocimiento de voz. Elige un modelo de voz a texto en Entrada de voz.",
+      "network": "El reconocimiento de voz de Chrome no pudo conectar con el servicio de Google. Revisa la red o usa un modelo de voz a texto.",
+      "transcribe": "No se pudo transcribir la grabación."
+    },
+    "permission": {
+      "title": "Acceso al micrófono",
+      "askingTitle": "Permite el micrófono",
+      "askingBody": "Chrome pregunta si Browser Helper puede usar tu micrófono. Solo se usa mientras dictas.",
+      "grantedTitle": "Micrófono permitido",
+      "grantedBody": "Ya puedes dictar en el panel lateral. Esta pestaña se cierra sola.",
+      "deniedTitle": "Micrófono bloqueado",
+      "deniedBody": "Permítelo con el icono a la derecha de la barra de direcciones, o en la configuración de Chrome › Privacidad y seguridad › Configuración de sitios › Micrófono, y vuelve a intentarlo.",
+      "retry": "Reintentar"
+    },
+    "title": "Entrada de voz",
+    "description": "Habla en lugar de escribir: pulsa el micrófono en el cuadro de mensaje y vuelve a pulsarlo (o haz una pausa de dos segundos) para terminar.",
+    "engine": "Reconocimiento",
+    "engines": {
+      "browser": {
+        "title": "Reconocimiento de voz de Chrome",
+        "description": "Gratis y en tiempo real. El audio se envía al servicio de voz de Google."
+      },
+      "stt": {
+        "title": "Modelo de voz a texto",
+        "description": "Graba y luego envía el audio al modelo de voz a texto de Funciones de los modelos. Más preciso y mejor con idiomas mezclados."
+      }
+    },
+    "setSttModel": "Elegir un modelo de voz a texto",
+    "language": "Idioma hablado",
+    "languageAuto": "El de la interfaz",
+    "autoSend": "Enviar cuando deje de hablar",
+    "autoSendHint": "Si no, el texto se queda en el cuadro para que lo edites.",
+    "microphone": "Micrófono",
+    "micHint": "Un panel lateral no puede pedir el micrófono, así que se abre una pestaña una vez para pedirlo.",
+    "micGranted": "Browser Helper puede usar el micrófono.",
+    "micAllowed": "Permitido",
+    "allowMic": "Permitir el micrófono"
+  },
+  "search": {
+    "title": "Búsqueda",
+    "description": "Cómo busca el asistente en la web cuando una página no tiene la respuesta.",
+    "provider": "Servicio de búsqueda",
+    "providers": {
+      "browser": {
+        "title": "Búsqueda en el navegador",
+        "description": "Google, Bing o DuckDuckGo en una pestaña en segundo plano. Gratis, puede encontrar CAPTCHA."
+      },
+      "deepseek": {
+        "title": "API de búsqueda de DeepSeek",
+        "description": "Usa la clave de tu conexión de DeepSeek. Los resultados traen resúmenes escritos para modelos."
+      },
+      "cloudflare": {
+        "title": "Cloudflare Web Search",
+        "description": "A través de tu AI Gateway, con cargo a tu cuenta de Cloudflare. Fuentes: Ceramic, Exa, Linkup."
+      },
+      "tavily": {
+        "title": "Tavily",
+        "description": "API de búsqueda pensada para agentes de IA."
+      },
+      "brave": {
+        "title": "Brave Search",
+        "description": "Índice web independiente."
+      },
+      "exa": {
+        "title": "Exa",
+        "description": "Búsqueda semántica con fragmentos destacados de cada página."
+      },
+      "native": {
+        "title": "Búsqueda propia del modelo",
+        "description": "OpenAI, Anthropic y Gemini buscan en la web por su lado, con el modelo actual."
+      }
+    },
+    "engine": "Motor de búsqueda del navegador",
+    "engineFallbackHint": "Se usa cuando la API falla, si lo permites abajo.",
     "engines": {
       "google": "Google",
       "bing": "Bing",
       "duckduckgo": "DuckDuckGo",
       "custom": "Personalizado"
     },
-    "customSearchUrl": "URL de búsqueda personalizada",
-    "customSearchUrlHint": "Usa %s donde va la búsqueda."
+    "customUrl": "URL de búsqueda personalizada",
+    "customUrlHint": "Usa %s donde va la búsqueda.",
+    "deepseekNoConnection": "La búsqueda de DeepSeek usa la clave de una conexión de DeepSeek, y todavía no tienes ninguna.",
+    "deepseekConnection": "Conexión de DeepSeek",
+    "deepseekHint": "Su clave de API y su URL base se usan para /v1/tools/search.",
+    "cloudflareAccount": "ID de cuenta",
+    "cloudflareGateway": "ID de AI Gateway",
+    "cloudflareSource": "Fuente de búsqueda",
+    "cloudflareToken": "Token de API",
+    "cloudflareTokenHint": "Necesita los permisos Workers AI Read y AI Gateway Read.",
+    "keyHint": "Se guarda solo en este dispositivo.",
+    "nativeHint": "Usa la conexión del modelo actual, que debe ser OpenAI, Anthropic o Gemini. Cada búsqueda es una petición de modelo más.",
+    "fallback": "Buscar en el navegador si la API falla",
+    "fallbackHint": "Por ejemplo, si la clave es incorrecta o se agotó la cuota.",
+    "test": "Probar la búsqueda",
+    "testQuery": "Búsqueda de prueba",
+    "testOk_one": "Funciona. {{count}} resultado:",
+    "testOk_many": "Funciona. {{count}} resultados:",
+    "testOk_other": "Funciona. {{count}} resultados:",
+    "testOkText": "Funciona. El modelo respondió:",
+    "verifyNote": "Sea cual sea el servicio, se pide al asistente que verifique los datos en las páginas de origen y las cite."
   }
 }

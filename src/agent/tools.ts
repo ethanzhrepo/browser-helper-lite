@@ -1,14 +1,39 @@
 import { tool } from 'ai';
 import { z } from 'zod';
 
-const index = z.number().int().min(1).describe('Element number from the latest page state, e.g. 12 for [12]');
+const index = z.number().int().min(1).describe('Element number from the latest page view, e.g. 12 for [12]');
 const url = z.string().describe('Absolute URL, e.g. https://www.example.com/page');
 
 /**
- * The agent's action space (§7.3). Tools have no `execute`: the runtime runs
+ * The assistant's tools (§7.3, M1.5). They have no `execute`: the runtime runs
  * them itself so it can check risk, ask for approval, and observe the page.
  */
-export const agentTools = {
+export const assistantTools = {
+  read_page: tool({
+    description:
+      'Read the whole current tab as Markdown (not only the viewport). Use it to answer questions about the page, or to summarize or translate it.',
+    inputSchema: z.object({}),
+  }),
+  view_page: tool({
+    description:
+      'See the visible part of the current tab with numbered interactive elements, to operate the page. Browser actions also return this view.',
+    inputSchema: z.object({}),
+  }),
+  extract: tool({
+    description:
+      'Read the whole current tab and extract information for a query, e.g. prices, plans, specs, steps or lists. Cheaper than read_page on long pages.',
+    inputSchema: z.object({ query: z.string().describe('What to extract, e.g. "all plan names, monthly prices and data"') }),
+  }),
+  look: tool({
+    description:
+      'Look at a screenshot of the viewport (elements are outlined with their numbers) and answer a question. Use it for icons, images, colors, calendars, charts or anything the text does not show.',
+    inputSchema: z.object({ question: z.string() }),
+  }),
+  web_search: tool({
+    description:
+      'Search the web and return the top results (title, URL, snippet). Use it when the current site lacks the information, then verify on the source when possible.',
+    inputSchema: z.object({ query: z.string() }),
+  }),
   navigate: tool({ description: 'Open a URL in the current tab.', inputSchema: z.object({ url }) }),
   click: tool({ description: 'Click an element.', inputSchema: z.object({ index }) }),
   type: tool({
@@ -48,21 +73,6 @@ export const agentTools = {
     description: 'Wait for the page to finish loading or updating.',
     inputSchema: z.object({ seconds: z.number().min(0.5).max(10) }),
   }),
-  extract: tool({
-    description:
-      'Read the whole current page (not just the viewport) and extract information for a query. Use this to collect prices, plans, specs, steps or lists. The result is kept in your history.',
-    inputSchema: z.object({ query: z.string().describe('What to extract, e.g. "all plan names, monthly prices and data"') }),
-  }),
-  look: tool({
-    description:
-      'Look at a screenshot of the viewport (elements are outlined with their numbers) and answer a question. Use it for icons, images, colors, calendars, charts or anything the text list does not show.',
-    inputSchema: z.object({ question: z.string() }),
-  }),
-  web_search: tool({
-    description:
-      'Search the web in a background tab and return the top results (title, URL, snippet). Use it when the current site lacks the information, then verify on the official site when possible.',
-    inputSchema: z.object({ query: z.string() }),
-  }),
   ask_user: tool({
     description: 'Ask the user a question and wait for the answer. Use it for choices, missing personal details or ambiguity.',
     inputSchema: z.object({ question: z.string() }),
@@ -75,18 +85,18 @@ export const agentTools = {
       message: z.string().describe('What the user should do, in their language'),
     }),
   }),
-  done: tool({
-    description: 'Finish the task. Call this alone, as the only action of the step.',
-    inputSchema: z.object({
-      success: z.boolean().describe('Whether the task was completed'),
-      summary: z
-        .string()
-        .describe('The final answer for the user in Markdown: results, comparison tables, source links, and anything left for them to do'),
-    }),
-  }),
 };
 
-export type AgentToolName = keyof typeof agentTools;
+export type AssistantToolName = keyof typeof assistantTools;
 
 /** Tools that act on an element of the current page. */
 export const ELEMENT_TOOLS = new Set<string>(['click', 'type', 'hover', 'select_option']);
+
+/** Tools that only read; they never take over the tab. */
+export const READING_TOOLS = new Set<string>(['read_page', 'view_page', 'extract', 'look', 'web_search', 'ask_user']);
+
+/** Tools after which the model gets a fresh page view. */
+export const VIEW_AFTER = new Set<string>([
+  'view_page', 'navigate', 'click', 'type', 'press', 'hover', 'scroll', 'select_option',
+  'go_back', 'open_tab', 'switch_tab', 'close_tab', 'wait', 'hand_off',
+]);

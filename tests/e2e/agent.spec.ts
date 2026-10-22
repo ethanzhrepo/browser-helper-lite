@@ -1,85 +1,40 @@
-import { chromium, expect, test, type BrowserContext, type Page } from '@playwright/test';
-import { existsSync, mkdirSync } from 'node:fs';
-import path from 'node:path';
+import { expect, test, type BrowserContext } from '@playwright/test';
+import { ask, chooseMode, groupOf, launch, openSiteAndPanel, screenshot, seed } from './helpers';
 import { MOCK_KEY, MOCK_MODEL, startMockServer } from './mock-llm-server';
-
-const EXTENSION_PATH = path.resolve('.output-e2e/chrome-mv3');
-const SCREENSHOT_DIR = process.env.E2E_SCREENSHOT_DIR;
-const CHROMIUM = process.env.CHROMIUM_PATH ?? (existsSync('/opt/pw-browsers/chromium') ? '/opt/pw-browsers/chromium' : undefined);
 
 let context: BrowserContext;
 let extensionId: string;
 let server: Awaited<ReturnType<typeof startMockServer>>;
 
-async function screenshot(page: Page, name: string) {
-  if (!SCREENSHOT_DIR) return;
-  mkdirSync(SCREENSHOT_DIR, { recursive: true });
-  // Let fade-in and color transitions finish.
-  await page.waitForTimeout(450);
-  await page.screenshot({ path: path.join(SCREENSHOT_DIR, `${name}.png`) });
+const settingsFor = (origin: string, agent: Record<string, unknown>, extra: Record<string, unknown> = {}) => ({
+  connections: [
+    {
+      id: 'mock',
+      vendor: 'openai-compatible',
+      presetId: 'custom',
+      name: 'Mock provider',
+      baseURL: `${origin}/v1`,
+      models: [MOCK_MODEL, 'mock-vision'],
+      createdAt: 1,
+      updatedAt: 1,
+    },
+  ],
+  slots: { chat: { connectionId: 'mock', modelId: MOCK_MODEL }, vision: { connectionId: 'mock', modelId: 'mock-vision' } },
+  agent: { mode: 'auto', useCdp: true, maxSteps: 20, notifications: true, ...agent },
+  search: { provider: 'browser', engine: 'custom', customUrl: `${origin}/search?q=%s`, cloudflare: { accountId: '', gatewayId: 'default', source: 'ceramic' }, fallbackToBrowser: true },
+  ...extra,
+});
+
+async function startTurn(panel: import('@playwright/test').Page, request: string) {
+  await ask(panel, request);
+  await expect(panel.getByTestId('agent-run')).toBeVisible({ timeout: 20_000 });
 }
 
-/** Opens a site, then the panel as a tab; the panel targets the site (its most recent other tab). */
-async function openSiteAndPanel(url: string): Promise<{ site: Page; panel: Page }> {
-  const site = await context.newPage();
-  await site.goto(url);
-  const panel = await context.newPage();
-  await panel.setViewportSize({ width: 420, height: 820 });
-  await panel.goto(`chrome-extension://${extensionId}/sidepanel.html`);
-  await panel.getByTestId('mode-act').click();
-  return { site, panel };
-}
-
-async function startTask(panel: Page, goal: string) {
-  const input = panel.getByTestId('composer-input');
-  await input.fill(goal);
-  await input.press('Enter');
-  await expect(panel.getByTestId('agent-run')).toBeVisible();
-}
-
-test.describe.serial('agent', () => {
+test.describe.serial('assistant operating pages', () => {
   test.beforeAll(async () => {
     server = await startMockServer();
-    context = await chromium.launchPersistentContext('', {
-      headless: true,
-      executablePath: CHROMIUM,
-      locale: 'en-US',
-      args: [`--disable-extensions-except=${EXTENSION_PATH}`, `--load-extension=${EXTENSION_PATH}`],
-    });
-    const worker = context.serviceWorkers()[0] ?? (await context.waitForEvent('serviceworker'));
-    extensionId = new URL(worker.url()).host;
-
-    // Seed a mock connection, chat + vision models and a custom search engine.
-    const options = await context.newPage();
-    await options.goto(`chrome-extension://${extensionId}/options.html`);
-    await options.evaluate(
-      async ({ origin, key, model }) => {
-        const connection = {
-          id: 'mock',
-          vendor: 'openai-compatible',
-          presetId: 'custom',
-          name: 'Mock provider',
-          baseURL: `${origin}/v1`,
-          models: [model, 'mock-vision'],
-          createdAt: 1,
-          updatedAt: 1,
-        };
-        await chrome.storage.local.set({
-          'settings:v1': {
-            schemaVersion: 1,
-            connections: [connection],
-            slots: { chat: { connectionId: 'mock', modelId: model }, vision: { connectionId: 'mock', modelId: 'mock-vision' } },
-            language: 'auto',
-            agent: { useCdp: true, maxSteps: 20, notifications: true, searchEngine: 'custom', customSearchUrl: `${origin}/search?q=%s` },
-            sitePolicies: {},
-            updatedAt: 1,
-          },
-          'secrets:v1': { mock: key },
-        });
-      },
-      { origin: server.origin, key: MOCK_KEY, model: MOCK_MODEL },
-    );
-    await options.close();
+    ({ context, extensionId } = await launch());
+    await seed(context, extensionId, settingsFor(server.origin, {}), { mock: MOCK_KEY });
   });
 
   test.afterAll(async () => {
@@ -87,16 +42,19 @@ test.describe.serial('agent', () => {
     await server?.close();
   });
 
-  test('shop: search the web, type, extract, look, approve adding to cart', async () => {
-    const { site, panel } = await openSiteAndPanel(`${server.origin}/shop.html`);
-    await expect(panel.getByTestId('target-chip')).toContainText('Test Shop');
+  test('shop in Manual mode: search, type, extract, look, approve adding to cart, tab group', async () => {
+    const { site, panel } = await openSiteAndPanel(context, extensionId, `${server.origin}/shop.html`);
+    await expect(panel.getByTestId('page-chip')).toContainText('Test Shop');
+    await expect(panel.getByTestId('mode-picker')).toHaveAttribute('data-mode', 'auto');
+    await chooseMode(panel, 'manual');
     await screenshot(panel, 'agent-empty');
-    await startTask(panel, 'TEST-SHOP: add the cheapest braided USB-C cable to my cart');
+    await startTurn(panel, 'TEST-SHOP: add the cheapest braided USB-C cable to my cart');
 
-    // "Add to cart" is an effect (risk 2): the agent waits for approval.
+    // Manual mode: typing into the search box runs, adding to the cart waits for approval.
     const approval = panel.getByTestId('approval-card');
     await expect(approval).toBeVisible({ timeout: 30_000 });
     await expect(approval).toContainText('Add Cable B to cart');
+    await expect(approval).toContainText('This submits, sends or saves something.');
     await expect(approval.getByRole('button', { name: 'Always allow on this site' })).toBeVisible();
     await screenshot(panel, 'agent-approval');
     await panel.emulateMedia({ colorScheme: 'dark' });
@@ -104,43 +62,56 @@ test.describe.serial('agent', () => {
     await panel.emulateMedia({ colorScheme: 'light' });
     await expect(site.locator('browser-helper-overlay')).toHaveCount(1);
     await screenshot(site, 'agent-overlay');
+    // While the turn waits for the user, its tab group turns yellow.
+    expect(await groupOf(panel, site.url())).toEqual({ title: 'Browser Helper', color: 'yellow' });
     await approval.getByRole('button', { name: 'Allow once' }).click();
 
     const run = panel.getByTestId('agent-run');
     await expect(run).toHaveAttribute('data-status', 'done', { timeout: 30_000 });
     await expect(panel.getByTestId('assistant-message').last()).toContainText('Added Cable B ($5.49) to the cart.');
+    await expect(panel.getByTestId('assistant-message').last().locator('table')).toBeVisible();
     await expect(site.locator('#cart')).toHaveText('Cart: 1 item');
-    // The overlay is removed when the task ends.
     await expect(site.locator('browser-helper-overlay')).toHaveCount(0);
+    expect(await groupOf(panel, site.url())).toEqual({ title: 'Browser Helper', color: 'grey' });
 
-    for (const tool of ['web_search', 'type', 'extract', 'look', 'click', 'done']) {
+    for (const tool of ['web_search', 'view_page', 'type', 'extract', 'look', 'click']) {
       await expect(run.locator(`[data-testid="agent-action"][data-tool="${tool}"][data-status="done"]`).first()).toBeVisible();
     }
-    const searchStep = server.agentRequests.find((r) => JSON.stringify(r.messages).includes('USB-C cable buying guide'));
-    expect(searchStep, 'search results reach the agent').toBeDefined();
+    // Search results and page views reach the model; older views are pruned.
+    const last = JSON.stringify(server.chatRequests.at(-1)!.messages);
+    expect(last).toContain('USB-C cable buying guide');
+    expect(last).toContain('Older page view removed');
+    expect(last.match(/<page_view>/g)).toHaveLength(1);
+    expect(server.chatRequests.at(-1)!.tools?.map((t) => t.function.name)).toContain('read_page');
     expect(JSON.stringify(server.extractRequests[0]?.messages)).toContain('Cable B');
     const image = server.lookRequests[0]?.messages[0]?.content;
     expect(Array.isArray(image) && image.some((p) => (p.image_url?.url.length ?? 0) > 1000)).toBe(true);
     console.log('driver used:', await run.getByTestId('driver-badge').textContent());
     await screenshot(panel, 'agent-shop-done');
+
+    // A new chat puts the tab back out of the group.
+    await panel.getByRole('button', { name: 'New chat' }).click();
+    await expect.poll(() => groupOf(panel, site.url())).toBeUndefined();
   });
 
-  test('park: CAPTCHA hand-off, question, high-risk payment denied', async () => {
-    const { site, panel } = await openSiteAndPanel(`${server.origin}/park.html`);
-    await startTask(panel, 'TEST-PARK: book a day pass');
+  test('park in Auto mode: CAPTCHA hand-off, question, high-risk payment denied', async () => {
+    const { site, panel } = await openSiteAndPanel(context, extensionId, `${server.origin}/park.html`);
+    await chooseMode(panel, 'auto');
+    await startTurn(panel, 'TEST-PARK: book a day pass');
 
     const handoff = panel.getByTestId('handoff-card');
     await expect(handoff).toBeVisible({ timeout: 20_000 });
     await expect(handoff).toContainText('Please solve the verification');
     await screenshot(panel, 'agent-handoff');
-    // The user solves it in the page; the task resumes by itself.
+    // The user solves it in the page; the turn resumes by itself.
     await site.click('#robot');
 
     await expect(panel.getByTestId('question-card')).toContainText('Which date would you like', { timeout: 20_000 });
-    await expect(panel.getByTestId('composer-input')).toHaveAttribute('placeholder', "Answer the agent's question…");
+    await expect(panel.getByTestId('composer-input')).toHaveAttribute('placeholder', "Answer the assistant's question…");
     await panel.getByTestId('composer-input').fill('Nov 3');
     await panel.getByTestId('composer-input').press('Enter');
 
+    // Auto mode runs the select and the click; paying is high risk.
     const approval = panel.getByTestId('approval-card');
     await expect(approval).toContainText('High-risk action', { timeout: 30_000 });
     await expect(approval).toContainText('Pay now');
@@ -155,9 +126,22 @@ test.describe.serial('agent', () => {
     await expect(panel.locator('[data-testid="agent-action"][data-status="rejected"]')).toHaveCount(1);
   });
 
+  test('Query mode refuses to press buttons', async () => {
+    const { site, panel } = await openSiteAndPanel(context, extensionId, `${server.origin}/shop.html`);
+    await chooseMode(panel, 'query');
+    await startTurn(panel, 'TEST-QUERY: search the shop');
+    await expect(panel.getByTestId('agent-run')).toHaveAttribute('data-status', 'done', { timeout: 30_000 });
+    await expect(panel.locator('[data-testid="agent-action"][data-tool="click"]')).toHaveAttribute('data-status', 'rejected');
+    await expect(panel.getByTestId('approval-card')).toHaveCount(0);
+    await expect(panel.getByTestId('assistant-message').last()).toContainText('Query mode is on');
+    await expect(site.locator('#results')).toBeEmpty();
+    expect(JSON.stringify(server.chatRequests.at(-1)!.messages)).toContain('Query mode is on: you may read');
+    await chooseMode(panel, 'auto');
+  });
+
   test('pauses when the user uses the page, resumes, and stops', async () => {
-    const { site, panel } = await openSiteAndPanel(`${server.origin}/shop.html`);
-    await startTask(panel, 'TEST-STOP: keep waiting');
+    const { site, panel } = await openSiteAndPanel(context, extensionId, `${server.origin}/shop.html`);
+    await startTurn(panel, 'TEST-STOP: keep waiting');
     const run = panel.getByTestId('agent-run');
     await expect(run.locator('[data-tool="wait"]').first()).toBeVisible({ timeout: 20_000 });
 
@@ -174,39 +158,16 @@ test.describe.serial('agent', () => {
   });
 });
 
-test.describe.serial('agent with the DOM driver', () => {
+test.describe.serial('assistant with the DOM driver', () => {
   test.beforeAll(async () => {
     server = await startMockServer();
-    context = await chromium.launchPersistentContext('', {
-      headless: true,
-      executablePath: CHROMIUM,
-      locale: 'en-US',
-      args: [`--disable-extensions-except=${EXTENSION_PATH}`, `--load-extension=${EXTENSION_PATH}`],
-    });
-    const worker = context.serviceWorkers()[0] ?? (await context.waitForEvent('serviceworker'));
-    extensionId = new URL(worker.url()).host;
-    const options = await context.newPage();
-    await options.goto(`chrome-extension://${extensionId}/options.html`);
-    await options.evaluate(
-      async ({ origin, key, model }) => {
-        await chrome.storage.local.set({
-          'settings:v1': {
-            schemaVersion: 1,
-            connections: [
-              { id: 'mock', vendor: 'openai-compatible', presetId: 'custom', name: 'Mock', baseURL: `${origin}/v1`, models: [model], createdAt: 1, updatedAt: 1 },
-            ],
-            slots: { chat: { connectionId: 'mock', modelId: model }, vision: { connectionId: 'mock', modelId: 'mock-vision' } },
-            language: 'auto',
-            agent: { useCdp: false, maxSteps: 20, notifications: false, searchEngine: 'custom', customSearchUrl: `${origin}/search?q=%s` },
-            sitePolicies: { '127.0.0.1': 'auto' },
-            updatedAt: 1,
-          },
-          'secrets:v1': { mock: key },
-        });
-      },
-      { origin: server.origin, key: MOCK_KEY, model: MOCK_MODEL },
+    ({ context, extensionId } = await launch());
+    await seed(
+      context,
+      extensionId,
+      settingsFor(server.origin, { mode: 'manual', useCdp: false, notifications: false }, { sitePolicies: { '127.0.0.1': 'auto' } }),
+      { mock: MOCK_KEY },
     );
-    await options.close();
   });
 
   test.afterAll(async () => {
@@ -214,11 +175,11 @@ test.describe.serial('agent with the DOM driver', () => {
     await server?.close();
   });
 
-  test('completes the shop task with simulated events and an "auto" site policy', async () => {
-    const { site, panel } = await openSiteAndPanel(`${server.origin}/shop.html`);
-    await startTask(panel, 'TEST-SHOP: add the cheapest braided USB-C cable to my cart');
+  test('a site marked automatic skips Manual approvals; input uses simulated events', async () => {
+    const { site, panel } = await openSiteAndPanel(context, extensionId, `${server.origin}/shop.html`);
+    await expect(panel.getByTestId('mode-picker')).toHaveAttribute('data-mode', 'manual');
+    await startTurn(panel, 'TEST-SHOP: add the cheapest braided USB-C cable to my cart');
     const run = panel.getByTestId('agent-run');
-    // The site policy is "auto", so adding to the cart (risk 2) needs no approval.
     await expect(run).toHaveAttribute('data-status', 'done', { timeout: 30_000 });
     await expect(panel.getByTestId('approval-card')).toHaveCount(0);
     await expect(run.getByTestId('driver-badge')).toHaveText('dom');

@@ -230,17 +230,113 @@ html body {
   border-radius: 5px;
   padding: 0.12em 0.35em;
 }
-.markdown pre {
+/* Code blocks: a frame with a header (language, copy) around the <pre>. */
+.markdown .code-block {
   background: var(--bg-subtle);
   border: 1px solid var(--border);
   border-radius: 10px;
-  padding: 0.8em 0.9em;
+  overflow: hidden;
+}
+.markdown .code-block pre {
+  padding: 0.75em 0.9em 0.85em;
   overflow-x: auto;
 }
 .markdown pre code {
+  display: block;
   background: none;
   padding: 0;
   font-size: 0.84em;
+  line-height: 1.6;
+}
+.markdown .katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0.2em 0;
+}
+.markdown .mermaid-diagram svg {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Syntax colors (highlight.js classes), tuned to the palette in both themes. */
+:root {
+  --code-keyword: #8a3ffc;
+  --code-string: #1f7a4d;
+  --code-number: #b4530a;
+  --code-comment: #8b918d;
+  --code-title: #1f5fa8;
+  --code-attr: #9a5b00;
+  --code-type: #0f7b8a;
+  --code-meta: #6b6f6d;
+  --code-deletion: #c2412d;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --code-keyword: #c6a0ff;
+    --code-string: #8fd6a9;
+    --code-number: #f2b27a;
+    --code-comment: #6f7873;
+    --code-title: #8cbcff;
+    --code-attr: #e8c07a;
+    --code-type: #79d0dc;
+    --code-meta: #9aa29e;
+    --code-deletion: #f08a7a;
+  }
+}
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-literal,
+.hljs-built_in,
+.hljs-doctag {
+  color: var(--code-keyword);
+}
+.hljs-string,
+.hljs-regexp,
+.hljs-addition,
+.hljs-template-string {
+  color: var(--code-string);
+}
+.hljs-number,
+.hljs-symbol,
+.hljs-bullet,
+.hljs-variable.constant_ {
+  color: var(--code-number);
+}
+.hljs-comment,
+.hljs-quote {
+  color: var(--code-comment);
+  font-style: italic;
+}
+.hljs-title,
+.hljs-title.function_,
+.hljs-section,
+.hljs-name {
+  color: var(--code-title);
+}
+.hljs-attr,
+.hljs-attribute,
+.hljs-property,
+.hljs-selector-class,
+.hljs-selector-id {
+  color: var(--code-attr);
+}
+.hljs-type,
+.hljs-title.class_,
+.hljs-tag {
+  color: var(--code-type);
+}
+.hljs-meta,
+.hljs-punctuation {
+  color: var(--code-meta);
+}
+.hljs-deletion {
+  color: var(--code-deletion);
+}
+.hljs-emphasis {
+  font-style: italic;
+}
+.hljs-strong {
+  font-weight: 650;
 }
 .markdown blockquote {
   border-left: 3px solid var(--accent-soft-strong);

@@ -1,7 +1,10 @@
 export type Vendor = 'openai' | 'anthropic' | 'google' | 'deepseek' | 'openai-compatible';
 
-/** Capability slots (§5.1). Agent and vision are configured now and used from M1. */
-export type Capability = 'chat' | 'fast' | 'agent' | 'vision';
+/**
+ * Capability slots (§5.1). `chat` is the current model, switched from the
+ * side panel header; it also drives the agent.
+ */
+export type Capability = 'chat' | 'fast' | 'vision' | 'stt';
 
 export type Locale = 'zh-CN' | 'en' | 'fr' | 'es';
 export type LanguageSetting = 'auto' | Locale;
@@ -16,6 +19,8 @@ export interface Connection {
   baseURL: string;
   /** Model ids returned by the last successful model listing. */
   models: string[];
+  /** Starred models; the header's model switcher shows these first. */
+  favoriteModels?: string[];
   modelsFetchedAt?: number;
   createdAt: number;
   updatedAt: number;
@@ -33,17 +38,52 @@ export interface SlotAssignment extends ModelRef {
 /** Per-site agent policy (§6). Keys of `Settings.sitePolicies` are hostnames; "example.com" also covers subdomains. */
 export type SitePolicy = 'blocked' | 'readOnly' | 'confirmEach' | 'confirmRisky' | 'auto';
 
-export type SearchEngineSetting = 'google' | 'bing' | 'duckduckgo' | 'custom';
+/**
+ * What the assistant may do on pages without asking (M1.5):
+ * - query: read, search and follow links only; never click buttons or fill forms
+ * - auto: everything, but high-risk actions (L3) need approval
+ * - manual: reading, scrolling, links and searches run; every other action needs approval
+ */
+export type AgentMode = 'query' | 'auto' | 'manual';
 
 export interface AgentSettings {
+  mode: AgentMode;
   /** Use the CDP driver when this build has the debugger permission. */
   useCdp: boolean;
   maxSteps: number;
   /** Chrome notifications when a task needs you. */
   notifications: boolean;
-  searchEngine: SearchEngineSetting;
+}
+
+export type SearchEngineSetting = 'google' | 'bing' | 'duckduckgo' | 'custom';
+
+/** `browser` searches in a background tab; the others are APIs (§7.6). */
+export type SearchProviderId = 'browser' | 'deepseek' | 'cloudflare' | 'tavily' | 'brave' | 'exa' | 'native';
+
+export type CloudflareSearchSource = 'ceramic' | 'exa' | 'linkup';
+
+export interface SearchSettings {
+  provider: SearchProviderId;
+  /** Engine for browser search, also the fallback when an API fails. */
+  engine: SearchEngineSetting;
   /** For the custom engine; `%s` is replaced by the query. */
-  customSearchUrl: string;
+  customUrl: string;
+  /** DeepSeek search reuses the key of a DeepSeek connection. */
+  deepseekConnectionId?: string;
+  cloudflare: { accountId: string; gatewayId: string; source: CloudflareSearchSource };
+  /** Search in the browser when the API fails. */
+  fallbackToBrowser: boolean;
+}
+
+export type VoiceEngine = 'browser' | 'stt';
+
+export interface VoiceSettings {
+  /** browser: Chrome's Web Speech API; stt: record and send to the speech-to-text model. */
+  engine: VoiceEngine;
+  /** BCP 47 tag such as "zh-CN", or "auto" to follow the interface language. */
+  language: string;
+  /** Send the message as soon as you stop speaking. */
+  autoSend: boolean;
 }
 
 export interface Settings {
@@ -52,6 +92,8 @@ export interface Settings {
   slots: Partial<Record<Capability, SlotAssignment>>;
   language: LanguageSetting;
   agent: AgentSettings;
+  search: SearchSettings;
+  voice: VoiceSettings;
   sitePolicies: Record<string, SitePolicy>;
   updatedAt: number;
 }

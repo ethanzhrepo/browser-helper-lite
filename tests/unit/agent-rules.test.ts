@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { parseKeyCombo } from '../../src/agent/keys';
 import type { TargetInfo } from '../../src/agent/page/types';
-import { decide, policyFor } from '../../src/agent/policy';
+import { decide, modeDecision, policyFor, siteDecision } from '../../src/agent/policy';
 import { classifyAction } from '../../src/agent/risk';
-import { buildSearchUrl } from '../../src/agent/search';
-import { DEFAULT_AGENT_SETTINGS } from '../../src/storage/settings';
+import { buildSearchUrl } from '../../src/search/search';
+import { DEFAULT_SEARCH_SETTINGS } from '../../src/storage/settings';
 
 const target = (overrides: Partial<TargetInfo> = {}): TargetInfo => ({
   tag: 'button',
@@ -62,7 +62,7 @@ describe('classifyAction', () => {
   });
 
   it('keeps reading tools at risk 0', () => {
-    for (const tool of ['scroll', 'extract', 'look', 'web_search', 'done']) expect(classifyAction(tool, {}).risk).toBe(0);
+    for (const tool of ['read_page', 'view_page', 'scroll', 'extract', 'look', 'web_search']) expect(classifyAction(tool, {}).risk).toBe(0);
     expect(classifyAction('navigate', { url: 'https://x' }).risk).toBe(1);
   });
 });
@@ -73,19 +73,60 @@ describe('site policies', () => {
   it('matches subdomains, preferring the most specific entry', () => {
     expect(policyFor('www.rogers.com', policies)).toBe('readOnly');
     expect(policyFor('shop.rogers.com', policies)).toBe('auto');
-    expect(policyFor('notrogers.com', policies)).toBe('confirmRisky');
+    expect(policyFor('notrogers.com', policies)).toBeUndefined();
   });
 
-  it('decides per risk level', () => {
-    expect(decide('confirmRisky', 1, { isNavigation: false })).toBe('allow');
-    expect(decide('confirmRisky', 2, { isNavigation: false })).toBe('confirm');
-    expect(decide('auto', 2, { isNavigation: false })).toBe('allow');
-    expect(decide('auto', 3, { isNavigation: false })).toBe('confirm');
-    expect(decide('confirmEach', 1, { isNavigation: false })).toBe('confirm');
-    expect(decide('readOnly', 1, { isNavigation: true })).toBe('allow');
-    expect(decide('readOnly', 1, { isNavigation: false })).toBe('deny');
-    expect(decide('blocked', 1, { isNavigation: true })).toBe('deny');
-    expect(decide('blocked', 0, { isNavigation: false })).toBe('allow');
+  it('decides per risk level and kind of action', () => {
+    expect(siteDecision(undefined, 2, 'change')).toBe('allow');
+    expect(siteDecision('confirmRisky', 1, 'change')).toBe('allow');
+    expect(siteDecision('confirmRisky', 2, 'change')).toBe('confirm');
+    expect(siteDecision('auto', 2, 'change')).toBe('allow');
+    expect(siteDecision('auto', 3, 'change')).toBe('confirm');
+    expect(siteDecision('confirmEach', 1, 'change')).toBe('confirm');
+    expect(siteDecision('confirmEach', 1, 'browse')).toBe('allow');
+    expect(siteDecision('readOnly', 1, 'browse')).toBe('allow');
+    expect(siteDecision('readOnly', 1, 'search')).toBe('allow');
+    expect(siteDecision('readOnly', 1, 'change')).toBe('deny');
+    expect(siteDecision('blocked', 1, 'browse')).toBe('deny');
+    expect(siteDecision('blocked', 0, 'change')).toBe('allow');
+  });
+});
+
+describe('modes', () => {
+  it('query mode only reads, searches and follows links', () => {
+    expect(modeDecision('query', 0, 'change')).toBe('allow');
+    expect(modeDecision('query', 1, 'browse')).toBe('allow');
+    expect(modeDecision('query', 1, 'search')).toBe('allow');
+    expect(modeDecision('query', 1, 'change')).toBe('deny');
+    expect(modeDecision('query', 2, 'change')).toBe('deny');
+  });
+
+  it('auto mode confirms only high-risk actions', () => {
+    expect(modeDecision('auto', 1, 'change')).toBe('allow');
+    expect(modeDecision('auto', 2, 'change')).toBe('allow');
+    expect(modeDecision('auto', 3, 'change')).toBe('confirm');
+  });
+
+  it('manual mode confirms every change but not browsing', () => {
+    expect(modeDecision('manual', 1, 'browse')).toBe('allow');
+    expect(modeDecision('manual', 1, 'search')).toBe('allow');
+    expect(modeDecision('manual', 1, 'change')).toBe('confirm');
+    expect(modeDecision('manual', 2, 'change')).toBe('confirm');
+  });
+
+  it('combines mode and site policy: the stricter wins', () => {
+    expect(decide('auto', 'blocked', 1, 'change')).toBe('deny');
+    expect(decide('auto', 'confirmRisky', 2, 'change')).toBe('confirm');
+    expect(decide('auto', 'readOnly', 1, 'change')).toBe('deny');
+    expect(decide('query', 'auto', 2, 'change')).toBe('deny');
+    expect(decide('auto', undefined, 2, 'change')).toBe('allow');
+  });
+
+  it('lets sites marked automatic skip manual approval, but never for high risk', () => {
+    expect(decide('manual', 'auto', 2, 'change')).toBe('allow');
+    expect(decide('manual', 'auto', 3, 'change')).toBe('confirm');
+    expect(decide('manual', undefined, 2, 'change')).toBe('confirm');
+    expect(decide('auto', 'auto', 3, 'change')).toBe('confirm');
   });
 });
 
@@ -99,12 +140,10 @@ describe('parseKeyCombo', () => {
 
 describe('buildSearchUrl', () => {
   it('builds engine URLs and custom templates', () => {
-    expect(buildSearchUrl(DEFAULT_AGENT_SETTINGS, 'usb c', 'fr')).toBe('https://www.google.com/search?q=usb%20c&hl=fr');
-    expect(buildSearchUrl({ ...DEFAULT_AGENT_SETTINGS, searchEngine: 'duckduckgo' }, 'a&b', 'en')).toBe(
-      'https://html.duckduckgo.com/html/?q=a%26b',
+    expect(buildSearchUrl(DEFAULT_SEARCH_SETTINGS, 'usb c', 'fr')).toBe('https://www.google.com/search?q=usb%20c&hl=fr');
+    expect(buildSearchUrl({ ...DEFAULT_SEARCH_SETTINGS, engine: 'duckduckgo' }, 'a&b', 'en')).toBe('https://html.duckduckgo.com/html/?q=a%26b');
+    expect(buildSearchUrl({ ...DEFAULT_SEARCH_SETTINGS, engine: 'custom', customUrl: 'https://s.example/?q=%s' }, 'x y', 'en')).toBe(
+      'https://s.example/?q=x%20y',
     );
-    expect(
-      buildSearchUrl({ ...DEFAULT_AGENT_SETTINGS, searchEngine: 'custom', customSearchUrl: 'https://s.example/?q=%s' }, 'x y', 'en'),
-    ).toBe('https://s.example/?q=x%20y');
   });
 });

@@ -1,10 +1,26 @@
-import { ArrowUp, Bot, Check, FileText, MessageSquare, Plus, Square, TextQuote, X } from 'lucide-react';
+import {
+  ArrowUp,
+  BookOpenText,
+  Check,
+  ChevronDown,
+  FileText,
+  Hand,
+  Loader2,
+  Mic,
+  Plus,
+  Sparkles,
+  Square,
+  TextQuote,
+  X,
+  type LucideIcon,
+} from 'lucide-react';
 import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { ActiveTab } from '../../src/browser/page-context';
 import { matchCommands, type SlashCommand } from '../../src/chat/commands';
-import type { ContextKind, ContextSnapshot } from '../../src/shared/types';
+import type { AgentMode, ContextKind, ContextSnapshot } from '../../src/shared/types';
 import type { PageAccess } from '../../src/ui/useActiveTab';
+import type { VoiceState } from '../../src/voice/useVoiceInput';
 
 type MenuItem = { kind: 'command'; command: SlashCommand } | { kind: 'mention'; target: ContextKind };
 
@@ -13,11 +29,15 @@ const MAX_TEXTAREA_HEIGHT = 200;
 
 const preview = (text: string, length = 40) => (text.length > length ? `${text.slice(0, length).trimEnd()}…` : text);
 
-export type ComposerMode = 'ask' | 'act';
+const MODES: { id: AgentMode; icon: LucideIcon }[] = [
+  { id: 'query', icon: BookOpenText },
+  { id: 'auto', icon: Sparkles },
+  { id: 'manual', icon: Hand },
+];
 
 export function Composer(props: {
-  mode: ComposerMode;
-  onModeChange: (mode: ComposerMode) => void;
+  mode: AgentMode;
+  onModeChange: (mode: AgentMode) => void;
   /** Replaces the default placeholder, e.g. while the agent asks a question. */
   placeholder?: string;
   text: string;
@@ -32,11 +52,13 @@ export function Composer(props: {
   onMention: (target: ContextKind) => void;
   onSend: () => void;
   onStop: () => void;
-  streaming: boolean;
+  /** A reply is in progress: the send button becomes a stop button. */
+  busy: boolean;
   disabled: boolean;
+  voice: { state: VoiceState; level: number; toggle: () => void };
 }) {
   const { t } = useTranslation();
-  const { text, onTextChange, streaming, disabled } = props;
+  const { text, onTextChange, busy, disabled } = props;
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [caret, setCaret] = useState(0);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -57,8 +79,7 @@ export function Composer(props: {
   const mentionLabel = (target: ContextKind) => t(`mentions.${target}`);
 
   let items: MenuItem[] = [];
-  // Commands and attachments belong to Ask mode; the agent reads pages itself.
-  if (dismissedFor !== text && props.mode === 'ask') {
+  if (dismissedFor !== text) {
     if (commandQuery !== undefined) {
       items = matchCommands(commandQuery, commandLabel).map((command) => ({ kind: 'command', command }));
     } else if (mentionQuery !== undefined) {
@@ -107,13 +128,12 @@ export function Composer(props: {
     }
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault();
-      if (!streaming && !disabled) props.onSend();
+      if (canSend) props.onSend();
     }
   };
 
-  const canSend = !disabled && (props.mode === 'act' ? text.trim() : text.trim() || props.selection || props.includePage);
-
-  const act = props.mode === 'act';
+  const canSend = !disabled && !busy && Boolean(text.trim() || props.selection || props.includePage);
+  const listening = props.voice.state === 'listening';
 
   return (
     <div className="relative mx-auto w-full max-w-3xl">
@@ -155,19 +175,15 @@ export function Composer(props: {
         </div>
       )}
 
-      {/* 1px frame: neutral in Ask mode, brand gradient in Act mode. */}
+      {/* 1px frame: neutral, brand gradient while a reply is in progress. */}
       <div
-        className={`rounded-2xl p-px shadow-card transition-colors ${act ? 'brand-border' : 'bg-line focus-within:bg-accent/45'}`}
+        className={`rounded-2xl p-px shadow-card transition-colors ${busy ? 'brand-border' : 'bg-line focus-within:bg-accent/45'}`}
         data-mode={props.mode}
       >
         <div className="rounded-[15px] bg-surface">
           <div className="flex flex-wrap gap-1.5 px-3 pt-3">
-            {act ? (
-              <TargetChip tab={props.tab} />
-            ) : (
-              <PageChip tab={props.tab} access={props.access} included={props.includePage} onToggle={props.onTogglePage} />
-            )}
-            {!act && props.selection && (
+            <PageChip tab={props.tab} access={props.access} included={props.includePage} onToggle={props.onTogglePage} />
+            {props.selection && (
               <span className="flex max-w-full animate-fade-in items-center gap-1.5 rounded-full border border-accent/25 bg-accent-soft py-1 pl-2.5 pr-1.5 text-xs text-accent">
                 <TextQuote className="h-3.5 w-3.5 shrink-0" />
                 <span className="truncate">“{preview(props.selection.content)}”</span>
@@ -191,7 +207,9 @@ export function Composer(props: {
             placeholder={
               disabled
                 ? t('composer.placeholderNoModel')
-                : (props.placeholder ?? (act ? t('composer.placeholderAct') : t('composer.placeholder')))
+                : listening
+                  ? t('voice.listening')
+                  : (props.placeholder ?? t('composer.placeholder'))
             }
             onChange={(e) => {
               onTextChange(e.target.value);
@@ -202,59 +220,138 @@ export function Composer(props: {
             className="block min-h-[44px] w-full resize-none bg-transparent px-3.5 py-2.5 text-sm leading-relaxed text-fg outline-none placeholder:text-faint"
           />
           <div className="flex items-center justify-between gap-2 px-2.5 pb-2.5">
-            <div className="flex rounded-lg bg-subtle p-0.5 text-xs" role="radiogroup" aria-label={t('composer.mode')}>
-              {(['ask', 'act'] as const).map((mode) => {
-                const checked = props.mode === mode;
-                return (
-                  <button
-                    key={mode}
-                    type="button"
-                    role="radio"
-                    aria-checked={checked}
-                    data-testid={`mode-${mode}`}
-                    onClick={() => props.onModeChange(mode)}
-                    title={t(`composer.modes.${mode}Hint`)}
-                    className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 font-medium transition-all ${
-                      checked ? 'bg-surface text-fg shadow-soft' : 'text-muted hover:text-fg'
-                    }`}
-                  >
-                    {mode === 'ask' ? (
-                      <MessageSquare className={`h-3.5 w-3.5 ${checked ? 'text-accent' : ''}`} />
-                    ) : (
-                      <Bot className={`h-3.5 w-3.5 ${checked ? 'text-accent' : ''}`} />
-                    )}
-                    {t(`composer.modes.${mode}`)}
-                  </button>
-                );
-              })}
+            <ModePicker mode={props.mode} onChange={props.onModeChange} />
+            <div className="flex items-center gap-1.5">
+              <MicButton {...props.voice} disabled={disabled} />
+              {busy ? (
+                <button
+                  type="button"
+                  data-testid="stop-button"
+                  onClick={props.onStop}
+                  aria-label={t('composer.stop')}
+                  title={t('composer.stop')}
+                  className="flex h-8 w-8 items-center justify-center rounded-full bg-fg text-surface transition-opacity hover:opacity-85"
+                >
+                  <Square className="h-3 w-3 fill-current" />
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  data-testid="send-button"
+                  onClick={props.onSend}
+                  disabled={!canSend}
+                  aria-label={t('composer.send')}
+                  title={t('composer.send')}
+                  className="flex h-8 w-8 items-center justify-center rounded-full text-white shadow-soft transition-all brand-gradient hover:brightness-110 disabled:bg-none disabled:bg-subtle disabled:text-faint disabled:shadow-none"
+                >
+                  <ArrowUp className="h-4 w-4" strokeWidth={2.5} />
+                </button>
+              )}
             </div>
-            {streaming ? (
-              <button
-                type="button"
-                onClick={props.onStop}
-                aria-label={t('composer.stop')}
-                title={t('composer.stop')}
-                className="flex h-8 w-8 items-center justify-center rounded-full bg-fg text-surface transition-opacity hover:opacity-85"
-              >
-                <Square className="h-3 w-3 fill-current" />
-              </button>
-            ) : (
-              <button
-                type="button"
-                data-testid="send-button"
-                onClick={props.onSend}
-                disabled={!canSend}
-                aria-label={t('composer.send')}
-                title={t('composer.send')}
-                className="flex h-8 w-8 items-center justify-center rounded-full text-white shadow-soft transition-all brand-gradient hover:brightness-110 disabled:bg-none disabled:bg-subtle disabled:text-faint disabled:shadow-none"
-              >
-                <ArrowUp className="h-4 w-4" strokeWidth={2.5} />
-              </button>
-            )}
           </div>
         </div>
       </div>
     </div>
+  );
+}
+
+/** Query / Auto / Manual (M1.5 B6), remembered globally. */
+function ModePicker({ mode, onChange }: { mode: AgentMode; onChange: (mode: AgentMode) => void }) {
+  const { t } = useTranslation();
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const current = MODES.find((m) => m.id === mode) ?? MODES[1]!;
+  const Icon = current.icon;
+
+  useEffect(() => {
+    if (!open) return;
+    const onPointerDown = (event: PointerEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+    };
+    document.addEventListener('pointerdown', onPointerDown);
+    return () => document.removeEventListener('pointerdown', onPointerDown);
+  }, [open]);
+
+  return (
+    <div ref={rootRef} className="relative">
+      <button
+        type="button"
+        data-testid="mode-picker"
+        data-mode={mode}
+        onClick={() => setOpen(!open)}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        title={t(`composer.modes.${mode}Hint`)}
+        className="flex h-7 items-center gap-1.5 rounded-lg bg-subtle px-2.5 text-xs font-medium text-fg transition-colors hover:bg-hover"
+      >
+        <Icon className="h-3.5 w-3.5 text-accent" />
+        {t(`composer.modes.${mode}`)}
+        <ChevronDown className={`h-3 w-3 text-faint transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && (
+        <div
+          role="menu"
+          className="absolute bottom-full left-0 z-20 mb-2 w-72 max-w-[calc(100vw-2rem)] animate-fade-in overflow-hidden rounded-xl border border-line bg-surface p-1 shadow-float"
+        >
+          {MODES.map(({ id, icon: ModeIcon }) => {
+            const checked = id === mode;
+            return (
+              <button
+                key={id}
+                type="button"
+                role="menuitemradio"
+                aria-checked={checked}
+                data-testid={`mode-option-${id}`}
+                onClick={() => {
+                  onChange(id);
+                  setOpen(false);
+                }}
+                className={`flex w-full items-start gap-2.5 rounded-lg px-2.5 py-2 text-left ${checked ? 'bg-accent-soft' : 'hover:bg-hover'}`}
+              >
+                <span className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md ${checked ? 'bg-accent text-on-accent' : 'bg-subtle text-muted'}`}>
+                  <ModeIcon className="h-3.5 w-3.5" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-medium">{t(`composer.modes.${id}`)}</span>
+                  <span className="block text-xs leading-relaxed text-muted">{t(`composer.modes.${id}Hint`)}</span>
+                </span>
+                {checked && <Check className="mt-1 h-4 w-4 shrink-0 text-accent" />}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MicButton({ state, level, toggle, disabled }: { state: VoiceState; level: number; toggle: () => void; disabled: boolean }) {
+  const { t } = useTranslation();
+  const listening = state === 'listening';
+  const label = listening ? t('voice.stop') : state === 'transcribing' ? t('voice.transcribing') : t('voice.start');
+  return (
+    <button
+      type="button"
+      data-testid="mic-button"
+      data-state={state}
+      onClick={toggle}
+      disabled={disabled || state === 'transcribing'}
+      aria-label={label}
+      title={label}
+      aria-pressed={listening}
+      className={`relative flex h-8 w-8 items-center justify-center rounded-full transition-colors disabled:opacity-45 ${
+        listening ? 'bg-accent-soft text-accent' : 'text-muted hover:bg-hover hover:text-fg'
+      }`}
+    >
+      {listening && (
+        <span
+          className="absolute inset-0 rounded-full border-2 border-accent/50 transition-transform duration-100"
+          style={{ transform: `scale(${1 + level * 0.45})` }}
+          aria-hidden
+        />
+      )}
+      {state === 'transcribing' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mic className="h-4 w-4" />}
+    </button>
   );
 }
 
@@ -295,18 +392,5 @@ function PageChip({ tab, access, included, onToggle }: {
       <span className="truncate">{title}</span>
       {included ? <Check className="h-3.5 w-3.5 shrink-0" strokeWidth={2.5} /> : <Plus className="h-3.5 w-3.5 shrink-0" />}
     </button>
-  );
-}
-
-function TargetChip({ tab }: { tab?: ActiveTab }) {
-  const { t } = useTranslation();
-  return (
-    <span
-      className="flex max-w-full items-center gap-1.5 rounded-full bg-accent-soft py-1 pl-2 pr-2.5 text-xs text-accent"
-      data-testid="target-chip"
-    >
-      <Bot className="h-3.5 w-3.5 shrink-0" />
-      <span className="truncate">{tab ? t('composer.actOn', { title: tab.title || tab.url }) : t('composer.actNewTab')}</span>
-    </span>
   );
 }

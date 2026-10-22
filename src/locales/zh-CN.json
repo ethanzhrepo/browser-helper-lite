@@ -18,27 +18,30 @@
     "choose": "选择模型",
     "search": "搜索模型",
     "none": "没有可选的模型。请添加连接，或在设置里手动填写模型 ID。",
-    "manage": "管理模型"
+    "manage": "管理模型",
+    "favorite": "设为常用",
+    "unfavorite": "取消常用",
+    "showMore_other": "再显示 {{count}} 个模型",
+    "showAll": "显示全部模型",
+    "showFavorites": "只显示常用"
   },
   "empty": {
     "setupTitle": "先连接一个模型",
     "setupBody": "添加 OpenAI、Anthropic、Gemini、DeepSeek 或任意 OpenAI 兼容服务的 API Key。Key 只保存在这台设备上。",
     "setupAction": "添加模型",
-    "title": "关于这个页面，需要我做什么？",
+    "title": "有什么可以帮你？",
     "actions": {
       "summarize": "总结此页",
       "translate": "翻译选中内容或整页",
       "explain": "解释选中的文字"
     },
     "tip": "输入 / 使用指令，输入 @ 附带页面或选中内容。",
-    "act": {
-      "title": "要我在网页上做什么？",
-      "body": "我会在当前标签页里点击、输入、滚动和跳转。有风险的步骤会先等你确认。",
-      "examples": {
-        "plans": "在 Rogers 官网找出月费 60 加元以内的手机套餐，并用表格对比",
-        "compare": "在 Amazon 和 AliExpress 上搜索 65W USB-C 充电器，对比价格和配送时间",
-        "process": "查一下把手机号转入 Rogers 的办理流程，按步骤列出来"
-      }
+    "body": "直接提问就行。我也可以读取这个页面、上网搜索，或在标签页里替你操作。",
+    "tasksTitle": "或者交给我一个任务",
+    "examples": {
+      "plans": "在 Rogers 官网找出月费 60 加元以内的手机套餐，并用表格对比",
+      "compare": "在 Amazon 和 AliExpress 上搜索 65W USB-C 充电器，对比价格和配送时间",
+      "process": "查一下把手机号转入 Rogers 的办理流程，按步骤列出来"
     }
   },
   "composer": {
@@ -48,17 +51,16 @@
     "stop": "停止",
     "removeSelection": "移除选中内容",
     "defaultPrompt": "请看附带的内容。",
-    "placeholderAct": "描述要在网页上完成的任务…",
-    "placeholderAnswer": "回答 Agent 的问题…",
+    "placeholderAnswer": "回答助手的问题…",
     "mode": "模式",
     "modes": {
-      "ask": "问答",
-      "act": "操作",
-      "askHint": "围绕网页对话，不会改动页面",
-      "actHint": "让 Agent 替你操作浏览器"
-    },
-    "actOn": "从这里开始：{{title}}",
-    "actNewTab": "从当前标签页开始"
+      "query": "查询模式",
+      "auto": "自动模式",
+      "manual": "手动批准",
+      "queryHint": "读页面、搜索、打开链接。不会点击按钮、填写表单或提交任何东西。",
+      "autoHint": "自动读取和操作页面。只有付款、删除、改账户设置等高风险操作会等你确认。",
+      "manualHint": "读取、滚动、搜索自动进行；每一个会改动页面的操作都要你批准。"
+    }
   },
   "context": {
     "unavailable": "无法读取此页面",
@@ -101,7 +103,9 @@
     "copy": "复制",
     "copied": "已复制",
     "retry": "重试",
-    "truncated": "部分内容"
+    "truncated": "部分内容",
+    "diagramError": "这个图表画不出来，下面是它的源码。",
+    "copySvg": "复制 SVG"
   },
   "history": {
     "title": "历史记录",
@@ -130,7 +134,9 @@
       "sites": "网站权限",
       "language": "语言",
       "about": "关于",
-      "agent": "Agent"
+      "agent": "Agent",
+      "search": "搜索",
+      "voice": "语音输入"
     }
   },
   "connections": {
@@ -181,20 +187,21 @@
     "typeModelId": "这个连接没有模型列表，请手动填写模型 ID。",
     "modelPlaceholder": "模型 ID",
     "chat": {
-      "title": "对话模型",
-      "description": "在侧边栏里回答你的问题。"
+      "title": "当前模型",
+      "description": "在侧边栏里回答和干活，包括操作网页（需要支持工具调用）。可以在侧边栏顶部随时切换。"
     },
     "fast": {
       "title": "快速模型",
-      "description": "处理便宜、快速的杂活：摘要、数据抽取、生成标题、风险判断。"
-    },
-    "agent": {
-      "title": "Agent 模型",
-      "description": "规划并操作网页，需要支持工具调用。如果它不能看图（比如 DeepSeek），会由视觉模型充当它的「眼睛」。"
+      "description": "处理便宜、快速的杂活：从长页面里抽取信息。"
     },
     "vision": {
       "title": "视觉模型",
-      "description": "替不能看图的模型查看截图和图片。建议选一个便宜、快速的多模态模型。"
+      "description": "替不能看图的模型（比如 DeepSeek）查看截图。建议选一个便宜、快速的多模态模型。"
+    },
+    "stt": {
+      "title": "语音识别模型",
+      "description": "当语音输入选择「语音识别模型」时，用它把录音转成文字。",
+      "modelHint": "例如 gpt-4o-transcribe、whisper-1（OpenAI），whisper-large-v3（Groq），gemini-2.5-flash（Gemini）。"
     }
   },
   "sites": {
@@ -210,7 +217,7 @@
     "noPolicies": "还没有设置任何网站策略。",
     "hostLabel": "网站",
     "addPolicy": "添加",
-    "defaultPolicy": "未设置策略的网站：有风险的操作需要确认。付款、删除等高风险操作始终需要你确认。",
+    "defaultPolicy": "没有设置策略的网站，按侧边栏里选择的模式处理。网站策略和模式冲突时取更严格的；设为「自动」的网站在「手动批准」模式下也不再逐一确认。高风险操作始终需要你确认。",
     "policies": {
       "blocked": "禁止",
       "readOnly": "只读",
@@ -265,7 +272,8 @@
       "web_search": "上网搜索：{{query}}",
       "ask_user": "询问你：{{question}}",
       "hand_off": "交给你处理",
-      "done": "完成"
+      "read_page": "读取页面",
+      "view_page": "查看页面"
     },
     "directions": {
       "up": "上",
@@ -280,7 +288,8 @@
         "destructive": "这看起来难以撤销（删除、取消、修改账户或安全设置）。",
         "submit": "这会提交、发送或保存内容。",
         "confirmEach": "你为这个网站设置了每步都要确认。",
-        "sensitiveField": "这涉及敏感信息。"
+        "sensitiveField": "这涉及敏感信息。",
+        "manualMode": "当前是「手动批准」模式。"
       },
       "allowOnce": "允许一次",
       "allowTask": "本任务内都允许",
@@ -309,7 +318,7 @@
       "done": "已完成，继续"
     },
     "question": {
-      "title": "Agent 想问你：",
+      "title": "助手想问你：",
       "hint": "请在下方输入框里回答。"
     },
     "controls": {
@@ -349,11 +358,13 @@
     "maxStepsSummary": "已经执行了 {{count}} 步，任务仍未完成，我先停下了。可以看看上面的步骤，然后给我一个更具体的任务，或者在设置里调高步数上限。",
     "stoppedSummary": "任务已停止。",
     "failedSummary": "任务失败：{{message}}",
-    "thinking": "思考中…"
+    "thinking": "思考中…",
+    "emptyAnswer": "（没有回答。）",
+    "closeTabs_other": "关闭我打开的 {{count}} 个标签页"
   },
   "agentSettings": {
     "title": "Agent",
-    "description": "设置 Agent 如何替你操作网页。",
+    "description": "设置助手如何替你操作网页。",
     "useCdp": "使用真实的鼠标和键盘输入（CDP）",
     "useCdpHint": "在现代网站上更可靠。任务运行期间，Chrome 顶部会显示「正在调试此浏览器」提示条。",
     "cdpUnavailable": "不可用：这个版本没有包含 debugger 权限。",
@@ -361,14 +372,114 @@
     "notificationsHint": "遇到验证码、登录或需要确认时，发送 Chrome 通知。",
     "maxSteps": "每个任务的步数上限",
     "maxStepsHint": "5 到 100 之间。",
-    "searchEngine": "网页搜索引擎",
+    "mode": "默认模式",
+    "modeHint": "也可以随时在输入框下方切换模式，对正在进行的任务立即生效。"
+  },
+  "voice": {
+    "start": "语音输入",
+    "stop": "停止聆听",
+    "transcribing": "正在识别…",
+    "listening": "正在聆听…",
+    "problems": {
+      "permission": "请在刚打开的标签页里允许使用麦克风，然后再点一次麦克风。",
+      "unsupported": "这个浏览器不支持语音识别。请在「语音输入」设置里改用语音识别模型。",
+      "network": "Chrome 语音识别连不上 Google 的服务。请检查网络，或改用语音识别模型。",
+      "transcribe": "录音没能转成文字。"
+    },
+    "permission": {
+      "title": "麦克风权限",
+      "askingTitle": "请允许使用麦克风",
+      "askingBody": "Chrome 正在询问是否允许 Browser Helper 使用麦克风。只在你开启语音输入时使用。",
+      "grantedTitle": "已允许使用麦克风",
+      "grantedBody": "现在可以在侧边栏里使用语音输入了。这个标签页会自动关闭。",
+      "deniedTitle": "麦克风被拦截了",
+      "deniedBody": "请点地址栏右侧的图标允许，或在 Chrome 设置 › 隐私和安全 › 网站设置 › 麦克风 中允许，然后重试。",
+      "retry": "重试"
+    },
+    "title": "语音输入",
+    "description": "用说话代替打字：点输入框里的麦克风开始，再点一次（或停顿两秒）结束。",
+    "engine": "识别方式",
+    "engines": {
+      "browser": {
+        "title": "Chrome 语音识别",
+        "description": "免费、实时。音频会发送到 Google 的语音服务。"
+      },
+      "stt": {
+        "title": "语音识别模型",
+        "description": "先录音，再发给「能力分配」里的语音识别模型。准确率更高，中英混说更好。"
+      }
+    },
+    "setSttModel": "设置语音识别模型",
+    "language": "说话的语言",
+    "languageAuto": "跟随界面语言",
+    "autoSend": "说完自动发送",
+    "autoSendHint": "关闭时，文字留在输入框里，方便你修改。",
+    "microphone": "麦克风",
+    "micHint": "侧边栏里弹不出麦克风授权，所以第一次使用时会打开一个标签页来询问。",
+    "micGranted": "Browser Helper 可以使用麦克风。",
+    "micAllowed": "已允许",
+    "allowMic": "允许使用麦克风"
+  },
+  "search": {
+    "title": "搜索",
+    "description": "页面里找不到答案时，助手用什么方式上网搜索。",
+    "provider": "搜索方式",
+    "providers": {
+      "browser": {
+        "title": "浏览器搜索",
+        "description": "在后台标签页里用 Google、Bing 或 DuckDuckGo 搜索。免费，偶尔会遇到验证码。"
+      },
+      "deepseek": {
+        "title": "DeepSeek 搜索 API",
+        "description": "使用你的 DeepSeek 连接的 Key。结果带有专为模型撰写的摘要。"
+      },
+      "cloudflare": {
+        "title": "Cloudflare Web Search",
+        "description": "通过你的 AI Gateway 调用，从 Cloudflare 账户扣费。搜索源：Ceramic、Exa、Linkup。"
+      },
+      "tavily": {
+        "title": "Tavily",
+        "description": "专为 AI Agent 设计的搜索 API。"
+      },
+      "brave": {
+        "title": "Brave Search",
+        "description": "独立的网页索引。"
+      },
+      "exa": {
+        "title": "Exa",
+        "description": "语义搜索，附带每个页面的重点摘录。"
+      },
+      "native": {
+        "title": "模型自带搜索",
+        "description": "OpenAI、Anthropic、Gemini 在自己那边联网搜索，使用当前模型。"
+      }
+    },
+    "engine": "浏览器搜索引擎",
+    "engineFallbackHint": "在下方允许时，API 出错会改用它。",
     "engines": {
       "google": "Google",
       "bing": "Bing",
       "duckduckgo": "DuckDuckGo",
       "custom": "自定义"
     },
-    "customSearchUrl": "自定义搜索地址",
-    "customSearchUrlHint": "用 %s 表示搜索词的位置。"
+    "customUrl": "自定义搜索地址",
+    "customUrlHint": "用 %s 表示搜索词的位置。",
+    "deepseekNoConnection": "DeepSeek 搜索使用 DeepSeek 连接的 API Key，你还没有添加。",
+    "deepseekConnection": "DeepSeek 连接",
+    "deepseekHint": "用它的 API Key 和 Base URL 调用 /v1/tools/search。",
+    "cloudflareAccount": "账户 ID（Account ID）",
+    "cloudflareGateway": "AI Gateway ID",
+    "cloudflareSource": "搜索源",
+    "cloudflareToken": "API Token",
+    "cloudflareTokenHint": "需要 Workers AI Read 和 AI Gateway Read 权限。",
+    "keyHint": "只保存在这台设备上。",
+    "nativeHint": "使用当前模型所在的连接，必须是 OpenAI、Anthropic 或 Gemini。每次搜索会多一次模型请求。",
+    "fallback": "API 出错时改用浏览器搜索",
+    "fallbackHint": "比如 Key 不对或额度用完的时候。",
+    "test": "测试搜索",
+    "testQuery": "测试搜索词",
+    "testOk_other": "可以用。共 {{count}} 条结果：",
+    "testOkText": "可以用。模型回答：",
+    "verifyNote": "无论用哪种方式，助手都会被要求回到原网页核实，并标明来源。"
   }
 }

@@ -1,24 +1,27 @@
-import { History, Info, Settings as SettingsIcon, SquarePen, X } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { History, Info, Plug, Settings as SettingsIcon, SquarePen, X } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ACTIVE_STATUSES } from '../../src/agent/types';
 import { useAgentTasks } from '../../src/agent/useAgentTasks';
 import { capturePage, captureSelection } from '../../src/browser/page-context';
 import { SLASH_COMMANDS, type SlashCommand } from '../../src/chat/commands';
-import { useChatSession } from '../../src/chat/useChatSession';
+import { useConversation } from '../../src/chat/useConversation';
 import { requestHostAccess } from '../../src/permissions/hosts';
-import type { ContextKind, ContextSnapshot, Locale } from '../../src/shared/types';
+import type { AgentMode, ContextKind, ContextSnapshot, ErrorInfo, Locale } from '../../src/shared/types';
 import { newId } from '../../src/storage/db';
-import { BrandMark, IconButton } from '../../src/ui/Button';
+import { DEFAULT_VOICE_SETTINGS, updateSettings } from '../../src/storage/settings';
+import { Button, IconButton } from '../../src/ui/Button';
+import { errorSummary } from '../../src/ui/errors';
 import { openOptions } from '../../src/ui/navigation';
 import { useActiveTab } from '../../src/ui/useActiveTab';
 import { useSettings } from '../../src/ui/useSettings';
+import { useVoiceInput, type VoiceProblem } from '../../src/voice/useVoiceInput';
 import { AgentControls } from './AgentControls';
-import { Composer, type ComposerMode } from './Composer';
+import { Composer } from './Composer';
 import { EmptyState } from './EmptyState';
 import { HistoryPanel } from './HistoryPanel';
 import { MessageList } from './MessageList';
-import { ModelPicker } from './ModelPicker';
+import { ModelSwitcher } from './ModelSwitcher';
 
 export function App() {
   const { t, i18n } = useTranslation();
@@ -26,25 +29,29 @@ export function App() {
   const { tab, access } = useActiveTab();
   const chatSlot = settings?.slots.chat?.modelId ? settings.slots.chat : undefined;
   const locale = i18n.language as Locale;
-  const session = useChatSession({ chatSlot, locale });
-  const agent = useAgentTasks(session.conversation?.id, () => void session.reload());
-  const agentSlot = settings?.slots.agent?.modelId ? settings.slots.agent : chatSlot;
+  const conversation = useConversation();
+  const agent = useAgentTasks(conversation.conversation?.id, () => void conversation.reload());
   const activeTask = Object.values(agent.tasks).find(
-    (task) => task.conversationId === session.conversation?.id && ACTIVE_STATUSES.includes(task.status),
+    (task) => task.conversationId === conversation.conversation?.id && ACTIVE_STATUSES.includes(task.status),
   );
   const question = activeTask?.waiting?.kind === 'question' ? activeTask : undefined;
 
-  const [mode, setMode] = useState<ComposerMode>('ask');
   const [view, setView] = useState<'chat' | 'history'>('chat');
   const [text, setText] = useState('');
   const [includePage, setIncludePage] = useState(false);
   const [selection, setSelection] = useState<ContextSnapshot>();
   const [notice, setNotice] = useState<string>();
+  const [pendingTaskId, setPendingTaskId] = useState<string>();
 
-  // Opening the panel while a task runs (e.g. from its notification) shows that task.
+  // The request's turn has reported back.
+  useEffect(() => {
+    if (pendingTaskId && agent.tasks[pendingTaskId]) setPendingTaskId(undefined);
+  }, [agent.tasks, pendingTaskId]);
+
+  // Opening the panel while a turn runs (e.g. from its notification) shows that conversation.
   const runningConversation = Object.values(agent.tasks).find((task) => ACTIVE_STATUSES.includes(task.status))?.conversationId;
   useEffect(() => {
-    if (runningConversation && !session.conversation) void session.open(runningConversation);
+    if (runningConversation && !conversation.conversation) void conversation.open(runningConversation);
   }, [runningConversation]);
 
   // A page toggle only applies to the tab it was turned on for.
@@ -94,38 +101,30 @@ export function App() {
     else void attachSelection(false);
   };
 
+  /** Stores the request and starts the assistant's turn in the background. */
   const send = async (prompt: string, contexts: ContextSnapshot[]) => {
     setNotice(undefined);
     setText('');
     setIncludePage(false);
     setSelection(undefined);
-    await session.send({ text: prompt, contexts });
-  };
-
-  /** Act mode: start a task on the current tab, or answer the agent's question. */
-  const startTask = async () => {
-    const goal = text.trim();
-    if (!goal) return;
-    if (question) {
-      setText('');
-      await session.addUserMessage({ text: goal, taskId: question.id });
-      agent.send({ type: 'respond', taskId: question.id, response: { kind: 'answer', text: goal } });
-      return;
-    }
-    if (activeTask) return setNotice(t('agent.busy'));
-    if (!tab) return setNotice(t('context.unavailable'));
-    // Pages the extension cannot read (e.g. a new tab) are fine: the agent navigates away.
-    if (access === 'missing' && !(await ensureAccess())) return accessNotice();
-    setNotice(undefined);
-    setText('');
     const taskId = newId();
-    const conversationId = await session.addUserMessage({ text: goal, taskId });
-    agent.send({ type: 'start', taskId, conversationId, goal, tabId: tab.id });
+    setPendingTaskId(taskId);
+    const { conversationId, message } = await conversation.appendUser({ text: prompt, contexts, taskId });
+    agent.send({ type: 'start', taskId, conversationId, anchorMessageId: message.id, tabId: tab?.id });
   };
 
-  const handleSend = async () => {
-    if (mode === 'act' || question) return startTask();
-    if (!chatSlot || session.streaming) return;
+  /** Answers the assistant's question; the answer is part of the conversation. */
+  const answer = async (reply: string) => {
+    if (!question) return;
+    setText('');
+    await conversation.appendUser({ text: reply, taskId: question.id });
+    agent.send({ type: 'respond', taskId: question.id, response: { kind: 'answer', text: reply } });
+  };
+
+  const handleSend = async (typed = text) => {
+    const prompt = typed.trim();
+    if (question) return prompt ? answer(prompt) : undefined;
+    if (!chatSlot || activeTask || pendingTaskId) return;
     const contexts: ContextSnapshot[] = [];
     if (includePage && tab) {
       try {
@@ -137,7 +136,18 @@ export function App() {
       }
     }
     if (selection) contexts.push(selection);
-    await send(text.trim() || t('composer.defaultPrompt'), contexts);
+    if (!prompt && contexts.length === 0) return;
+    await send(prompt || t('composer.defaultPrompt'), contexts);
+  };
+
+  /** A new reply to the same request, after an error or a stop. */
+  const retry = () => {
+    const current = conversation.conversation;
+    const last = conversation.messages.at(-1);
+    if (!current || !last || activeTask) return;
+    const taskId = newId();
+    setPendingTaskId(taskId);
+    agent.send({ type: 'start', taskId, conversationId: current.id, anchorMessageId: last.id, tabId: tab?.id });
   };
 
   /** Empty-state shortcuts: attach what the command needs and send at once. */
@@ -159,28 +169,55 @@ export function App() {
     }
   };
 
+  const newChat = () => {
+    const previous = conversation.conversation;
+    // Tabs this conversation grouped go back to how they were (M1.5 A4).
+    if (previous) agent.send({ type: 'release', conversationId: previous.id });
+    conversation.reset();
+    setPendingTaskId(undefined);
+    setView('chat');
+  };
+
+  const voiceProblem = (problem: VoiceProblem, error?: ErrorInfo) =>
+    setNotice(problem === 'transcribe' && error ? errorSummary(t, error) : t(`voice.problems.${problem}`));
+
+  // Spoken text is added after what was already typed.
+  const typedBeforeVoice = useRef('');
+  const withTyped = (spoken: string) => (typedBeforeVoice.current ? `${typedBeforeVoice.current} ${spoken}` : spoken);
+  const voice = useVoiceInput({
+    voice: settings?.voice ?? DEFAULT_VOICE_SETTINGS,
+    locale,
+    onText: (spoken) => setText(withTyped(spoken)),
+    onDone: (spoken) => {
+      if (spoken && settings?.voice.autoSend) void handleSend(withTyped(spoken));
+    },
+    onProblem: voiceProblem,
+  });
+  const toggleVoice = () => {
+    if (voice.state === 'idle') typedBeforeVoice.current = text.trim();
+    voice.toggle();
+  };
+
   if (!settings) return null;
 
   const hasModel = Boolean(chatSlot);
-  const showEmpty = session.messages.length === 0 && !session.streaming;
+  const showEmpty = conversation.messages.length === 0 && !pendingTaskId;
+  const busy = Boolean((activeTask && !question) || pendingTaskId);
 
   return (
     <div className="flex h-screen flex-col bg-bg text-fg">
-      <header className="flex h-12 shrink-0 items-center gap-1 border-b border-line bg-surface px-2.5">
-        <BrandMark size="sm" />
+      {/* Chrome draws the extension's name above the panel, so the header leads with the model. */}
+      <header className="flex h-12 shrink-0 items-center gap-1 border-b border-line bg-surface px-2">
         {settings.connections.length > 0 ? (
-          <ModelPicker settings={settings} />
+          <ModelSwitcher settings={settings} />
         ) : (
-          <span className="ml-1 text-sm font-semibold tracking-tight">Browser Helper</span>
+          <Button size="sm" variant="soft" onClick={() => openOptions('providers')}>
+            <Plug className="h-3.5 w-3.5" />
+            {t('empty.setupAction')}
+          </Button>
         )}
         <div className="flex-1" />
-        <IconButton
-          label={t('header.newChat')}
-          onClick={() => {
-            session.reset();
-            setView('chat');
-          }}
-        >
+        <IconButton label={t('header.newChat')} onClick={newChat}>
           <SquarePen className="h-4 w-4" />
         </IconButton>
         <IconButton label={t('header.history')} onClick={() => setView(view === 'history' ? 'chat' : 'history')}>
@@ -193,9 +230,11 @@ export function App() {
 
       {view === 'history' ? (
         <HistoryPanel
-          currentId={session.conversation?.id}
+          currentId={conversation.conversation?.id}
           onOpen={(id) => {
-            void session.open(id);
+            const previous = conversation.conversation;
+            if (previous && previous.id !== id) agent.send({ type: 'release', conversationId: previous.id });
+            void conversation.open(id);
             setView('chat');
           }}
           onClose={() => setView('chat')}
@@ -203,54 +242,52 @@ export function App() {
       ) : (
         <>
           {showEmpty ? (
-            <EmptyState
-              hasModel={mode === 'act' ? Boolean(agentSlot) : hasModel}
-              mode={mode}
-              onQuickAction={(id) => void runQuickAction(id)}
-              onExample={setText}
-            />
+            <EmptyState hasModel={hasModel} onQuickAction={(id) => void runQuickAction(id)} onExample={setText} />
           ) : (
             <MessageList
-              messages={session.messages}
-              streaming={session.streaming}
-              onRetry={session.retry}
+              messages={conversation.messages}
               tasks={agent.tasks}
+              pendingTaskId={pendingTaskId}
+              onRetry={retry}
               onAgentSend={agent.send}
             />
           )}
           <div className="shrink-0 space-y-2 px-3 pb-3 pt-1">
-          {notice && (
-            <div
-              className="flex animate-fade-in items-start gap-2 rounded-xl border border-warning/25 bg-warning-soft px-3 py-2 text-xs text-fg"
-              role="status"
-            >
-              <Info className="mt-px h-3.5 w-3.5 shrink-0 text-warning" />
-              <span className="flex-1 leading-relaxed">{notice}</span>
-              <button type="button" aria-label={t('common.dismiss')} onClick={() => setNotice(undefined)} className="text-muted hover:text-fg">
-                <X className="h-3.5 w-3.5" />
-              </button>
-            </div>
-          )}
-          {activeTask && <AgentControls task={activeTask} onSend={agent.send} />}
-          <Composer
-            mode={question ? 'act' : mode}
-            onModeChange={setMode}
-            placeholder={question ? t('composer.placeholderAnswer') : undefined}
-            text={text}
-            onTextChange={setText}
-            tab={tab}
-            access={access}
-            includePage={includePage}
-            onTogglePage={() => (includePage ? setIncludePage(false) : void attachPage())}
-            selection={selection}
-            onRemoveSelection={() => setSelection(undefined)}
-            onCommand={applyCommand}
-            onMention={applyMention}
-            onSend={() => void handleSend()}
-            onStop={session.stop}
-            streaming={Boolean(session.streaming)}
-            disabled={mode === 'act' ? !agentSlot : !hasModel}
-          />
+            {notice && (
+              <div
+                className="flex animate-fade-in items-start gap-2 rounded-xl border border-warning/25 bg-warning-soft px-3 py-2 text-xs text-fg"
+                role="status"
+              >
+                <Info className="mt-px h-3.5 w-3.5 shrink-0 text-warning" />
+                <span className="flex-1 leading-relaxed">{notice}</span>
+                <button type="button" aria-label={t('common.dismiss')} onClick={() => setNotice(undefined)} className="text-muted hover:text-fg">
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            )}
+            {activeTask && (activeTask.steps.length > 0 || activeTask.waiting) && (
+              <AgentControls task={activeTask} onSend={agent.send} />
+            )}
+            <Composer
+              mode={settings.agent.mode}
+              onModeChange={(mode: AgentMode) => void updateSettings((s) => ({ ...s, agent: { ...s.agent, mode } }))}
+              placeholder={question ? t('composer.placeholderAnswer') : undefined}
+              text={text}
+              onTextChange={setText}
+              tab={tab}
+              access={access}
+              includePage={includePage}
+              onTogglePage={() => (includePage ? setIncludePage(false) : void attachPage())}
+              selection={selection}
+              onRemoveSelection={() => setSelection(undefined)}
+              onCommand={applyCommand}
+              onMention={applyMention}
+              onSend={() => void handleSend()}
+              onStop={() => activeTask && agent.send({ type: 'stop', taskId: activeTask.id })}
+              busy={busy}
+              disabled={!hasModel}
+              voice={{ state: voice.state, level: voice.level, toggle: toggleVoice }}
+            />
           </div>
         </>
       )}
