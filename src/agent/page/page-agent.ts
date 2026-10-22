@@ -237,25 +237,42 @@ export function createPageAgent(): PageAgentApi {
   const root = host.attachShadow({ mode: 'closed' });
   root.innerHTML = `
     <style>
-      .frame { position: fixed; inset: 0; pointer-events: none; box-shadow: inset 0 0 0 3px #6d5efc, inset 0 0 24px rgba(109,94,252,.45); animation: pulse 2s ease-in-out infinite; }
-      .frame.waiting { box-shadow: inset 0 0 0 3px #f59e0b, inset 0 0 24px rgba(245,158,11,.45); }
-      @keyframes pulse { 50% { opacity: .55; } }
-      .bar { position: fixed; top: 10px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px; align-items: center; max-width: calc(100vw - 32px);
-        padding: 6px 8px 6px 14px; border-radius: 999px; background: #1c1d24; color: #fff; font: 500 13px/1.3 system-ui, -apple-system, "Segoe UI", sans-serif;
-        box-shadow: 0 6px 24px rgba(0,0,0,.25); pointer-events: auto; }
-      .bar span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-      .bar button { all: unset; cursor: pointer; padding: 4px 10px; border-radius: 999px; background: #3a3b46; color: #fff; font-weight: 600; white-space: nowrap; }
-      .bar button.primary { background: #6d5efc; }
-      .cursor { position: fixed; left: 0; top: 0; width: 22px; height: 22px; pointer-events: none; transition: transform .35s cubic-bezier(.2,.7,.3,1); display: none; }
-      .ripple { position: fixed; width: 28px; height: 28px; margin: -14px 0 0 -14px; border-radius: 50%; border: 2px solid #6d5efc; pointer-events: none; animation: ripple .5s ease-out forwards; }
-      @keyframes ripple { from { transform: scale(.3); opacity: 1; } to { transform: scale(1.4); opacity: 0; } }
-      .box { position: fixed; border: 2px solid #6d5efc; border-radius: 3px; pointer-events: none; }
-      .box b { position: absolute; top: -2px; left: -2px; transform: translateY(-100%); background: #6d5efc; color: #fff; font: 700 11px/1 system-ui, sans-serif; padding: 2px 4px; border-radius: 3px 3px 3px 0; }
+      .frame { position: fixed; inset: 0; pointer-events: none; border-radius: 0;
+        box-shadow: inset 0 0 0 2px rgba(124,108,242,.9), inset 0 0 36px rgba(124,108,242,.28);
+        animation: breathe 2.4s ease-in-out infinite; }
+      .frame.waiting { box-shadow: inset 0 0 0 2px rgba(234,152,40,.95), inset 0 0 36px rgba(234,152,40,.28); }
+      @keyframes breathe { 50% { opacity: .55; } }
+      .bar { position: fixed; top: 12px; left: 50%; transform: translateX(-50%); display: flex; gap: 8px; align-items: center;
+        max-width: calc(100vw - 32px); padding: 5px 5px 5px 12px; border-radius: 999px;
+        background: rgba(22,22,28,.86); color: #f4f4f6; border: 1px solid rgba(255,255,255,.1);
+        -webkit-backdrop-filter: blur(14px) saturate(1.4); backdrop-filter: blur(14px) saturate(1.4);
+        font: 500 13px/1.3 ui-sans-serif, system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+        box-shadow: 0 10px 30px rgba(0,0,0,.28), 0 1px 2px rgba(0,0,0,.2); pointer-events: auto;
+        animation: drop .3s cubic-bezier(.2,.7,.3,1); }
+      @keyframes drop { from { opacity: 0; transform: translate(-50%, -8px); } }
+      .dot { width: 8px; height: 8px; flex: none; border-radius: 50%; background: linear-gradient(135deg, #6366f1, #a78bfa);
+        box-shadow: 0 0 0 3px rgba(124,108,242,.25); animation: blink 1.4s ease-in-out infinite; }
+      .waiting-bar .dot { background: #f0a43a; box-shadow: 0 0 0 3px rgba(240,164,58,.25); }
+      @keyframes blink { 50% { opacity: .4; } }
+      .bar span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-right: 2px; }
+      .bar button { all: unset; cursor: pointer; padding: 5px 12px; border-radius: 999px; background: rgba(255,255,255,.1);
+        color: #fff; font-weight: 600; white-space: nowrap; transition: background .15s; }
+      .bar button:hover { background: rgba(255,255,255,.18); }
+      .bar button.primary { background: linear-gradient(135deg, #6366f1, #8b5cf6); }
+      .bar button.primary:hover { filter: brightness(1.1); }
+      .cursor { position: fixed; left: 0; top: 0; width: 24px; height: 24px; pointer-events: none; display: none;
+        transition: transform .35s cubic-bezier(.2,.7,.3,1); filter: drop-shadow(0 2px 4px rgba(0,0,0,.3)); }
+      .ripple { position: fixed; width: 30px; height: 30px; margin: -15px 0 0 -15px; border-radius: 50%;
+        border: 2px solid #7c6cf2; background: rgba(124,108,242,.15); pointer-events: none; animation: ripple .55s ease-out forwards; }
+      @keyframes ripple { from { transform: scale(.3); opacity: 1; } to { transform: scale(1.5); opacity: 0; } }
+      .box { position: fixed; border: 1.5px solid #7c6cf2; border-radius: 4px; background: rgba(124,108,242,.06); pointer-events: none; }
+      .box b { position: absolute; top: -1px; left: -1px; transform: translateY(-100%); background: #6d5efc; color: #fff;
+        font: 700 11px/1 ui-sans-serif, system-ui, sans-serif; padding: 2px 5px; border-radius: 4px 4px 4px 0; }
       [hidden] { display: none !important; }
     </style>
     <div class="frame" hidden></div>
-    <div class="bar" hidden><span></span><button class="primary" data-action="continue" hidden></button><button data-action="stop"></button></div>
-    <svg class="cursor" viewBox="0 0 24 24"><path d="M4 2l15 11-6.5 1 4 7.5-3 1.5-4-7.5L4 20z" fill="#111" stroke="#fff" stroke-width="1.5"/></svg>
+    <div class="bar" hidden><i class="dot"></i><span></span><button class="primary" data-action="continue" hidden></button><button data-action="stop"></button></div>
+    <svg class="cursor" viewBox="0 0 24 24"><defs><linearGradient id="bh-g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6366f1"/><stop offset="1" stop-color="#8b5cf6"/></linearGradient></defs><path d="M4 2l15 11-6.5 1 4 7.5-3 1.5-4-7.5L4 20z" fill="url(#bh-g)" stroke="#fff" stroke-width="1.6" stroke-linejoin="round"/></svg>
     <div class="boxes"></div>`;
   const frame = root.querySelector<HTMLDivElement>('.frame')!;
   const bar = root.querySelector<HTMLDivElement>('.bar')!;
@@ -647,6 +664,7 @@ export function createPageAgent(): PageAgentApi {
       mount();
       frame.hidden = false;
       frame.classList.toggle('waiting', state.mode === 'waiting');
+      bar.classList.toggle('waiting-bar', state.mode === 'waiting');
       bar.hidden = false;
       barText.textContent = state.message;
       stopButton.textContent = state.stopLabel;

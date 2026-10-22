@@ -113,55 +113,71 @@ export function Composer(props: {
 
   const canSend = !disabled && (props.mode === 'act' ? text.trim() : text.trim() || props.selection || props.includePage);
 
-  return (
-    <div className="border-t border-line bg-bg p-3">
-      <div className="relative mx-auto max-w-3xl">
-        {menuOpen && (
-          <div
-            role="listbox"
-            className="absolute bottom-full left-0 right-0 z-10 mb-2 overflow-hidden rounded-lg border border-line bg-bg py-1 shadow-lg"
-          >
-            {items.map((item, index) => (
-              <button
-                key={item.kind === 'command' ? item.command.id : item.target}
-                type="button"
-                role="option"
-                aria-selected={index === activeIndex}
-                onMouseEnter={() => setActiveIndex(index)}
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={() => select(item)}
-                className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm ${index === activeIndex ? 'bg-hover' : ''}`}
-              >
-                {item.kind === 'command' ? (
-                  <>
-                    <span className="font-mono text-muted">/</span>
-                    <span className="font-medium">{commandLabel(item.command)}</span>
-                    <span className="truncate text-xs text-muted">{t(`commands.${item.command.id}.description`)}</span>
-                  </>
-                ) : (
-                  <>
-                    {item.target === 'page' ? <FileText className="h-4 w-4 text-muted" /> : <TextQuote className="h-4 w-4 text-muted" />}
-                    <span>{mentionLabel(item.target)}</span>
-                  </>
-                )}
-              </button>
-            ))}
-          </div>
-        )}
+  const act = props.mode === 'act';
 
-        <div className="rounded-xl border border-line bg-bg focus-within:border-accent focus-within:ring-2 focus-within:ring-accent/15">
-          <div className="flex flex-wrap gap-1.5 px-2.5 pt-2.5">
-            {props.mode === 'act' ? (
+  return (
+    <div className="relative mx-auto w-full max-w-3xl">
+      {menuOpen && (
+        <div
+          role="listbox"
+          className="absolute bottom-full left-0 right-0 z-10 mb-2 animate-fade-in overflow-hidden rounded-xl border border-line bg-surface p-1 shadow-float"
+        >
+          {items.map((item, index) => (
+            <button
+              key={item.kind === 'command' ? item.command.id : item.target}
+              type="button"
+              role="option"
+              aria-selected={index === activeIndex}
+              onMouseEnter={() => setActiveIndex(index)}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => select(item)}
+              className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm ${index === activeIndex ? 'bg-hover' : ''}`}
+            >
+              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-accent-soft text-accent">
+                {item.kind === 'command' ? (
+                  <span className="font-mono text-xs font-semibold">/</span>
+                ) : item.target === 'page' ? (
+                  <FileText className="h-3.5 w-3.5" />
+                ) : (
+                  <TextQuote className="h-3.5 w-3.5" />
+                )}
+              </span>
+              {item.kind === 'command' ? (
+                <span className="min-w-0">
+                  <span className="block font-medium">{commandLabel(item.command)}</span>
+                  <span className="block truncate text-xs text-muted">{t(`commands.${item.command.id}.description`)}</span>
+                </span>
+              ) : (
+                <span className="font-medium">{mentionLabel(item.target)}</span>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* 1px frame: neutral in Ask mode, brand gradient in Act mode. */}
+      <div
+        className={`rounded-2xl p-px shadow-card transition-colors ${act ? 'brand-border' : 'bg-line focus-within:bg-accent/45'}`}
+        data-mode={props.mode}
+      >
+        <div className="rounded-[15px] bg-surface">
+          <div className="flex flex-wrap gap-1.5 px-3 pt-3">
+            {act ? (
               <TargetChip tab={props.tab} />
             ) : (
               <PageChip tab={props.tab} access={props.access} included={props.includePage} onToggle={props.onTogglePage} />
             )}
-            {props.mode === 'ask' && props.selection && (
-              <span className="flex max-w-full items-center gap-1 rounded-md border border-line bg-subtle px-2 py-1 text-xs">
-                <TextQuote className="h-3.5 w-3.5 shrink-0 text-muted" />
+            {!act && props.selection && (
+              <span className="flex max-w-full animate-fade-in items-center gap-1.5 rounded-full border border-accent/25 bg-accent-soft py-1 pl-2.5 pr-1.5 text-xs text-accent">
+                <TextQuote className="h-3.5 w-3.5 shrink-0" />
                 <span className="truncate">“{preview(props.selection.content)}”</span>
-                <button type="button" aria-label={t('composer.removeSelection')} onClick={props.onRemoveSelection} className="text-muted hover:text-fg">
-                  <X className="h-3.5 w-3.5" />
+                <button
+                  type="button"
+                  aria-label={t('composer.removeSelection')}
+                  onClick={props.onRemoveSelection}
+                  className="rounded-full p-0.5 hover:bg-accent-soft-strong"
+                >
+                  <X className="h-3 w-3" />
                 </button>
               </span>
             )}
@@ -175,7 +191,7 @@ export function Composer(props: {
             placeholder={
               disabled
                 ? t('composer.placeholderNoModel')
-                : (props.placeholder ?? (props.mode === 'act' ? t('composer.placeholderAct') : t('composer.placeholder')))
+                : (props.placeholder ?? (act ? t('composer.placeholderAct') : t('composer.placeholder')))
             }
             onChange={(e) => {
               onTextChange(e.target.value);
@@ -183,27 +199,34 @@ export function Composer(props: {
             }}
             onSelect={(e) => setCaret(e.currentTarget.selectionStart)}
             onKeyDown={onKeyDown}
-            className="block w-full resize-none bg-transparent px-3 py-2 text-sm outline-none placeholder:text-muted"
+            className="block min-h-[44px] w-full resize-none bg-transparent px-3.5 py-2.5 text-sm leading-relaxed text-fg outline-none placeholder:text-faint"
           />
-          <div className="flex items-center justify-between px-2 pb-2">
-            <div className="flex rounded-md border border-line p-0.5 text-xs" role="radiogroup" aria-label={t('composer.mode')}>
-              {(['ask', 'act'] as const).map((mode) => (
-                <button
-                  key={mode}
-                  type="button"
-                  role="radio"
-                  aria-checked={props.mode === mode}
-                  data-testid={`mode-${mode}`}
-                  onClick={() => props.onModeChange(mode)}
-                  title={t(`composer.modes.${mode}Hint`)}
-                  className={`flex items-center gap-1 rounded px-2 py-1 ${
-                    props.mode === mode ? 'bg-accent-soft font-medium text-accent' : 'text-muted hover:text-fg'
-                  }`}
-                >
-                  {mode === 'ask' ? <MessageSquare className="h-3.5 w-3.5" /> : <Bot className="h-3.5 w-3.5" />}
-                  {t(`composer.modes.${mode}`)}
-                </button>
-              ))}
+          <div className="flex items-center justify-between gap-2 px-2.5 pb-2.5">
+            <div className="flex rounded-lg bg-subtle p-0.5 text-xs" role="radiogroup" aria-label={t('composer.mode')}>
+              {(['ask', 'act'] as const).map((mode) => {
+                const checked = props.mode === mode;
+                return (
+                  <button
+                    key={mode}
+                    type="button"
+                    role="radio"
+                    aria-checked={checked}
+                    data-testid={`mode-${mode}`}
+                    onClick={() => props.onModeChange(mode)}
+                    title={t(`composer.modes.${mode}Hint`)}
+                    className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 font-medium transition-all ${
+                      checked ? 'bg-surface text-fg shadow-soft' : 'text-muted hover:text-fg'
+                    }`}
+                  >
+                    {mode === 'ask' ? (
+                      <MessageSquare className={`h-3.5 w-3.5 ${checked ? 'text-accent' : ''}`} />
+                    ) : (
+                      <Bot className={`h-3.5 w-3.5 ${checked ? 'text-accent' : ''}`} />
+                    )}
+                    {t(`composer.modes.${mode}`)}
+                  </button>
+                );
+              })}
             </div>
             {streaming ? (
               <button
@@ -211,9 +234,9 @@ export function Composer(props: {
                 onClick={props.onStop}
                 aria-label={t('composer.stop')}
                 title={t('composer.stop')}
-                className="flex h-8 w-8 items-center justify-center rounded-full bg-fg text-bg"
+                className="flex h-8 w-8 items-center justify-center rounded-full bg-fg text-surface transition-opacity hover:opacity-85"
               >
-                <Square className="h-3.5 w-3.5 fill-current" />
+                <Square className="h-3 w-3 fill-current" />
               </button>
             ) : (
               <button
@@ -223,9 +246,9 @@ export function Composer(props: {
                 disabled={!canSend}
                 aria-label={t('composer.send')}
                 title={t('composer.send')}
-                className="flex h-8 w-8 items-center justify-center rounded-full bg-accent text-on-accent disabled:opacity-40"
+                className="flex h-8 w-8 items-center justify-center rounded-full text-white shadow-soft transition-all brand-gradient hover:brightness-110 disabled:bg-none disabled:bg-subtle disabled:text-faint disabled:shadow-none"
               >
-                <ArrowUp className="h-4 w-4" />
+                <ArrowUp className="h-4 w-4" strokeWidth={2.5} />
               </button>
             )}
           </div>
@@ -244,7 +267,7 @@ function PageChip({ tab, access, included, onToggle }: {
   const { t } = useTranslation();
   if (!tab || access === 'none' || access === 'restricted') {
     return (
-      <span className="flex items-center gap-1 rounded-md border border-dashed border-line px-2 py-1 text-xs text-muted">
+      <span className="flex items-center gap-1.5 rounded-full px-1 py-1 text-xs text-faint">
         <FileText className="h-3.5 w-3.5" />
         {t('context.unavailable')}
       </span>
@@ -258,13 +281,19 @@ function PageChip({ tab, access, included, onToggle }: {
       aria-pressed={included}
       onClick={onToggle}
       title={access === 'missing' ? t('context.needsAccess') : t('context.includeHint')}
-      className={`flex max-w-full items-center gap-1.5 rounded-md border px-2 py-1 text-xs ${
-        included ? 'border-accent/40 bg-accent-soft text-accent' : 'border-line text-muted hover:bg-hover hover:text-fg'
+      className={`flex max-w-full items-center gap-1.5 rounded-full border py-1 pl-2 pr-2.5 text-xs transition-colors ${
+        included
+          ? 'border-accent/25 bg-accent-soft text-accent'
+          : 'border-line bg-surface text-muted hover:border-line-strong hover:text-fg'
       }`}
     >
-      {tab.favIconUrl ? <img src={tab.favIconUrl} alt="" className="h-3.5 w-3.5 shrink-0" /> : <FileText className="h-3.5 w-3.5 shrink-0" />}
+      {tab.favIconUrl ? (
+        <img src={tab.favIconUrl} alt="" className="h-3.5 w-3.5 shrink-0 rounded-sm" />
+      ) : (
+        <FileText className="h-3.5 w-3.5 shrink-0" />
+      )}
       <span className="truncate">{title}</span>
-      {included ? <Check className="h-3.5 w-3.5 shrink-0" /> : <Plus className="h-3.5 w-3.5 shrink-0" />}
+      {included ? <Check className="h-3.5 w-3.5 shrink-0" strokeWidth={2.5} /> : <Plus className="h-3.5 w-3.5 shrink-0" />}
     </button>
   );
 }
@@ -272,7 +301,10 @@ function PageChip({ tab, access, included, onToggle }: {
 function TargetChip({ tab }: { tab?: ActiveTab }) {
   const { t } = useTranslation();
   return (
-    <span className="flex max-w-full items-center gap-1.5 rounded-md border border-line bg-subtle px-2 py-1 text-xs text-muted" data-testid="target-chip">
+    <span
+      className="flex max-w-full items-center gap-1.5 rounded-full bg-accent-soft py-1 pl-2 pr-2.5 text-xs text-accent"
+      data-testid="target-chip"
+    >
       <Bot className="h-3.5 w-3.5 shrink-0" />
       <span className="truncate">{tab ? t('composer.actOn', { title: tab.title || tab.url }) : t('composer.actNewTab')}</span>
     </span>

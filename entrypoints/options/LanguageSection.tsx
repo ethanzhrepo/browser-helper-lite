@@ -3,7 +3,7 @@ import { browser } from 'wxt/browser';
 import { detectLocale, LOCALE_NATIVE_NAMES, LOCALES } from '../../src/i18n';
 import type { LanguageSetting, Settings } from '../../src/shared/types';
 import { updateSettings } from '../../src/storage/settings';
-import { Card, Section } from './Section';
+import { Section } from './Section';
 
 export function LanguageSection({ settings }: { settings: Settings }) {
   const { t } = useTranslation();
@@ -17,20 +17,28 @@ export function LanguageSection({ settings }: { settings: Settings }) {
 
   return (
     <Section title={t('language.title')} description={t('language.description')}>
-      <Card className="space-y-1 p-2">
-        {options.map(({ value, label }) => (
-          <label key={value} className="flex cursor-pointer items-center gap-3 rounded-md px-3 py-2 hover:bg-hover">
-            <input
-              type="radio"
-              name="language"
-              className="accent-[var(--accent)]"
-              checked={settings.language === value}
-              onChange={() => choose(value)}
-            />
-            <span className="text-sm">{label}</span>
-          </label>
-        ))}
-      </Card>
+      <div className="grid gap-2 sm:grid-cols-2">
+        {options.map(({ value, label }) => {
+          const checked = settings.language === value;
+          return (
+            <label
+              key={value}
+              className={`flex cursor-pointer items-center gap-3 rounded-xl border px-4 py-3 shadow-soft transition-colors ${
+                checked ? 'border-accent/40 bg-accent-soft' : 'border-line bg-surface hover:border-line-strong'
+              } ${value === 'auto' ? 'sm:col-span-2' : ''}`}
+            >
+              <input
+                type="radio"
+                name="language"
+                className="h-4 w-4 accent-[var(--accent)]"
+                checked={checked}
+                onChange={() => choose(value)}
+              />
+              <span className={`text-sm ${checked ? 'font-medium text-accent' : ''}`}>{label}</span>
+            </label>
+          );
+        })}
+      </div>
     </Section>
   );
 }

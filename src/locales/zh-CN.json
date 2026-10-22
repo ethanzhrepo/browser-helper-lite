@@ -167,7 +167,8 @@
     "hints": {
       "region": "中国大陆版和国际版使用不同的接口地址。如果你的 Key 属于另一个区域，请修改 Base URL。",
       "ollama": "Ollama 默认拒绝来自浏览器扩展的请求。请设置环境变量 OLLAMA_ORIGINS=chrome-extension://* 后重新启动 Ollama 再试。"
-    }
+    },
+    "noModels": "无模型列表"
   },
   "slots": {
     "title": "能力分配",
@@ -316,8 +317,7 @@
       "resume": "继续",
       "stop": "停止",
       "takeOver": "我来接管",
-      "progress": "第 {{step}}/{{max}} 步",
-      "tokens_other": "{{formatted}} tokens"
+      "progress": "第 {{step}}/{{max}} 步"
     },
     "overlay": {
       "running": "Browser Helper 正在操作这个标签页",
@@ -348,7 +348,8 @@
     },
     "maxStepsSummary": "已经执行了 {{count}} 步，任务仍未完成，我先停下了。可以看看上面的步骤，然后给我一个更具体的任务，或者在设置里调高步数上限。",
     "stoppedSummary": "任务已停止。",
-    "failedSummary": "任务失败：{{message}}"
+    "failedSummary": "任务失败：{{message}}",
+    "thinking": "思考中…"
   },
   "agentSettings": {
     "title": "Agent",

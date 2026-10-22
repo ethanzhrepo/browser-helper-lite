@@ -1,11 +1,19 @@
+import { Bot, Eye, MessageSquare, Zap, type LucideIcon } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { suggestChatModel } from '../../src/providers/suggest';
 import type { Capability, Settings, SlotAssignment } from '../../src/shared/types';
 import { updateSettings } from '../../src/storage/settings';
-import { Card, Field, inputClass, Section } from './Section';
+import { Card, Field, IconBadge, inputClass, Section } from './Section';
 
 const SLOTS: Capability[] = ['chat', 'fast', 'agent', 'vision'];
+
+const SLOT_ICONS: Record<Capability, LucideIcon> = {
+  chat: MessageSquare,
+  fast: Zap,
+  agent: Bot,
+  vision: Eye,
+};
 
 async function saveSlot(capability: Capability, slot: SlotAssignment | undefined) {
   await updateSettings((settings) => {
@@ -60,9 +68,14 @@ function SlotCard({ capability, settings }: { capability: Capability; settings: 
 
   const listId = `models-${capability}`;
   return (
-    <Card>
-      <h3 className="mb-3 font-medium">{t(`slots.${capability}.title`)}</h3>
-      <p className="mb-3 text-sm text-muted">{t(`slots.${capability}.description`)}</p>
+    <Card className="p-5">
+      <div className="mb-4 flex items-start gap-3">
+        <IconBadge icon={SLOT_ICONS[capability]} />
+        <div className="min-w-0">
+          <h3 className="text-[15px] font-semibold tracking-tight">{t(`slots.${capability}.title`)}</h3>
+          <p className="mt-0.5 text-sm leading-relaxed text-muted">{t(`slots.${capability}.description`)}</p>
+        </div>
+      </div>
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label={t('slots.connection')} htmlFor={`connection-${capability}`}>
           <select

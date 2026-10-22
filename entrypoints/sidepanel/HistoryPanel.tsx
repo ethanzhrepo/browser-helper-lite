@@ -29,37 +29,42 @@ export function HistoryPanel({ currentId, onOpen, onClose }: {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex items-center gap-2 border-b border-line px-2 py-2">
+      <div className="flex items-center gap-1 px-2.5 pt-2.5">
         <IconButton label={t('common.back')} onClick={onClose}>
           <ArrowLeft className="h-4 w-4" />
         </IconButton>
-        <h2 className="text-sm font-semibold">{t('history.title')}</h2>
+        <h2 className="text-sm font-semibold tracking-tight">{t('history.title')}</h2>
       </div>
-      <div className="px-3 pt-3">
-        <div className="flex items-center gap-2 rounded-md border border-line px-2.5 py-1.5 focus-within:border-accent">
-          <Search className="h-4 w-4 text-muted" />
+      <div className="px-3.5 pt-2">
+        <div className="flex h-9 items-center gap-2 rounded-xl border border-line bg-surface px-3 shadow-soft focus-within:border-accent/50 focus-within:ring-2 focus-within:ring-accent/15">
+          <Search className="h-4 w-4 text-faint" />
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder={t('history.search')}
-            className="w-full bg-transparent text-sm outline-none placeholder:text-muted"
+            className="w-full bg-transparent text-sm outline-none placeholder:text-faint"
           />
         </div>
       </div>
-      <ul className="flex-1 overflow-y-auto px-2 py-2">
-        {visible.length === 0 && <li className="px-2 py-6 text-center text-sm text-muted">{t('history.empty')}</li>}
+      <ul className="flex-1 space-y-0.5 overflow-y-auto px-2.5 py-3">
+        {visible.length === 0 && <li className="px-2 py-10 text-center text-sm text-faint">{t('history.empty')}</li>}
         {visible.map((conversation) => (
-          <li key={conversation.id} className="group flex items-center rounded-md hover:bg-hover">
+          <li
+            key={conversation.id}
+            className={`group flex items-center rounded-xl transition-colors hover:bg-surface hover:shadow-soft ${
+              conversation.id === currentId ? 'bg-accent-soft hover:bg-accent-soft' : ''
+            }`}
+          >
             <button
               type="button"
               onClick={() => onOpen(conversation.id)}
-              className="min-w-0 flex-1 px-2 py-2 text-left"
+              className="min-w-0 flex-1 px-3 py-2.5 text-left"
               aria-current={conversation.id === currentId ? 'true' : undefined}
             >
-              <div className={`truncate text-sm ${conversation.id === currentId ? 'font-semibold' : ''}`}>
+              <div className={`truncate text-sm ${conversation.id === currentId ? 'font-semibold text-accent' : 'text-fg'}`}>
                 {conversation.title || t('history.untitled')}
               </div>
-              <div className="text-xs text-muted">{formatter.format(conversation.updatedAt)}</div>
+              <div className="mt-0.5 text-xs text-faint">{formatter.format(conversation.updatedAt)}</div>
             </button>
             <IconButton
               label={t('common.delete')}

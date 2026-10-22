@@ -8,6 +8,28 @@ import { Button, IconButton } from '../../src/ui/Button';
 import { ConnectionForm } from './ConnectionForm';
 import { Card, Section } from './Section';
 
+/** Colored monogram per vendor (no logos). */
+const VENDOR_COLORS: Record<Connection['vendor'], string> = {
+  openai: '#10a37f',
+  anthropic: '#c96442',
+  google: '#3b82f6',
+  deepseek: '#4f6bed',
+  'openai-compatible': '#7c6cf2',
+};
+
+function Monogram({ connection }: { connection: Connection }) {
+  const initial = (connection.name.trim()[0] ?? '?').toUpperCase();
+  return (
+    <span
+      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-sm font-semibold text-white shadow-soft"
+      style={{ background: VENDOR_COLORS[connection.vendor] }}
+      aria-hidden
+    >
+      {initial}
+    </span>
+  );
+}
+
 export function vendorLabel(connection: Pick<Connection, 'vendor' | 'presetId'>): string {
   const preset = connection.vendor === 'openai-compatible' ? findPreset(connection.presetId) : undefined;
   return preset && preset.id !== 'custom' ? preset.label : VENDORS[connection.vendor].label;
@@ -49,19 +71,25 @@ export function ConnectionsSection({ settings }: { settings: Settings }) {
             onDone={() => setEditing(null)}
           />
         ) : (
-          <Card key={connection.id} className="flex items-center gap-3">
+          <Card key={connection.id} className="flex items-center gap-3.5 transition-shadow hover:shadow-card">
+            <Monogram connection={connection} />
             <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-baseline gap-x-2">
-                <span className="font-medium">{connection.name}</span>
-                <span className="text-xs text-muted">{vendorLabel(connection)}</span>
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                <span className="text-[15px] font-semibold tracking-tight">{connection.name}</span>
+                <span className="rounded-md bg-subtle px-1.5 py-px text-[11px] text-muted">{vendorLabel(connection)}</span>
               </div>
-              <div className="truncate text-xs text-muted">{connection.baseURL}</div>
-              <div className="mt-1 text-xs text-muted">
-                {connection.models.length > 0
-                  ? t('connections.modelCount', { count: connection.models.length })
-                  : t('connections.noModelList')}
-              </div>
+              <div className="mt-0.5 truncate font-mono text-xs text-faint">{connection.baseURL}</div>
             </div>
+            <span
+              className={`hidden shrink-0 rounded-full px-2.5 py-1 text-xs font-medium sm:inline ${
+                connection.models.length > 0 ? 'bg-success-soft text-success' : 'bg-warning-soft text-warning'
+              }`}
+              title={connection.models.length > 0 ? undefined : t('connections.noModelList')}
+            >
+              {connection.models.length > 0
+                ? t('connections.modelCount', { count: connection.models.length })
+                : t('connections.noModels')}
+            </span>
             <IconButton label={t('common.edit')} onClick={() => setEditing(connection.id)}>
               <Pencil className="h-4 w-4" />
             </IconButton>
@@ -72,7 +100,7 @@ export function ConnectionsSection({ settings }: { settings: Settings }) {
         ),
       )}
       {settings.connections.length === 0 && editing !== 'new' && (
-        <Card className="text-sm text-muted">{t('connections.empty')}</Card>
+        <Card className="py-8 text-center text-sm text-muted">{t('connections.empty')}</Card>
       )}
     </Section>
   );

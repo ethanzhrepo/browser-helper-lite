@@ -171,7 +171,8 @@
     "hints": {
       "region": "Las cuentas de China continental y las internacionales usan direcciones distintas. Cambia la URL base si tu clave es de la otra región.",
       "ollama": "Ollama bloquea las extensiones de forma predeterminada. Reinícialo con la variable de entorno OLLAMA_ORIGINS=chrome-extension://* y vuelve a intentarlo."
-    }
+    },
+    "noModels": "Sin lista de modelos"
   },
   "slots": {
     "title": "Funciones de los modelos",
@@ -322,10 +323,7 @@
       "resume": "Reanudar",
       "stop": "Detener",
       "takeOver": "Tomar el control",
-      "progress": "Paso {{step}}/{{max}}",
-      "tokens_one": "{{formatted}} token",
-      "tokens_many": "{{formatted}} de tokens",
-      "tokens_other": "{{formatted}} tokens"
+      "progress": "Paso {{step}}/{{max}}"
     },
     "overlay": {
       "running": "Browser Helper está trabajando en esta pestaña",
@@ -356,7 +354,8 @@
     },
     "maxStepsSummary": "Me detuve tras {{count}} pasos sin terminar. Revisa los pasos de arriba y dame una tarea más concreta o sube el límite de pasos en los ajustes.",
     "stoppedSummary": "La tarea se detuvo.",
-    "failedSummary": "La tarea falló: {{message}}"
+    "failedSummary": "La tarea falló: {{message}}",
+    "thinking": "Pensando…"
   },
   "agentSettings": {
     "title": "Agente",

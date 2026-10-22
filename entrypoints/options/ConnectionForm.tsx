@@ -140,7 +140,7 @@ export function ConnectionForm({ settings, initial, onDone }: {
   const busy = status.kind === 'busy';
 
   return (
-    <Card className="space-y-4 border-accent/40">
+    <Card className="animate-fade-in space-y-5 p-5 shadow-card ring-1 ring-accent/25">
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label={t('connections.fields.vendor')} htmlFor="vendor">
           <select
@@ -234,17 +234,19 @@ export function ConnectionForm({ settings, initial, onDone }: {
               setStatus({ kind: 'idle' });
             }}
           />
-          <Button aria-label={showKey ? t('connections.hideKey') : t('connections.showKey')} onClick={() => setShowKey(!showKey)}>
+          <Button className="h-9 w-9 px-0" aria-label={showKey ? t('connections.hideKey') : t('connections.showKey')} onClick={() => setShowKey(!showKey)}>
             {showKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
           </Button>
         </div>
       </Field>
 
-      {preset?.hintKey && <p className="rounded-md bg-warning-soft px-3 py-2 text-xs">{t(preset.hintKey)}</p>}
+      {preset?.hintKey && (
+        <p className="rounded-lg border border-warning/25 bg-warning-soft px-3 py-2 text-xs leading-relaxed">{t(preset.hintKey)}</p>
+      )}
 
       <TestStatus status={status} />
 
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-2 border-t border-line pt-4">
         <Button variant="primary" disabled={busy} onClick={() => void handleSave()}>
           {t('common.save')}
         </Button>
@@ -269,7 +271,7 @@ function TestStatus({ status }: { status: Status }) {
   const { result } = status;
   if (result.ok) {
     return (
-      <p className="flex items-center gap-1.5 rounded-md bg-success-soft px-3 py-2 text-sm text-success">
+      <p className="flex animate-fade-in items-center gap-2 rounded-lg border border-success/25 bg-success-soft px-3 py-2 text-sm font-medium text-success">
         <CheckCircle2 className="h-4 w-4 shrink-0" />
         {t('connections.testOk', { count: result.models.length })}
       </p>
@@ -281,8 +283,8 @@ function TestStatus({ status }: { status: Status }) {
 function TestError({ error }: { error: ErrorInfo }) {
   const { t } = useTranslation();
   return (
-    <div className="rounded-md bg-danger-soft px-3 py-2 text-sm">
-      <p className="flex items-center gap-1.5 font-medium text-danger">
+    <div className="animate-fade-in rounded-lg border border-danger/25 bg-danger-soft px-3 py-2.5 text-sm">
+      <p className="flex items-center gap-2 font-medium text-danger">
         <XCircle className="h-4 w-4 shrink-0" />
         {errorSummary(t, error)}
       </p>

@@ -171,7 +171,8 @@
     "hints": {
       "region": "Les comptes de Chine continentale et internationaux utilisent des adresses différentes. Modifiez l'URL de base si votre clé dépend de l'autre région.",
       "ollama": "Ollama bloque les extensions par défaut. Relancez-le avec la variable d'environnement OLLAMA_ORIGINS=chrome-extension://* puis réessayez."
-    }
+    },
+    "noModels": "Pas de liste de modèles"
   },
   "slots": {
     "title": "Rôles des modèles",
@@ -322,10 +323,7 @@
       "resume": "Reprendre",
       "stop": "Arrêter",
       "takeOver": "Prendre la main",
-      "progress": "Étape {{step}}/{{max}}",
-      "tokens_one": "{{formatted}} jeton",
-      "tokens_many": "{{formatted}} de jetons",
-      "tokens_other": "{{formatted}} jetons"
+      "progress": "Étape {{step}}/{{max}}"
     },
     "overlay": {
       "running": "Browser Helper travaille dans cet onglet",
@@ -356,7 +354,8 @@
     },
     "maxStepsSummary": "Je me suis arrêté après {{count}} étapes sans terminer. Consultez les étapes ci-dessus, puis donnez-moi une tâche plus précise ou augmentez la limite d'étapes dans les paramètres.",
     "stoppedSummary": "La tâche a été arrêtée.",
-    "failedSummary": "La tâche a échoué : {{message}}"
+    "failedSummary": "La tâche a échoué : {{message}}",
+    "thinking": "Réflexion…"
   },
   "agentSettings": {
     "title": "Agent",

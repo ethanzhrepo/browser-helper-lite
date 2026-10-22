@@ -14,6 +14,8 @@ let server: Awaited<ReturnType<typeof startMockServer>>;
 async function screenshot(page: Page, name: string) {
   if (!SCREENSHOT_DIR) return;
   mkdirSync(SCREENSHOT_DIR, { recursive: true });
+  // Let fade-in and color transitions finish.
+  await page.waitForTimeout(450);
   await page.screenshot({ path: path.join(SCREENSHOT_DIR, `${name}.png`) });
 }
 
@@ -60,6 +62,13 @@ test('connect a provider, attach page context and stream a reply', async () => {
   // The first connection becomes the chat model automatically.
   await options.goto(`chrome-extension://${extensionId}/options.html#models`);
   await expect(options.locator('#model-chat')).toHaveValue(MOCK_MODEL);
+  await screenshot(options, 'options-models');
+  await options.goto(`chrome-extension://${extensionId}/options.html#agent`);
+  await screenshot(options, 'options-agent');
+  await options.emulateMedia({ colorScheme: 'dark' });
+  await options.goto(`chrome-extension://${extensionId}/options.html#providers`);
+  await screenshot(options, 'options-providers-dark');
+  await options.emulateMedia({ colorScheme: 'light' });
 
   // 2. Open a web page and select some text on it.
   const site = await context.newPage();

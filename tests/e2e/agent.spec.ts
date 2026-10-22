@@ -14,6 +14,8 @@ let server: Awaited<ReturnType<typeof startMockServer>>;
 async function screenshot(page: Page, name: string) {
   if (!SCREENSHOT_DIR) return;
   mkdirSync(SCREENSHOT_DIR, { recursive: true });
+  // Let fade-in and color transitions finish.
+  await page.waitForTimeout(450);
   await page.screenshot({ path: path.join(SCREENSHOT_DIR, `${name}.png`) });
 }
 
@@ -88,6 +90,7 @@ test.describe.serial('agent', () => {
   test('shop: search the web, type, extract, look, approve adding to cart', async () => {
     const { site, panel } = await openSiteAndPanel(`${server.origin}/shop.html`);
     await expect(panel.getByTestId('target-chip')).toContainText('Test Shop');
+    await screenshot(panel, 'agent-empty');
     await startTask(panel, 'TEST-SHOP: add the cheapest braided USB-C cable to my cart');
 
     // "Add to cart" is an effect (risk 2): the agent waits for approval.
@@ -96,7 +99,11 @@ test.describe.serial('agent', () => {
     await expect(approval).toContainText('Add Cable B to cart');
     await expect(approval.getByRole('button', { name: 'Always allow on this site' })).toBeVisible();
     await screenshot(panel, 'agent-approval');
+    await panel.emulateMedia({ colorScheme: 'dark' });
+    await screenshot(panel, 'agent-approval-dark');
+    await panel.emulateMedia({ colorScheme: 'light' });
     await expect(site.locator('browser-helper-overlay')).toHaveCount(1);
+    await screenshot(site, 'agent-overlay');
     await approval.getByRole('button', { name: 'Allow once' }).click();
 
     const run = panel.getByTestId('agent-run');
@@ -114,7 +121,7 @@ test.describe.serial('agent', () => {
     expect(JSON.stringify(server.extractRequests[0]?.messages)).toContain('Cable B');
     const image = server.lookRequests[0]?.messages[0]?.content;
     expect(Array.isArray(image) && image.some((p) => (p.image_url?.url.length ?? 0) > 1000)).toBe(true);
-    console.log('driver used:', await run.locator('span.uppercase').textContent());
+    console.log('driver used:', await run.getByTestId('driver-badge').textContent());
     await screenshot(panel, 'agent-shop-done');
   });
 
@@ -214,7 +221,7 @@ test.describe.serial('agent with the DOM driver', () => {
     // The site policy is "auto", so adding to the cart (risk 2) needs no approval.
     await expect(run).toHaveAttribute('data-status', 'done', { timeout: 30_000 });
     await expect(panel.getByTestId('approval-card')).toHaveCount(0);
-    await expect(run.locator('span.uppercase')).toHaveText('dom');
+    await expect(run.getByTestId('driver-badge')).toHaveText('dom');
     await expect(site.locator('#cart')).toHaveText('Cart: 1 item');
   });
 });

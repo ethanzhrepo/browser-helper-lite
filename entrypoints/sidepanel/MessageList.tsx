@@ -1,4 +1,4 @@
-import { AlertTriangle, Check, Copy, FileText, RotateCcw, Settings2, TextQuote } from 'lucide-react';
+import { AlertTriangle, Brain, Check, ChevronRight, Copy, FileText, RotateCcw, Settings2, Square, TextQuote } from 'lucide-react';
 import { Fragment, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { AgentClientMessage, AgentTask } from '../../src/agent/types';
@@ -39,8 +39,8 @@ export function MessageList({ messages, streaming, onRetry, tasks, onAgentSend }
   for (const message of messages) if (message.role === 'user' && message.taskId) runAfter.set(message.taskId, message.id);
 
   return (
-    <div ref={scrollRef} onScroll={onScroll} className="flex-1 overflow-y-auto px-3 py-4" data-testid="message-list">
-      <div className="mx-auto flex max-w-3xl flex-col gap-5">
+    <div ref={scrollRef} onScroll={onScroll} className="flex-1 overflow-y-auto px-3.5 pb-2 pt-5" data-testid="message-list">
+      <div className="mx-auto flex max-w-3xl flex-col gap-6">
         {messages.map((message) =>
           message.role === 'user' ? (
             <Fragment key={message.id}>
@@ -84,20 +84,20 @@ function ContextChip({ context }: { context: ContextSnapshot }) {
       target="_blank"
       rel="noreferrer"
       title={context.url}
-      className="flex max-w-full items-center gap-1.5 rounded-md border border-line bg-bg px-2 py-1 text-xs text-muted hover:text-fg"
+      className="flex max-w-[85%] items-center gap-1.5 rounded-full border border-line bg-surface px-2.5 py-1 text-xs text-muted shadow-soft transition-colors hover:border-line-strong hover:text-fg"
     >
-      <Icon className="h-3.5 w-3.5 shrink-0" />
+      <Icon className="h-3.5 w-3.5 shrink-0 text-accent" />
       <span className="truncate">{label}</span>
-      {context.truncated && <span className="shrink-0">· {t('message.truncated')}</span>}
+      {context.truncated && <span className="shrink-0 text-faint">· {t('message.truncated')}</span>}
     </a>
   );
 }
 
 function UserMessage({ message }: { message: MessageRecord }) {
   return (
-    <div className="flex flex-col items-end gap-1.5" data-testid="user-message">
+    <div className="flex animate-fade-in flex-col items-end gap-1.5" data-testid="user-message">
       {message.contexts?.map((context) => <ContextChip key={`${context.kind}-${context.capturedAt}`} context={context} />)}
-      <div className="max-w-[90%] whitespace-pre-wrap rounded-2xl rounded-br-md bg-subtle px-3.5 py-2 text-sm">
+      <div className="max-w-[88%] whitespace-pre-wrap rounded-2xl rounded-br-md bg-accent-soft px-3.5 py-2 text-sm leading-relaxed text-fg">
         {message.content}
       </div>
     </div>
@@ -123,29 +123,37 @@ function AssistantMessage({ content, reasoning, modelId, streaming, aborted, err
   };
 
   return (
-    <div className="group flex flex-col gap-2 text-sm" data-testid="assistant-message">
+    <div className="group flex animate-fade-in flex-col gap-2 text-sm text-fg" data-testid="assistant-message">
       {reasoning && (
-        <details className="rounded-md border border-line px-3 py-2 text-xs text-muted" open={streaming && !content}>
-          <summary className="cursor-pointer select-none">{t('message.reasoning')}</summary>
-          <div className="mt-2 whitespace-pre-wrap">{reasoning}</div>
+        <details className="group/reasoning rounded-xl bg-subtle px-3 py-2 text-xs text-muted" open={streaming && !content}>
+          <summary className="flex cursor-pointer list-none items-center gap-1.5 font-medium select-none [&::-webkit-details-marker]:hidden">
+            <Brain className="h-3.5 w-3.5" />
+            {t('message.reasoning')}
+            <ChevronRight className="h-3.5 w-3.5 transition-transform group-open/reasoning:rotate-90" />
+          </summary>
+          <div className="mt-2 whitespace-pre-wrap leading-relaxed">{reasoning}</div>
         </details>
       )}
       {content && <Markdown text={content} />}
       {streaming && !content && !reasoning && (
-        <div className="flex gap-1 py-1" aria-label={t('message.thinking')}>
+        <div className="flex gap-1 py-1.5" aria-label={t('message.thinking')}>
           {[0, 1, 2].map((i) => (
-            <span key={i} className="h-1.5 w-1.5 animate-pulse rounded-full bg-muted" style={{ animationDelay: `${i * 150}ms` }} />
+            <span key={i} className="h-1.5 w-1.5 animate-pulse-dot rounded-full bg-accent" style={{ animationDelay: `${i * 180}ms` }} />
           ))}
         </div>
       )}
       {error && <ErrorCard error={error} />}
-      {aborted && <p className="text-xs text-muted">{t('message.stopped')}</p>}
+      {aborted && (
+        <p className="flex items-center gap-1 text-xs text-faint">
+          <Square className="h-3 w-3" />
+          {t('message.stopped')}
+        </p>
+      )}
       {!streaming && (
-        <div className="flex items-center gap-1 text-xs text-muted">
-          {modelId && <span className="mr-1 truncate">{modelId}</span>}
+        <div className="-ml-1.5 flex items-center gap-0.5 text-xs text-faint">
           {content && (
             <IconButton label={copied ? t('message.copied') : t('message.copy')} onClick={() => void copy()} className="h-7 w-7">
-              {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+              {copied ? <Check className="h-3.5 w-3.5 text-success" /> : <Copy className="h-3.5 w-3.5" />}
             </IconButton>
           )}
           {onRetry && (
@@ -153,6 +161,7 @@ function AssistantMessage({ content, reasoning, modelId, streaming, aborted, err
               <RotateCcw className="h-3.5 w-3.5" />
             </IconButton>
           )}
+          {modelId && <span className="ml-1 truncate opacity-0 transition-opacity group-hover:opacity-100">{modelId}</span>}
         </div>
       )}
     </div>
@@ -162,15 +171,15 @@ function AssistantMessage({ content, reasoning, modelId, streaming, aborted, err
 function ErrorCard({ error }: { error: ErrorInfo }) {
   const { t } = useTranslation();
   return (
-    <div className="rounded-md border border-danger/30 bg-danger-soft px-3 py-2" role="alert">
-      <p className="flex items-center gap-1.5 font-medium text-danger">
-        <AlertTriangle className="h-4 w-4 shrink-0" />
+    <div className="rounded-xl border border-danger/25 bg-danger-soft px-3.5 py-3" role="alert">
+      <p className="flex items-start gap-2 font-medium text-danger">
+        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
         {errorSummary(t, error)}
       </p>
-      {error.message && <p className="mt-1 break-all font-mono text-xs text-muted">{error.message}</p>}
+      {error.message && <p className="mt-1.5 break-all pl-6 font-mono text-[11px] leading-relaxed text-muted">{error.message}</p>}
       {isSettingsError(error) && (
-        <Button className="mt-2" onClick={() => openOptions('providers')}>
-          <Settings2 className="h-4 w-4" />
+        <Button size="sm" className="ml-6 mt-2.5" onClick={() => openOptions('providers')}>
+          <Settings2 className="h-3.5 w-3.5" />
           {t('common.openSettings')}
         </Button>
       )}

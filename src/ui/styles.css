@@ -1,156 +1,284 @@
 @import "tailwindcss";
 
-/* Semantic color tokens; dark mode follows the system setting. */
+/*
+ * Design tokens. Warm neutrals with an iris accent that matches the icon's
+ * indigo → violet gradient. Dark mode follows the system setting.
+ */
 :root {
-  --bg: #ffffff;
-  --bg-subtle: #f5f6f8;
-  --bg-hover: #eceef2;
-  --border: #e2e4e9;
-  --text: #1c1f24;
-  --text-muted: #636a74;
-  --accent: #4f46e5;
-  --accent-hover: #4338ca;
-  --accent-soft: #eef0ff;
+  --bg: #f7f7f5;
+  --surface: #ffffff;
+  --bg-subtle: #f1f1ee;
+  --bg-hover: #eaeae6;
+  --border: #e6e5e1;
+  --border-strong: #d4d3ce;
+  --text: #19191c;
+  --text-muted: #66666e;
+  --text-faint: #9b9ba3;
+  --accent: #5b4ff0;
+  --accent-hover: #4b3fe0;
+  --accent-soft: #f0eeff;
+  --accent-soft-strong: #e2deff;
   --accent-fg: #ffffff;
-  --danger: #c4232e;
-  --danger-soft: #fdeceb;
-  --success: #17803d;
-  --success-soft: #e8f6ec;
-  --warning-soft: #fff6e0;
+  --brand-from: #6366f1;
+  --brand-to: #8b5cf6;
+  --danger: #d4372c;
+  --danger-soft: #fdeeec;
+  --success: #1b8a4f;
+  --success-soft: #e7f6ed;
+  --warning: #b25e09;
+  --warning-soft: #fff4e2;
+  --shadow-sm: 0 1px 2px rgb(24 24 27 / 0.05);
+  --shadow-md: 0 1px 2px rgb(24 24 27 / 0.04), 0 4px 16px -4px rgb(24 24 27 / 0.08);
+  --shadow-lg: 0 2px 4px rgb(24 24 27 / 0.04), 0 12px 32px -8px rgb(24 24 27 / 0.16);
   color-scheme: light;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #16171b;
-    --bg-subtle: #1e2025;
-    --bg-hover: #282a31;
-    --border: #2f323a;
-    --text: #e7e8eb;
-    --text-muted: #9da3ac;
-    --accent: #8b93ff;
-    --accent-hover: #a3a9ff;
-    --accent-soft: #262a4a;
-    --accent-fg: #11121a;
-    --danger: #ff7b7b;
-    --danger-soft: #3a1d20;
-    --success: #5ccf86;
-    --success-soft: #16301f;
-    --warning-soft: #332a12;
+    --bg: #111113;
+    --surface: #19191c;
+    --bg-subtle: #202024;
+    --bg-hover: #29292e;
+    --border: #2a2a2f;
+    --border-strong: #3a3a41;
+    --text: #ececef;
+    --text-muted: #a0a0a9;
+    --text-faint: #6f6f78;
+    --accent: #9d93ff;
+    --accent-hover: #b3abff;
+    --accent-soft: rgb(157 147 255 / 0.13);
+    --accent-soft-strong: rgb(157 147 255 / 0.22);
+    --accent-fg: #14121f;
+    --brand-from: #7c7ff5;
+    --brand-to: #a57cf7;
+    --danger: #ff8178;
+    --danger-soft: rgb(255 129 120 / 0.12);
+    --success: #5fd391;
+    --success-soft: rgb(95 211 145 / 0.12);
+    --warning: #f5b453;
+    --warning-soft: rgb(245 180 83 / 0.12);
+    --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.3);
+    --shadow-md: 0 1px 2px rgb(0 0 0 / 0.3), 0 6px 20px -6px rgb(0 0 0 / 0.5);
+    --shadow-lg: 0 2px 4px rgb(0 0 0 / 0.3), 0 16px 40px -8px rgb(0 0 0 / 0.6);
     color-scheme: dark;
   }
 }
 
 @theme inline {
   --color-bg: var(--bg);
+  --color-surface: var(--surface);
   --color-subtle: var(--bg-subtle);
   --color-hover: var(--bg-hover);
   --color-line: var(--border);
+  --color-line-strong: var(--border-strong);
   --color-fg: var(--text);
   --color-muted: var(--text-muted);
+  --color-faint: var(--text-faint);
   --color-accent: var(--accent);
   --color-accent-hover: var(--accent-hover);
   --color-accent-soft: var(--accent-soft);
+  --color-accent-soft-strong: var(--accent-soft-strong);
   --color-on-accent: var(--accent-fg);
   --color-danger: var(--danger);
   --color-danger-soft: var(--danger-soft);
   --color-success: var(--success);
   --color-success-soft: var(--success-soft);
+  --color-warning: var(--warning);
   --color-warning-soft: var(--warning-soft);
+  --shadow-soft: var(--shadow-sm);
+  --shadow-card: var(--shadow-md);
+  --shadow-float: var(--shadow-lg);
   --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "PingFang SC", "Hiragino Sans GB",
     "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
+  --animate-fade-in: fade-in 0.25s ease-out both;
+  --animate-shimmer: shimmer 1.6s linear infinite;
+  --animate-pulse-dot: pulse-dot 1.4s ease-in-out infinite;
 }
 
-html,
-body {
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
+@keyframes shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+
+@keyframes pulse-dot {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: scale(0.85);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@utility brand-gradient {
+  background-image: linear-gradient(135deg, var(--brand-from), var(--brand-to));
+}
+
+/* A 1px gradient frame; put a surface-colored child inside. */
+@utility brand-border {
+  background-image: linear-gradient(135deg, var(--brand-from), var(--brand-to));
+  padding: 1px;
+}
+
+/* Thin animated bar shown while the agent is working. */
+@utility progress-shimmer {
+  background-image: linear-gradient(90deg, transparent, var(--brand-from), var(--brand-to), transparent);
+  background-size: 200% 100%;
+  animation: var(--animate-shimmer);
+}
+
+/*
+ * Chrome injects a stylesheet into extension pages that sets the body to
+ * font-size: 75% (12px) and its own font. `html body` outranks it.
+ */
+html body {
   background: var(--bg);
   color: var(--text);
   font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* In the base layer so utilities such as outline-none can override it. */
+@layer base {
+
+  ::selection {
+    background: var(--accent-soft-strong);
+  }
+
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-strong) transparent;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
 }
 
 /* Rendered assistant Markdown. */
 .markdown {
-  line-height: 1.6;
+  line-height: 1.65;
   overflow-wrap: anywhere;
 }
 .markdown > * + * {
-  margin-top: 0.6em;
+  margin-top: 0.65em;
 }
 .markdown h1,
 .markdown h2,
 .markdown h3,
 .markdown h4 {
-  font-weight: 600;
+  font-weight: 650;
   line-height: 1.3;
-  margin-top: 1em;
+  margin-top: 1.1em;
+  letter-spacing: -0.01em;
 }
 .markdown h1 {
-  font-size: 1.25em;
+  font-size: 1.2em;
 }
 .markdown h2 {
-  font-size: 1.15em;
+  font-size: 1.1em;
 }
 .markdown h3 {
-  font-size: 1.05em;
+  font-size: 1.02em;
+}
+.markdown strong {
+  font-weight: 650;
 }
 .markdown ul {
   list-style: disc;
-  padding-left: 1.4em;
+  padding-left: 1.3em;
 }
 .markdown ol {
   list-style: decimal;
   padding-left: 1.4em;
 }
+.markdown li::marker {
+  color: var(--text-faint);
+}
 .markdown li + li {
-  margin-top: 0.2em;
+  margin-top: 0.25em;
 }
 .markdown a {
   color: var(--accent);
   text-decoration: underline;
-  text-underline-offset: 2px;
+  text-decoration-color: color-mix(in srgb, var(--accent) 35%, transparent);
+  text-underline-offset: 3px;
+}
+.markdown a:hover {
+  text-decoration-color: var(--accent);
 }
 .markdown code {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 0.88em;
+  font-size: 0.86em;
   background: var(--bg-subtle);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  padding: 0.05em 0.3em;
+  border-radius: 5px;
+  padding: 0.12em 0.35em;
 }
 .markdown pre {
   background: var(--bg-subtle);
   border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 0.75em;
+  border-radius: 10px;
+  padding: 0.8em 0.9em;
   overflow-x: auto;
 }
 .markdown pre code {
   background: none;
-  border: none;
   padding: 0;
-  font-size: 0.85em;
+  font-size: 0.84em;
 }
 .markdown blockquote {
-  border-left: 3px solid var(--border);
-  padding-left: 0.8em;
+  border-left: 3px solid var(--accent-soft-strong);
+  padding-left: 0.85em;
   color: var(--text-muted);
 }
 .markdown table {
   display: block;
   overflow-x: auto;
-  border-collapse: collapse;
-  font-size: 0.92em;
+  border-collapse: separate;
+  border-spacing: 0;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-size: 0.9em;
+  max-width: 100%;
+  width: fit-content;
 }
 .markdown th,
 .markdown td {
-  border: 1px solid var(--border);
-  padding: 0.35em 0.6em;
+  padding: 0.45em 0.75em;
   text-align: left;
   vertical-align: top;
+  border-bottom: 1px solid var(--border);
+}
+.markdown th + th,
+.markdown td + td {
+  border-left: 1px solid var(--border);
+}
+.markdown tr:last-child td {
+  border-bottom: none;
 }
 .markdown th {
   background: var(--bg-subtle);
   font-weight: 600;
+  color: var(--text);
+}
+.markdown tbody tr:nth-child(even) td {
+  background: color-mix(in srgb, var(--bg-subtle) 45%, transparent);
 }
 .markdown hr {
   border: none;

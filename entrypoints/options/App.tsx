@@ -2,6 +2,7 @@ import { Bot, Info, Languages, Plug, ShieldCheck, SlidersHorizontal } from 'luci
 import { useEffect, useState, type ComponentType, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { Settings } from '../../src/shared/types';
+import { BrandMark } from '../../src/ui/Button';
 import { useSettings } from '../../src/ui/useSettings';
 import { AboutSection } from './AboutSection';
 import { AgentSection } from './AgentSection';
@@ -45,32 +46,35 @@ export function App() {
 
   return (
     <div className="min-h-screen bg-bg text-fg">
-      <header className="border-b border-line">
-        <div className="mx-auto flex max-w-5xl items-center gap-3 px-4 py-4 sm:px-6">
-          <img src="/icon/48.png" alt="" className="h-8 w-8" />
-          <div>
-            <h1 className="text-base font-semibold">Browser Helper Lite</h1>
-            <p className="text-sm text-muted">{t('options.subtitle')}</p>
-          </div>
+      <header className="sticky top-0 z-10 border-b border-line bg-surface/85 backdrop-blur">
+        <div className="mx-auto flex h-14 max-w-5xl items-center gap-3 px-4 sm:px-6">
+          <BrandMark size="md" />
+          <h1 className="text-[15px] font-semibold tracking-tight">Browser Helper Lite</h1>
+          <span className="text-faint">/</span>
+          <span className="text-sm text-muted">{t('options.subtitle')}</span>
         </div>
       </header>
-      <div className="mx-auto flex max-w-5xl flex-col gap-6 px-4 py-6 sm:px-6 md:flex-row">
-        <nav className="flex shrink-0 gap-1 overflow-x-auto md:w-48 md:flex-col" aria-label={t('options.nav')}>
+      <div className="mx-auto flex max-w-5xl flex-col gap-6 px-4 py-6 sm:px-6 md:flex-row md:gap-10 md:py-10">
+        <nav className="flex shrink-0 gap-1 overflow-x-auto md:sticky md:top-24 md:w-52 md:flex-col md:self-start" aria-label={t('options.nav')}>
           {SECTIONS.map(({ id, icon: Icon }) => (
             <a
               key={id}
               href={`#${id}`}
               aria-current={id === section ? 'page' : undefined}
-              className={`flex items-center gap-2 whitespace-nowrap rounded-md px-3 py-2 text-sm ${
-                id === section ? 'bg-accent-soft font-medium text-accent' : 'text-muted hover:bg-hover hover:text-fg'
+              className={`flex items-center gap-2.5 whitespace-nowrap rounded-lg px-3 py-2 text-sm transition-colors ${
+                id === section
+                  ? 'bg-surface font-medium text-fg shadow-soft ring-1 ring-line'
+                  : 'text-muted hover:bg-hover hover:text-fg'
               }`}
             >
-              <Icon className="h-4 w-4 shrink-0" />
+              <Icon className={`h-4 w-4 shrink-0 ${id === section ? 'text-accent' : ''}`} />
               {t(`options.sections.${id}`)}
             </a>
           ))}
         </nav>
-        <main className="min-w-0 flex-1">{settings && active.render(settings)}</main>
+        <main className="min-w-0 flex-1 animate-fade-in" key={section}>
+          {settings && active.render(settings)}
+        </main>
       </div>
     </div>
   );

@@ -649,7 +649,7 @@ flowchart TB
 | 层 | 选型 | 理由 |
 | --- | --- | --- |
 | 扩展框架 | WXT（基于 Vite） | 支持 MV3 多入口和热更新，自动生成 manifest，可以用构建开关（如 `ENABLE_CDP_DRIVER`）切换 manifest 内容；同时兼容 Edge |
-| UI | React + TypeScript + Tailwind + shadcn/ui | 生态成熟，容易做出 ChatGPT 风格的界面 |
+| UI | React + TypeScript + Tailwind（自定义设计令牌：暖中性色 + 鸢尾紫主色，深浅色模式） | 生态成熟；颜色、阴影、圆角集中在 `src/ui/styles.css` 里统一管理 |
 | 状态管理 | Zustand | 轻量 |
 | 多语言 | i18next + react-i18next；manifest 部分用 `_locales` | 见 §4.6 |
 | 存储 | `chrome.storage` 存配置；IndexedDB（Dexie）存大数据 | — |

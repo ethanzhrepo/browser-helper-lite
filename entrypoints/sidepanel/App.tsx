@@ -1,4 +1,4 @@
-import { History, Settings as SettingsIcon, SquarePen, X } from 'lucide-react';
+import { History, Info, Settings as SettingsIcon, SquarePen, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ACTIVE_STATUSES } from '../../src/agent/types';
@@ -9,7 +9,7 @@ import { useChatSession } from '../../src/chat/useChatSession';
 import { requestHostAccess } from '../../src/permissions/hosts';
 import type { ContextKind, ContextSnapshot, Locale } from '../../src/shared/types';
 import { newId } from '../../src/storage/db';
-import { IconButton } from '../../src/ui/Button';
+import { BrandMark, IconButton } from '../../src/ui/Button';
 import { openOptions } from '../../src/ui/navigation';
 import { useActiveTab } from '../../src/ui/useActiveTab';
 import { useSettings } from '../../src/ui/useSettings';
@@ -166,12 +166,12 @@ export function App() {
 
   return (
     <div className="flex h-screen flex-col bg-bg text-fg">
-      <header className="flex items-center gap-1 border-b border-line px-2 py-1.5">
-        <img src="/icon/32.png" alt="" className="mx-1 h-5 w-5" />
+      <header className="flex h-12 shrink-0 items-center gap-1 border-b border-line bg-surface px-2.5">
+        <BrandMark size="sm" />
         {settings.connections.length > 0 ? (
           <ModelPicker settings={settings} />
         ) : (
-          <span className="text-sm font-medium">Browser Helper</span>
+          <span className="ml-1 text-sm font-semibold tracking-tight">Browser Helper</span>
         )}
         <div className="flex-1" />
         <IconButton
@@ -218,10 +218,15 @@ export function App() {
               onAgentSend={agent.send}
             />
           )}
+          <div className="shrink-0 space-y-2 px-3 pb-3 pt-1">
           {notice && (
-            <div className="mx-3 mb-1 flex items-start gap-2 rounded-md bg-warning-soft px-3 py-2 text-xs" role="status">
-              <span className="flex-1">{notice}</span>
-              <button type="button" aria-label={t('common.dismiss')} onClick={() => setNotice(undefined)}>
+            <div
+              className="flex animate-fade-in items-start gap-2 rounded-xl border border-warning/25 bg-warning-soft px-3 py-2 text-xs text-fg"
+              role="status"
+            >
+              <Info className="mt-px h-3.5 w-3.5 shrink-0 text-warning" />
+              <span className="flex-1 leading-relaxed">{notice}</span>
+              <button type="button" aria-label={t('common.dismiss')} onClick={() => setNotice(undefined)} className="text-muted hover:text-fg">
                 <X className="h-3.5 w-3.5" />
               </button>
             </div>
@@ -246,6 +251,7 @@ export function App() {
             streaming={Boolean(session.streaming)}
             disabled={mode === 'act' ? !agentSlot : !hasModel}
           />
+          </div>
         </>
       )}
     </div>

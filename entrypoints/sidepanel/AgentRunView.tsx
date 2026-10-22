@@ -1,19 +1,19 @@
 import {
   Ban,
-  Bot,
   Check,
   ChevronDown,
-  ChevronRight,
   CircleAlert,
   Hand,
   KeyRound,
   Loader2,
+  MessageCircleQuestion,
   Minus,
   Pause,
   ShieldAlert,
+  Square,
   X,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import { ALL_SITES_PATTERN, requestHostAccess } from '../../src/permissions/hosts';
@@ -42,82 +42,154 @@ export function actionLabel(t: TFunction, action: AgentAction): string {
 }
 
 function ActionIcon({ status }: { status: AgentAction['status'] }) {
-  const className = 'mt-0.5 h-3.5 w-3.5 shrink-0';
+  const className = 'mt-[3px] h-3.5 w-3.5 shrink-0';
   switch (status) {
     case 'running':
       return <Loader2 className={`${className} animate-spin text-accent`} />;
     case 'awaiting':
-      return <Hand className={`${className} text-accent`} />;
+      return <Hand className={`${className} text-warning`} />;
     case 'done':
-      return <Check className={`${className} text-success`} />;
+      return <Check className={`${className} text-success`} strokeWidth={2.5} />;
     case 'error':
-      return <X className={`${className} text-danger`} />;
+      return <X className={`${className} text-danger`} strokeWidth={2.5} />;
     case 'rejected':
       return <Ban className={`${className} text-danger`} />;
     case 'skipped':
-      return <Minus className={`${className} text-muted`} />;
+      return <Minus className={`${className} text-faint`} />;
   }
 }
+
+const STATUS_STYLE: Record<AgentTask['status'], { icon: typeof Check; tone: string; spin?: boolean }> = {
+  running: { icon: Loader2, tone: 'bg-accent-soft text-accent', spin: true },
+  waiting: { icon: Hand, tone: 'bg-warning-soft text-warning' },
+  paused: { icon: Pause, tone: 'bg-subtle text-muted' },
+  done: { icon: Check, tone: 'bg-success-soft text-success' },
+  failed: { icon: CircleAlert, tone: 'bg-danger-soft text-danger' },
+  stopped: { icon: Square, tone: 'bg-subtle text-muted' },
+};
 
 export function AgentRunView({ task, onSend }: { task: AgentTask; onSend: (message: AgentClientMessage) => void }) {
   const { t } = useTranslation();
   const active = task.status === 'running' || task.status === 'paused' || task.status === 'waiting';
-  const [open, setOpen] = useState(true);
+  // Runs that were already finished when shown start collapsed; live runs stay open.
+  const [open, setOpen] = useState(active);
   const expanded = open || active;
   const actionCount = task.steps.reduce((n, step) => n + step.actions.length, 0);
+  const status = STATUS_STYLE[task.status];
+  const StatusIcon = status.icon;
 
   return (
-    <div className="rounded-lg border border-line bg-bg text-sm" data-testid="agent-run" data-status={task.status}>
+    <div
+      className="animate-fade-in overflow-hidden rounded-xl border border-line bg-surface text-sm shadow-soft"
+      data-testid="agent-run"
+      data-status={task.status}
+    >
+      {task.status === 'running' && <div className="h-0.5 progress-shimmer" aria-hidden />}
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="flex w-full items-center gap-2 px-3 py-2 text-left"
+        disabled={active}
+        className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left enabled:hover:bg-subtle/60"
         aria-expanded={expanded}
       >
-        {task.status === 'running' ? (
-          <Loader2 className="h-4 w-4 animate-spin text-accent" />
-        ) : task.status === 'paused' ? (
-          <Pause className="h-4 w-4 text-muted" />
-        ) : task.status === 'waiting' ? (
-          <Hand className="h-4 w-4 text-accent" />
-        ) : task.status === 'failed' ? (
-          <CircleAlert className="h-4 w-4 text-danger" />
-        ) : (
-          <Bot className="h-4 w-4 text-muted" />
-        )}
-        <span className="font-medium">{t(`agent.status.${task.status}`)}</span>
-        <span className="text-xs text-muted">· {t('agent.actionCount', { count: actionCount })}</span>
-        <span className="ml-auto rounded bg-subtle px-1.5 py-0.5 text-[10px] uppercase text-muted" title={t('agent.driverHint')}>
+        <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${status.tone}`}>
+          <StatusIcon className={`h-3.5 w-3.5 ${status.spin ? 'animate-spin' : ''}`} strokeWidth={2.25} />
+        </span>
+        <span className="font-semibold tracking-tight">{t(`agent.status.${task.status}`)}</span>
+        <span className="text-xs text-faint">{t('agent.actionCount', { count: actionCount })}</span>
+        <span
+          className="ml-auto rounded-md border border-line px-1.5 py-px font-mono text-[10px] tracking-wide text-faint uppercase"
+          title={t('agent.driverHint')}
+          data-testid="driver-badge"
+        >
           {task.driver}
         </span>
-        {!active && (expanded ? <ChevronDown className="h-4 w-4 text-muted" /> : <ChevronRight className="h-4 w-4 text-muted" />)}
+        {!active && <ChevronDown className={`h-4 w-4 text-faint transition-transform ${expanded ? 'rotate-180' : ''}`} />}
       </button>
 
       {expanded && task.steps.length > 0 && (
-        <ol className="space-y-2 border-t border-line px-3 py-2">
-          {task.steps.map((step) => (
-            <li key={step.index} className="space-y-1">
-              {step.thought && <p className="line-clamp-3 text-xs text-muted">{step.thought}</p>}
-              {step.actions.map((action) => (
-                <div key={action.id} className="flex items-start gap-1.5" data-testid="agent-action" data-tool={action.tool} data-status={action.status}>
-                  <ActionIcon status={action.status} />
-                  <div className="min-w-0">
-                    <span className="break-words">{actionLabel(t, action)}</span>
-                    {(action.status === 'error' || action.status === 'rejected') && action.result && (
-                      <p className="text-xs text-muted">{clip(action.result, 160)}</p>
-                    )}
-                  </div>
+        <ol className="relative mx-3 mb-3 ml-[23px] space-y-3 border-l border-line pl-4">
+          {task.steps.map((step, i) => {
+            const current = active && i === task.steps.length - 1;
+            const failed = step.actions.some((a) => a.status === 'error' || a.status === 'rejected');
+            return (
+              <li key={step.index} className="relative">
+                <span
+                  className={`absolute -left-[21px] top-[5px] h-2.5 w-2.5 rounded-full ring-4 ring-surface ${
+                    current ? 'bg-accent animate-pulse-dot' : failed ? 'bg-danger' : 'bg-line-strong'
+                  }`}
+                />
+                {step.thought && <p className="mb-1 line-clamp-3 text-xs leading-relaxed text-muted">{step.thought}</p>}
+                <div className="space-y-1">
+                  {step.actions.map((action) => (
+                    <div
+                      key={action.id}
+                      className="flex items-start gap-2"
+                      data-testid="agent-action"
+                      data-tool={action.tool}
+                      data-status={action.status}
+                    >
+                      <ActionIcon status={action.status} />
+                      <div className="min-w-0 leading-snug">
+                        <span
+                          className={`break-words text-[13px] ${
+                            action.status === 'awaiting' ? 'font-medium text-fg' : action.status === 'skipped' ? 'text-faint' : 'text-fg'
+                          }`}
+                        >
+                          {actionLabel(t, action)}
+                        </span>
+                        {(action.status === 'error' || action.status === 'rejected') && action.result && (
+                          <p className="mt-0.5 text-xs text-muted">{clip(action.result, 160)}</p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                  {step.actions.length === 0 && current && (
+                    <div className="flex items-center gap-2 text-xs text-faint">
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      {t('agent.thinking')}
+                    </div>
+                  )}
                 </div>
-              ))}
-            </li>
-          ))}
+              </li>
+            );
+          })}
         </ol>
       )}
 
       {task.status === 'paused' && (
-        <p className="border-t border-line px-3 py-2 text-xs text-muted">{t(`agent.overlay.paused.${task.pauseReason ?? 'user'}`)}</p>
+        <p className="flex items-center gap-2 border-t border-line bg-subtle/60 px-3.5 py-2.5 text-xs text-muted">
+          <Pause className="h-3.5 w-3.5 shrink-0" />
+          {t(`agent.overlay.paused.${task.pauseReason ?? 'user'}`)}
+        </p>
       )}
       {task.waiting && <WaitingCard task={task} waiting={task.waiting} onSend={onSend} />}
+    </div>
+  );
+}
+
+function CardShell({ tone, icon, title, children, testId }: {
+  tone: 'accent' | 'warning' | 'danger';
+  icon: typeof Check;
+  title: string;
+  children: ReactNode;
+  testId: string;
+}) {
+  const Icon = icon;
+  const tones = {
+    accent: { box: 'bg-accent-soft/60', badge: 'bg-accent text-on-accent' },
+    warning: { box: 'bg-warning-soft', badge: 'bg-warning text-white' },
+    danger: { box: 'bg-danger-soft', badge: 'bg-danger text-white' },
+  }[tone];
+  return (
+    <div className={`animate-fade-in space-y-2.5 border-t border-line px-3.5 py-3.5 ${tones.box}`} data-testid={testId} role="alertdialog">
+      <p className="flex items-center gap-2 font-semibold tracking-tight">
+        <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full ${tones.badge}`}>
+          <Icon className="h-3 w-3" strokeWidth={2.5} />
+        </span>
+        {title}
+      </p>
+      {children}
     </div>
   );
 }
@@ -134,30 +206,34 @@ function WaitingCard({ task, waiting, onSend }: {
   if (waiting.kind === 'approval') {
     const decide = (decision: ApprovalDecision) => respond({ kind: 'approval', decision });
     const action = task.steps.flatMap((step) => step.actions).find((a) => a.id === waiting.actionId);
+    const high = waiting.risk >= 3;
     return (
-      <div className="space-y-2 border-t border-line bg-accent-soft/50 px-3 py-3" data-testid="approval-card" role="alertdialog">
-        <p className="flex items-center gap-1.5 font-medium">
-          <ShieldAlert className={`h-4 w-4 ${waiting.risk >= 3 ? 'text-danger' : 'text-accent'}`} />
-          {waiting.risk >= 3 ? t('agent.approval.titleHigh') : t('agent.approval.title')}
-        </p>
-        <p>
-          {t('agent.approval.body', { site: waiting.site })}{' '}
-          <strong>
+      <CardShell
+        tone={high ? 'danger' : 'accent'}
+        icon={ShieldAlert}
+        title={high ? t('agent.approval.titleHigh') : t('agent.approval.title')}
+        testId="approval-card"
+      >
+        <div className="space-y-1">
+          <p className="text-xs text-muted">{t('agent.approval.body', { site: waiting.site })}</p>
+          <p className="rounded-lg border border-line bg-surface px-3 py-2 font-medium leading-snug shadow-soft">
             {actionLabel(t, action ?? { id: '', tool: waiting.tool, args: {}, target: waiting.target, risk: waiting.risk, status: 'awaiting' })}
-          </strong>
-        </p>
-        <p className="text-xs text-muted">{t(`agent.approval.reason.${waiting.reason}`)}</p>
-        <div className="flex flex-wrap gap-1.5">
+          </p>
+          <p className="text-xs text-muted">{t(`agent.approval.reason.${waiting.reason}`)}</p>
+        </div>
+        <div className="grid grid-cols-2 gap-1.5">
           <Button variant="primary" onClick={() => decide('allowOnce')}>
             {t('agent.approval.allowOnce')}
           </Button>
-          <Button onClick={() => decide('allowTask')}>{t('agent.approval.allowTask')}</Button>
-          {waiting.risk < 3 && <Button onClick={() => decide('allowSite')}>{t('agent.approval.allowSite')}</Button>}
           <Button variant="danger" onClick={() => decide('deny')}>
             {t('agent.approval.deny')}
           </Button>
+          <Button onClick={() => decide('allowTask')} className={waiting.risk < 3 ? '' : 'col-span-2'}>
+            {t('agent.approval.allowTask')}
+          </Button>
+          {waiting.risk < 3 && <Button onClick={() => decide('allowSite')}>{t('agent.approval.allowSite')}</Button>}
         </div>
-      </div>
+      </CardShell>
     );
   }
 
@@ -166,35 +242,34 @@ function WaitingCard({ task, waiting, onSend }: {
     const grant = (pattern: string) =>
       void requestHostAccess(pattern).then((granted) => respond({ kind: 'permission', granted }));
     return (
-      <div className="space-y-2 border-t border-line bg-accent-soft/50 px-3 py-3" data-testid="permission-card" role="alertdialog">
-        <p className="flex items-center gap-1.5 font-medium">
-          <KeyRound className="h-4 w-4 text-accent" />
-          {t('agent.permission.title')}
-        </p>
-        <p className="break-all">{t('agent.permission.body', { origin: waiting.origin })}</p>
-        <div className="flex flex-wrap gap-1.5">
+      <CardShell tone="accent" icon={KeyRound} title={t('agent.permission.title')} testId="permission-card">
+        <p className="break-all text-[13px] leading-relaxed">{t('agent.permission.body', { origin: waiting.origin })}</p>
+        <div className="grid grid-cols-2 gap-1.5">
           <Button variant="primary" onClick={() => grant(waiting.url)}>
             {t('agent.permission.allowSite')}
           </Button>
-          <Button onClick={() => grant(ALL_SITES_PATTERN)}>{t('agent.permission.allowAll')}</Button>
           <Button variant="danger" onClick={() => respond({ kind: 'permission', granted: false })}>
             {t('agent.permission.deny')}
           </Button>
+          <Button onClick={() => grant(ALL_SITES_PATTERN)} className="col-span-2">
+            {t('agent.permission.allowAll')}
+          </Button>
         </div>
-      </div>
+      </CardShell>
     );
   }
 
   if (waiting.kind === 'handoff') {
     return (
-      <div className="space-y-2 border-t border-line bg-warning-soft px-3 py-3" data-testid="handoff-card" role="alertdialog">
-        <p className="flex items-center gap-1.5 font-medium">
-          <Hand className="h-4 w-4" />
-          {t(`agent.handoff.title.${waiting.reason}`)}
-        </p>
-        <p>{waiting.message || t(`agent.handoff.${waiting.reason}`, { site: waiting.site })}</p>
-        {waiting.reason === 'captcha' && <p className="text-xs text-muted">{t('agent.handoff.autoResume')}</p>}
-        <div className="flex flex-wrap gap-1.5">
+      <CardShell tone="warning" icon={Hand} title={t(`agent.handoff.title.${waiting.reason}`)} testId="handoff-card">
+        <p className="text-[13px] leading-relaxed">{waiting.message || t(`agent.handoff.${waiting.reason}`, { site: waiting.site })}</p>
+        {waiting.reason === 'captcha' && (
+          <p className="flex items-center gap-1.5 text-xs text-muted">
+            <Loader2 className="h-3 w-3 animate-spin" />
+            {t('agent.handoff.autoResume')}
+          </p>
+        )}
+        <div className="grid grid-cols-2 gap-1.5">
           <Button variant="primary" onClick={() => respond({ kind: 'continue' })}>
             {t('agent.handoff.done')}
           </Button>
@@ -202,15 +277,14 @@ function WaitingCard({ task, waiting, onSend }: {
             {t('agent.controls.stop')}
           </Button>
         </div>
-      </div>
+      </CardShell>
     );
   }
 
   return (
-    <div className="space-y-1 border-t border-line bg-accent-soft/50 px-3 py-3" data-testid="question-card">
-      <p className="font-medium">{t('agent.question.title')}</p>
-      <p className="whitespace-pre-wrap">{waiting.question}</p>
+    <CardShell tone="accent" icon={MessageCircleQuestion} title={t('agent.question.title')} testId="question-card">
+      <p className="whitespace-pre-wrap text-[13px] leading-relaxed">{waiting.question}</p>
       <p className="text-xs text-muted">{t('agent.question.hint')}</p>
-    </div>
+    </CardShell>
   );
 }

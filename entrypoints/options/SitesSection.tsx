@@ -1,4 +1,4 @@
-import { Globe, Plus, Trash2 } from 'lucide-react';
+import { Globe, Plus, Shield, Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { browser } from 'wxt/browser';
@@ -12,7 +12,7 @@ import {
 import type { Settings, SitePolicy } from '../../src/shared/types';
 import { updateSettings } from '../../src/storage/settings';
 import { Button, IconButton } from '../../src/ui/Button';
-import { Card, inputClass, Section } from './Section';
+import { Card, IconBadge, inputClass, Section } from './Section';
 
 const POLICIES: SitePolicy[] = ['blocked', 'readOnly', 'confirmEach', 'confirmRisky', 'auto'];
 
@@ -59,15 +59,18 @@ function SitePolicies({ settings }: { settings: Settings }) {
   );
 
   return (
-    <div className="space-y-3 pt-4" data-testid="site-policies">
-      <div>
-        <h3 className="font-medium">{t('sites.policiesTitle')}</h3>
-        <p className="mt-1 text-sm text-muted">{t('sites.policiesDescription')}</p>
+    <div className="space-y-3 pt-6" data-testid="site-policies">
+      <div className="flex items-start gap-3">
+        <IconBadge icon={Shield} />
+        <div>
+          <h3 className="text-[15px] font-semibold tracking-tight">{t('sites.policiesTitle')}</h3>
+          <p className="mt-0.5 text-sm leading-relaxed text-muted">{t('sites.policiesDescription')}</p>
+        </div>
       </div>
-      <Card className="space-y-2">
-        {entries.length === 0 && <p className="text-sm text-muted">{t('sites.noPolicies')}</p>}
+      <Card className="divide-y divide-line p-0">
+        {entries.length === 0 && <p className="px-4 py-4 text-sm text-faint">{t('sites.noPolicies')}</p>}
         {entries.map(([site, value]) => (
-          <div key={site} className="flex flex-wrap items-center gap-2">
+          <div key={site} className="flex flex-wrap items-center gap-2 px-4 py-2.5">
             <span className="min-w-0 flex-1 truncate font-mono text-sm">{site}</span>
             {policySelect(value, (next) => setPolicy(site, next))}
             <IconButton label={t('common.delete')} onClick={() => setPolicy(site, undefined)}>
@@ -75,7 +78,7 @@ function SitePolicies({ settings }: { settings: Settings }) {
             </IconButton>
           </div>
         ))}
-        <div className="flex flex-wrap items-center gap-2 border-t border-line pt-3">
+        <div className="flex flex-wrap items-center gap-2 bg-subtle/50 px-4 py-3">
           <input
             aria-label={t('sites.hostLabel')}
             className={`${inputClass} min-w-0 flex-1`}
@@ -137,22 +140,25 @@ export function SitesSection({ settings }: { settings: Settings }) {
         )
       }
     >
-      {origins.length === 0 && <Card className="text-sm text-muted">{t('sites.none')}</Card>}
-      {origins.map((origin) => (
-        <Card key={origin} className="flex items-center gap-3 py-3">
-          <div className="min-w-0 flex-1">
-            <div className="truncate font-mono text-sm">
-              {origin === ALL_SITES_PATTERN ? t('sites.allSites') : origin}
+      <Card className="divide-y divide-line p-0">
+        {origins.length === 0 && <p className="px-4 py-4 text-sm text-faint">{t('sites.none')}</p>}
+        {origins.map((origin) => (
+          <div key={origin} className="flex items-center gap-3 px-4 py-2.5">
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-subtle text-muted">
+              <Globe className="h-3.5 w-3.5" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <div className="truncate font-mono text-sm">{origin === ALL_SITES_PATTERN ? t('sites.allSites') : origin}</div>
+              {usedBy.has(origin) && (
+                <div className="text-xs text-faint">{t('sites.usedByConnection', { name: usedBy.get(origin) })}</div>
+              )}
             </div>
-            {usedBy.has(origin) && (
-              <div className="text-xs text-muted">{t('sites.usedByConnection', { name: usedBy.get(origin) })}</div>
-            )}
+            <Button size="sm" variant="danger" onClick={() => void revokeOrigin(origin).then(refresh)}>
+              {t('sites.revoke')}
+            </Button>
           </div>
-          <Button variant="danger" onClick={() => void revokeOrigin(origin).then(refresh)}>
-            {t('sites.revoke')}
-          </Button>
-        </Card>
-      ))}
+        ))}
+      </Card>
       <SitePolicies settings={settings} />
     </Section>
   );
