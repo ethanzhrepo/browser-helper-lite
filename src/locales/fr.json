@@ -113,7 +113,8 @@
     "truncated": "partiel",
     "diagramError": "Ce diagramme n'a pas pu être dessiné. Voici sa source.",
     "copySvg": "Copier le SVG",
-    "image": "Image"
+    "image": "Image",
+    "linkData": "Ce lien transporte des données dans son adresse (par exemple une adresse e-mail ou un long code). Vérifiez-la, puis cliquez à nouveau sur le lien pour l'ouvrir :"
   },
   "history": {
     "title": "Historique",
@@ -131,6 +132,7 @@
     "network": "Impossible de joindre le fournisseur. Vérifiez votre réseau, l'URL de base et l'accès au site.",
     "noModel": "Aucun modèle n'est sélectionné. Choisissez-en un dans les paramètres.",
     "noKey": "Cette connexion n'a pas de clé API. Ajoutez-en une dans les paramètres.",
+    "insecure": "Votre clé API serait envoyée en HTTP non chiffré. Utilisez une adresse https:// (http n'est autorisé que pour cet ordinateur, par exemple localhost).",
     "unknown": "Une erreur s'est produite."
   },
   "options": {
@@ -306,7 +308,12 @@
         "manualMode": "Le mode validation manuelle est activé.",
         "injection": "Cette page a tenté de donner des instructions à l'assistant : jusqu'à la fin de cette tâche, il demande avant de modifier une page ou d'ouvrir un nouveau site.",
         "exfiltration": "L'adresse contient des données (adresse e-mail, numéro de carte ou long code). Vérifiez que vous voulez les envoyer à ce site.",
-        "newSite": "Ce site n'est pas encore apparu dans cette tâche : il ne figure ni dans votre demande, ni dans votre onglet, ni dans les résultats de recherche."
+        "newSite": "Ce site n'est pas encore apparu dans cette tâche : il ne figure ni dans votre demande, ni dans votre onglet, ni dans les résultats de recherche.",
+        "secret": "Le texte ressemble à une clé ou à un jeton. Vérifiez que vous voulez bien le saisir sur ce site.",
+        "clipboard": "Cela colle le contenu de votre presse-papiers dans la page. L'assistant ne peut pas voir ce qu'il contient.",
+        "frame": "Cette action a lieu dans un cadre d'un autre site, que l'assistant ne peut pas lire. Vérifiez ce qu'il va cliquer ou saisir.",
+        "download": "Cela télécharge un fichier. Les programmes et les archives peuvent nuire à votre ordinateur : n'autorisez que les fichiers attendus.",
+        "sensitivePage": "Cette page concerne la sécurité de votre compte, des clés, des paiements ou une console cloud : chaque modification vous est soumise."
       },
       "allowOnce": "Autoriser une fois",
       "allowTask": "Autoriser pour cette tâche",

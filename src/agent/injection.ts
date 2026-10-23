@@ -81,11 +81,12 @@ export function newBoundary(): string {
 /**
  * Wraps untrusted text in `<tag id="…">…</tag id="…">`. Any `<tag` inside is
  * escaped, so the content cannot close the block early or open a fake one.
+ * Card numbers and credentials are hidden first.
  */
 export function wrapUntrusted(tag: string, boundary: string, attributes: Record<string, string>, body: string): string {
-  const escaped = neutralizeControlTokens(body).replace(new RegExp(`<(/?)${tag}\\b`, 'gi'), '&lt;$1' + tag);
+  const escaped = neutralizeControlTokens(redactSensitive(body)).replace(new RegExp(`<(/?)${tag}\\b`, 'gi'), '&lt;$1' + tag);
   const attrs = Object.entries(attributes)
-    .map(([key, value]) => ` ${key}="${value.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;')}"`)
+    .map(([key, value]) => ` ${key}="${redactSensitive(value).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;')}"`)
     .join('');
   return `<${tag} id="${boundary}"${attrs}>\n${escaped}\n</${tag} id="${boundary}">`;
 }
@@ -93,9 +94,15 @@ export function wrapUntrusted(tag: string, boundary: string, attributes: Record<
 const EMAIL = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i;
 const ENCODED = /[A-Za-z0-9+/_=-]{80,}/;
 
-/** True when the digits form a valid payment card number (Luhn check). */
+/** Leading digits of the card networks (Visa, Mastercard, Amex, Discover, JCB, UnionPay, Diners, Maestro, Mir, RuPay). */
+const CARD_PREFIX = /^(?:4|5[0-8]|2[2-7]|3[0-8]|6|8[12])/;
+/** How card numbers are written: one run of digits, groups of four, or Amex/Diners 4-6-5 and 4-6-4. */
+const CARD_GROUPING = /^(?:\d+|\d{4}([ -])\d{4}\1\d{4}\1\d{1,7}|\d{4}([ -])\d{6}\2\d{4,5})$/;
+const DIGIT_RUN = /\b\d(?:[ -]?\d){12,18}\b/g;
+
+/** True when the digits form a valid payment card number (network prefix and Luhn check). */
 export function isCardNumber(digits: string): boolean {
-  if (!/^\d{13,19}$/.test(digits)) return false;
+  if (!/^\d{13,19}$/.test(digits) || !CARD_PREFIX.test(digits)) return false;
   let sum = 0;
   for (let i = 0; i < digits.length; i++) {
     let digit = Number(digits[digits.length - 1 - i]);
@@ -108,19 +115,60 @@ export function isCardNumber(digits: string): boolean {
   return sum % 10 === 0;
 }
 
-/** A payment card number written with or without spaces or dashes. */
-export function containsCardNumber(text: string): boolean {
-  for (const match of text.matchAll(/\b\d(?:[ -]?\d){12,18}\b/g)) {
-    if (isCardNumber(match[0].replace(/[ -]/g, ''))) return true;
+/**
+ * A payment card number written with or without spaces or dashes. `grouped`
+ * also requires the usual grouping, so an order number such as
+ * 402-1234567-1234567 is not mistaken for a card when hiding page text.
+ */
+export function containsCardNumber(text: string, { grouped = false } = {}): boolean {
+  for (const match of text.matchAll(DIGIT_RUN)) {
+    if ((!grouped || CARD_GROUPING.test(match[0])) && isCardNumber(match[0].replace(/[ -]/g, ''))) return true;
   }
   return false;
 }
 
+/** Credentials with a recognizable shape: API keys, access tokens, private keys. */
+const SECRET_SOURCES = [
+  String.raw`\bsk-(?:ant-|proj-)?[A-Za-z0-9_-]{20,}`, // OpenAI, Anthropic, DeepSeek and others
+  String.raw`\b(?:sk|rk)_live_[A-Za-z0-9]{16,}`, // Stripe
+  String.raw`\bgh[pousr]_[A-Za-z0-9]{30,}`, // GitHub
+  String.raw`\bgithub_pat_[A-Za-z0-9_]{30,}`,
+  String.raw`\bglpat-[A-Za-z0-9_-]{20,}`, // GitLab
+  String.raw`\b(?:AKIA|ASIA)[0-9A-Z]{16}\b`, // AWS
+  String.raw`\bAIza[0-9A-Za-z_-]{35}`, // Google
+  String.raw`\bxox[abposr]-[A-Za-z0-9-]{10,}`, // Slack
+  String.raw`\bhf_[A-Za-z0-9]{30,}`, // Hugging Face
+  String.raw`\beyJ[A-Za-z0-9_-]{8,}\.eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}`, // JSON Web Token
+  String.raw`-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?(?:-----END [A-Z ]*PRIVATE KEY-----|$)`,
+];
+const SECRET = new RegExp(SECRET_SOURCES.join('|'));
+const SECRETS = new RegExp(SECRET_SOURCES.join('|'), 'g');
+
+/** True when the text holds something shaped like an API key, access token or private key. */
+export function containsSecret(text: string): boolean {
+  return SECRET.test(text);
+}
+
+export const HIDDEN_CARD = '[card number hidden]';
+export const HIDDEN_SECRET = '[key or token hidden]';
+
+/**
+ * Removes card numbers and credentials from content before the model sees it.
+ * The assistant never needs them, and what it never sees it cannot be talked
+ * into sending anywhere.
+ */
+export function redactSensitive(text: string): string {
+  return text
+    .replace(SECRETS, HIDDEN_SECRET)
+    .replace(DIGIT_RUN, (run) => (CARD_GROUPING.test(run) && isCardNumber(run.replace(/[ -]/g, '')) ? HIDDEN_CARD : run));
+}
+
 /**
  * Why a URL the model built might carry data out (an email address, a card
- * number, a long encoded blob in its query, fragment or path), if it does.
+ * number, a key or token, a long encoded blob in its query, fragment, path,
+ * credentials or subdomains), if it does.
  */
-export function urlDataLeak(url: string): 'email' | 'card' | 'encoded' | undefined {
+export function urlDataLeak(url: string): 'email' | 'card' | 'secret' | 'encoded' | undefined {
   let parsed: URL;
   try {
     parsed = new URL(url);
@@ -134,10 +182,25 @@ export function urlDataLeak(url: string): 'email' | 'card' | 'encoded' | undefin
       return value;
     }
   };
-  const values = [...parsed.searchParams.values(), decode(parsed.hash.slice(1)), ...parsed.pathname.split('/').map(decode), decode(parsed.username)];
+  const query = decode(parsed.search.slice(1));
+  // Many short parameters add up: a long query is data in itself.
+  if (query.length >= 600) return 'encoded';
+  // Data hidden in subdomains reaches the site's DNS server even if the page never loads.
+  if (parsed.hostname.split('.').some((label) => label.length >= 40 && /\d/.test(label) && /[a-z]/.test(label))) return 'encoded';
+  const values = [
+    ...parsed.searchParams.values(),
+    ...parsed.searchParams.keys(),
+    decode(parsed.hash.slice(1)),
+    ...parsed.pathname.split('/').map(decode),
+    decode(parsed.username),
+    decode(parsed.password),
+  ];
+  // The whole query too, for values split over several parameters.
+  if (EMAIL.test(query)) return 'email';
   for (const value of values) {
     if (EMAIL.test(value)) return 'email';
     if (containsCardNumber(value)) return 'card';
+    if (containsSecret(value)) return 'secret';
     const blob = ENCODED.exec(value)?.[0];
     if (value.length >= 200 || (blob && /[a-z]/.test(blob) && /[A-Z]/.test(blob) && /\d/.test(blob))) return 'encoded';
   }

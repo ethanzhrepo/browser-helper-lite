@@ -1,6 +1,6 @@
 import type { SearchResult } from '../agent/page/types';
 import { ConfigError, HttpError } from '../providers/errors';
-import { normalizeBaseURL } from '../providers/vendors';
+import { keyedBaseURL, normalizeBaseURL } from '../providers/vendors';
 import type { Connection, Locale, SearchProviderId, SearchSettings } from '../shared/types';
 
 type FetchLike = typeof fetch;
@@ -163,6 +163,7 @@ export async function apiSearch(provider: SearchProviderId, query: string, conte
   const url = searchEndpoint(provider, settings, context.connections);
   if (!url) throw new Error(`${provider} is not an API search provider.`);
   if (!apiKey) throw new ConfigError('noKey', `No API key for ${provider} search.`);
+  keyedBaseURL(url, apiKey);
   const bearer = { Authorization: `Bearer ${apiKey}` };
 
   switch (provider) {

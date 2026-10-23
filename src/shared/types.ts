@@ -108,6 +108,8 @@ export type ErrorCode =
   | 'network'
   | 'noModel'
   | 'noKey'
+  /** The API key would travel over plain HTTP to another machine. */
+  | 'insecure'
   | 'unknown';
 
 export interface ErrorInfo {

@@ -49,7 +49,17 @@ export type RiskReason =
   /** A URL the model built carries data such as an email address or a long code. */
   | 'exfiltration'
   /** A URL the model built leads to a site that has not come up in the task. */
-  | 'newSite';
+  | 'newSite'
+  /** The text to type looks like an API key, access token or private key. */
+  | 'secret'
+  /** A key combination that pastes the user's clipboard. */
+  | 'clipboard'
+  /** The click or key lands in a frame from another site, which the extension cannot read. */
+  | 'frame'
+  /** Downloads a file (a program is high risk). */
+  | 'download'
+  /** Account security, credentials, payments or a cloud console: every change is confirmed. */
+  | 'sensitivePage';
 
 /** Content that looked like it was trying to instruct the assistant. */
 export interface InjectionWarning {
@@ -105,7 +115,8 @@ export interface AgentTask {
 export type ApprovalDecision = 'allowOnce' | 'allowTask' | 'allowSite' | 'deny';
 
 export type WaitResponse =
-  | { kind: 'approval'; decision: ApprovalDecision }
+  /** `actionId` names the action the user saw, so an answer never applies to another one. */
+  | { kind: 'approval'; actionId: string; decision: ApprovalDecision }
   | { kind: 'answer'; text: string }
   | { kind: 'continue' }
   | { kind: 'permission'; granted: boolean };

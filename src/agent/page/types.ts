@@ -44,6 +44,12 @@ export interface TargetInfo {
   disabled: boolean;
   /** For an element inside a form: the text of the button that submits it. */
   formSubmitText?: string;
+  /** A link with the `download` attribute. */
+  download?: boolean;
+  /** A native select's options, for checking the one select_option picks. */
+  options?: { text: string; value: string }[];
+  /** Set when a click or key would land in a frame from another site, which the extension cannot read. */
+  frameOrigin?: string;
   /** Short human label, e.g. `button "Add to cart"`. */
   label: string;
 }

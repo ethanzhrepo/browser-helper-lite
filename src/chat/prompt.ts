@@ -1,3 +1,4 @@
+import { neutralizeControlTokens, redactSensitive } from '../agent/injection';
 import type { ContextSnapshot, MessageRecord } from '../shared/types';
 
 export interface ChatTurn {
@@ -10,11 +11,12 @@ function escapeAttribute(value: string): string {
 }
 
 export function renderContext(context: ContextSnapshot): string {
-  // Neutralize closing tags so page text cannot break out of its block.
-  const body = context.content.replace(/<\/context/gi, '&lt;/context');
+  // Escape our tag so page text cannot end its block or open a fake one; card
+  // numbers, keys and chat control tokens never reach the model (§8.2).
+  const body = neutralizeControlTokens(redactSensitive(context.content)).replace(/<(\/?)context\b/gi, '&lt;$1context');
   const attributes = [
     `type="${context.kind}"`,
-    `title="${escapeAttribute(context.title)}"`,
+    `title="${escapeAttribute(neutralizeControlTokens(context.title.replace(/\s+/g, ' ').trim().slice(0, 200)))}"`,
     `url="${escapeAttribute(context.url)}"`,
     ...(context.truncated ? ['truncated="true"'] : []),
   ].join(' ');

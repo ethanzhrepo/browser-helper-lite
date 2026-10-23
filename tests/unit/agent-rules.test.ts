@@ -68,11 +68,76 @@ describe('classifyAction', () => {
     expect(press('Space', { text: 'Delete account' })).toMatchObject({ risk: 3 });
     expect(press('Enter', { tag: 'input', editable: true, inForm: true, formSubmitText: 'Pay now' })).toMatchObject({ risk: 3 });
     expect(press('Enter', { tag: 'textarea', editable: true })).toMatchObject({ risk: 2 });
-    expect(press('Control+V', { tag: 'input', editable: true })).toMatchObject({ risk: 2 });
+    expect(press('Control+V', { tag: 'input', editable: true })).toMatchObject({ risk: 3, reason: 'clipboard' });
+    expect(press('Meta+V', { tag: 'textarea', editable: true })).toMatchObject({ risk: 3, reason: 'clipboard' });
+    expect(press('Shift+Insert', { tag: 'input', editable: true })).toMatchObject({ risk: 3, reason: 'clipboard' });
+    expect(press('Control+C', { tag: 'input', editable: true })).toMatchObject({ risk: 2 });
     expect(press('Control+A').risk).toBe(1);
     expect(press('Tab').risk).toBe(1);
     expect(press('Escape', { text: 'Pay now' }).risk).toBe(1);
     expect(press('Enter').risk).toBe(1);
+  });
+
+  it('applies the typing rules to single key presses', () => {
+    const press = (keys: string, focused: Partial<TargetInfo>) => classifyAction('press', { keys }, target(focused));
+    expect(press('a', { tag: 'input', editable: true, isPassword: true })).toMatchObject({ forbidden: 'password' });
+    expect(press('4', { tag: 'input', editable: true, isPaymentField: true })).toMatchObject({ forbidden: 'payment' });
+    expect(press('7', { tag: 'input', editable: true, isOneTimeCode: true })).toMatchObject({ forbidden: 'oneTimeCode' });
+    // The last digit of a card number typed one key at a time.
+    expect(press('1', { tag: 'input', editable: true, text: '411111111111111' })).toMatchObject({ forbidden: 'payment' });
+    expect(press('1', { tag: 'input', editable: true, text: '41111' }).risk).toBe(1);
+    expect(press('Tab', { tag: 'input', editable: true, isPassword: true }).risk).toBe(1);
+  });
+
+  it('checks the whole field value when text is appended', () => {
+    const field = target({ tag: 'input', editable: true, text: '4111 1111 1111' });
+    expect(classifyAction('type', { index: 1, text: ' 1111', clear: false }, field)).toMatchObject({ forbidden: 'payment' });
+    expect(classifyAction('type', { index: 1, text: ' 1111' }, field).risk).toBe(1);
+  });
+
+  it('asks before typing keys or tokens anywhere', () => {
+    const field = target({ tag: 'input', editable: true, label: 'input "Coupon"' });
+    expect(classifyAction('type', { index: 1, text: 'sk-proj-abcdefghijklmnopqrstuvwxyz012345' }, field)).toMatchObject({ risk: 3, reason: 'secret' });
+    expect(classifyAction('type', { index: 1, text: 'ghp_abcdefghijklmnopqrstuvwxyz0123456789' }, field)).toMatchObject({ risk: 3, reason: 'secret' });
+    expect(classifyAction('type', { index: 1, text: 'AKIAIOSFODNN7EXAMPLE' }, field)).toMatchObject({ risk: 3, reason: 'secret' });
+    expect(classifyAction('type', { index: 1, text: 'task-force meeting notes' }, field).risk).toBe(1);
+  });
+
+  it('rates clicks and keys that land in another site\'s frame as high risk', () => {
+    const framed = target({ tag: 'div', text: 'Continue', frameOrigin: 'https://pay.example' });
+    expect(classifyAction('click', { index: 1 }, framed)).toMatchObject({ risk: 3, reason: 'frame' });
+    const frame = target({ tag: 'iframe', frameOrigin: 'https://pay.example' });
+    expect(classifyAction('press', { keys: 'Enter' }, frame)).toMatchObject({ risk: 3, reason: 'frame' });
+    expect(classifyAction('press', { keys: 'x' }, frame)).toMatchObject({ risk: 3, reason: 'frame' });
+    expect(classifyAction('press', { keys: 'Tab' }, frame).risk).toBe(1);
+  });
+
+  it('judges select_option by the option it will pick', () => {
+    const select = target({
+      tag: 'select',
+      isSelect: true,
+      options: [
+        { text: 'Keep my account', value: 'keep' },
+        { text: 'Delete my account', value: 'opt-2' },
+      ],
+    });
+    expect(classifyAction('select_option', { index: 1, option: 'opt-2' }, select)).toMatchObject({ risk: 3, reason: 'destructive' });
+    expect(classifyAction('select_option', { index: 1, option: 'keep' }, select).risk).toBe(1);
+  });
+
+  it('rates downloads by what they fetch', () => {
+    expect(clickRisk({ tag: 'a', text: 'Get the app', href: 'https://x.example/files/setup.exe' })).toMatchObject({ risk: 3, reason: 'download' });
+    expect(clickRisk({ tag: 'a', text: 'Source', href: 'https://x.example/src.tar.gz' })).toMatchObject({ risk: 2, reason: 'download' });
+    expect(clickRisk({ tag: 'a', text: 'Report', href: 'https://x.example/report.pdf', download: true })).toMatchObject({ risk: 2, reason: 'download' });
+    expect(clickRisk({ tag: 'a', text: 'Report', href: 'https://x.example/report.pdf' }).risk).toBe(1);
+  });
+
+  it('rates credential and account-security buttons as high risk', () => {
+    for (const text of ['Generate new token', 'Revoke', 'Transfer ownership', 'Approve', 'Add to Chrome', '生成令牌', '关闭两步验证', 'Révoquer', 'Revocar']) {
+      expect(clickRisk({ text }).risk, text).toBe(3);
+    }
+    // Undo in Chinese UIs is "撤销"; only revoking access counts.
+    expect(clickRisk({ text: '撤销' }).risk).toBe(1);
   });
 
   it('sorts actions into browsing, searching and changing', () => {

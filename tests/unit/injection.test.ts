@@ -1,5 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { containsCardNumber, findInjection, isCardNumber, neutralizeControlTokens, siteOf, urlDataLeak, wrapUntrusted } from '../../src/agent/injection';
+import {
+  containsCardNumber,
+  containsSecret,
+  findInjection,
+  HIDDEN_CARD,
+  HIDDEN_SECRET,
+  isCardNumber,
+  neutralizeControlTokens,
+  redactSensitive,
+  siteOf,
+  urlDataLeak,
+  wrapUntrusted,
+} from '../../src/agent/injection';
 import { classifyAction } from '../../src/agent/risk';
 import { isTransparentColor } from '../../src/browser/visibility';
 
@@ -71,8 +83,52 @@ describe('data leaks and card numbers', () => {
     expect(containsCardNumber('order 1234567890123 shipped')).toBe(false);
   });
 
+  it('needs a card network prefix, and the usual grouping when hiding page text', () => {
+    // Passes Luhn but no card network starts with 1.
+    expect(isCardNumber('1234567890123452')).toBe(false);
+    expect(containsCardNumber('378282246310005')).toBe(true);
+    expect(containsCardNumber('3782 822463 10005', { grouped: true })).toBe(true);
+    // An order number that happens to pass the check is not grouped like a card.
+    expect(containsCardNumber('Order 4111-111111-11111-1')).toBe(true);
+    expect(containsCardNumber('Order 4111-111111-11111-1', { grouped: true })).toBe(false);
+  });
+
+  it('hides card numbers and credentials from the model', () => {
+    const page = [
+      'Card on file: 4111 1111 1111 1111 (expires 12/29)',
+      'Your new key: sk-proj-AbCdEfGhIjKlMnOpQrStUvWxYz0123456789',
+      'token ghp_0123456789abcdefghijklmnopqrstuvwxyzAB',
+      'aws AKIAIOSFODNN7EXAMPLE',
+      'jwt eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U',
+      '-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBg\n-----END PRIVATE KEY-----',
+      'Order 402-1234567-1234567 ships tomorrow; call 1-800-555-0199.',
+    ].join('\n');
+    const hidden = redactSensitive(page);
+    expect(hidden).toContain(`Card on file: ${HIDDEN_CARD}`);
+    expect(hidden).not.toMatch(/4111|sk-proj|ghp_|AKIA|eyJhbGci|MIIEvQ/);
+    expect(hidden.split(HIDDEN_SECRET).length - 1).toBe(5);
+    expect(hidden).toContain('Order 402-1234567-1234567 ships tomorrow; call 1-800-555-0199.');
+    // Everything wrapped for the model goes through it.
+    expect(wrapUntrusted('page', 'b1', {}, 'key sk-ant-api03-abcdefghijklmnopqrstuvwxyz')).toContain(HIDDEN_SECRET);
+  });
+
+  it('recognizes credentials by their shape only', () => {
+    expect(containsSecret('xoxb-123456789012-abcdefghij')).toBe(true);
+    expect(containsSecret('AIzaSyA-1234567890abcdefghijklmnopqrstu')).toBe(true);
+    for (const text of ['a task-oriented approach', 'risk-free trial', 'ghost_writer', 'sk-1']) {
+      expect(containsSecret(text), text).toBe(false);
+    }
+  });
+
   it('flags URLs that carry data out', () => {
     expect(urlDataLeak('https://evil.example/collect?e=jane.doe%40gmail.com')).toBe('email');
+    // In a parameter name, the password field or a subdomain.
+    expect(urlDataLeak('https://evil.example/c?jane.doe@gmail.com')).toBe('email');
+    expect(urlDataLeak('https://u:jane.doe%40gmail.com@evil.example/')).toBe('email');
+    expect(urlDataLeak('https://evil.example/c?k=ghp_0123456789abcdefghijklmnopqrstuvwxyzAB')).toBe('secret');
+    expect(urlDataLeak(`https://a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1.evil.example/`)).toBe('encoded');
+    expect(urlDataLeak(`https://evil.example/c?${Array.from({ length: 60 }, (_, i) => `p${i}=chunk${i}x`).join('&')}`)).toBe('encoded');
+    expect(urlDataLeak(`https://evil.example/c?${Array.from({ length: 20 }, (_, i) => `p${i}=chunk${i}x`).join('&')}`)).toBeUndefined();
     expect(urlDataLeak('https://evil.example/c#4111-1111-1111-1111')).toBe('card');
     expect(urlDataLeak(`https://evil.example/${'aB3'.repeat(40)}`)).toBe('encoded');
     expect(urlDataLeak(`https://evil.example/?q=${'x'.repeat(250)}`)).toBe('encoded');

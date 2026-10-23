@@ -1,12 +1,13 @@
 import 'katex/dist/katex.min.css';
 import { Check, Copy, ImageOff } from 'lucide-react';
-import { lazy, memo, Suspense, useState, type ReactNode } from 'react';
+import { lazy, memo, Suspense, useState, type AnchorHTMLAttributes, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import ReactMarkdown from 'react-markdown';
 import rehypeHighlight from 'rehype-highlight';
 import rehypeKatex from 'rehype-katex';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
+import { urlDataLeak } from '../agent/injection';
 import { normalizeMath } from './math';
 
 // Mermaid is large; it loads only when a reply contains a diagram.
@@ -85,6 +86,43 @@ function BlockedImage({ src, alt }: { src?: string; alt?: string }) {
   );
 }
 
+/**
+ * Links in replies. The full address shows on hover, so a link's real target
+ * is visible before clicking. A link whose address carries data (an email
+ * address, a long code) could hand your data to a site a page picked, so the
+ * first click shows the whole address and only the second one opens it.
+ */
+function ReplyLink({ href, children, ...props }: AnchorHTMLAttributes<HTMLAnchorElement>) {
+  const { t } = useTranslation();
+  const [checked, setChecked] = useState(false);
+  const carriesData = href ? urlDataLeak(href) !== undefined : false;
+  return (
+    <>
+      <a
+        {...props}
+        href={href}
+        title={href}
+        target="_blank"
+        rel="noreferrer noopener"
+        data-testid={carriesData ? 'data-link' : undefined}
+        onClick={(event) => {
+          if (carriesData && !checked) {
+            event.preventDefault();
+            setChecked(true);
+          }
+        }}
+      >
+        {children}
+      </a>
+      {carriesData && checked && (
+        <span className="my-1 block rounded-md border border-warning/25 bg-warning-soft px-2 py-1 text-xs leading-relaxed" data-testid="data-link-warning">
+          {t('message.linkData')} <code className="break-all">{href}</code>
+        </span>
+      )}
+    </>
+  );
+}
+
 function CodeBlock({ node, streaming, children }: { node?: HastNode; streaming: boolean; children: ReactNode }) {
   const code = node?.children?.find((child) => child.tagName === 'code');
   const language = languageOf(code);
@@ -145,8 +183,7 @@ export const Markdown = memo(function Markdown({ text, streaming = false }: { te
           [rehypeHighlight, { detect: false, plainText: ['mermaid', 'text', 'txt', 'plain'] }],
         ]}
         components={{
-          // The full address on hover, so a link's real target is visible before clicking.
-          a: ({ node: _node, ...props }) => <a {...props} title={props.href} target="_blank" rel="noreferrer noopener" />,
+          a: ({ node: _node, ...props }) => <ReplyLink {...props} />,
           img: ({ src, alt }) => <BlockedImage src={typeof src === 'string' ? src : undefined} alt={alt} />,
           pre: ({ node, children }) => (
             <CodeBlock node={node as HastNode | undefined} streaming={streaming}>

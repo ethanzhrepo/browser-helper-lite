@@ -15,7 +15,7 @@ export class HttpError extends Error {
 
 export class ConfigError extends Error {
   constructor(
-    readonly code: Extract<ErrorCode, 'noModel' | 'noKey'>,
+    readonly code: Extract<ErrorCode, 'noModel' | 'noKey' | 'insecure'>,
     message: string,
   ) {
     super(message);

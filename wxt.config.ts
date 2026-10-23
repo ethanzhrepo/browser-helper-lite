@@ -37,11 +37,13 @@ export default defineConfig({
       'favicon',
       ...(enableCdpDriver ? ['debugger'] : []),
     ],
-    // Our pages load scripts and images only from the extension itself. Model
-    // output can therefore never make the side panel contact a server, e.g.
-    // through an image URL carrying your data (§8.2).
+    // Our pages load scripts, images, fonts and media only from the extension
+    // itself, and embed no frames. Model output can therefore never make the
+    // side panel contact a server, e.g. through an image URL carrying your
+    // data (§8.2).
     content_security_policy: {
-      extension_pages: "script-src 'self'; object-src 'self'; img-src 'self' data: blob:",
+      extension_pages:
+        "script-src 'self'; object-src 'self'; img-src 'self' data: blob:; font-src 'self' data:; media-src 'self' blob:; frame-src 'none'; base-uri 'none'; form-action 'none'",
     },
     // Site access is requested at runtime, per site or for all sites (§6).
     optional_host_permissions: ['<all_urls>'],

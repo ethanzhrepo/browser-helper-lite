@@ -112,7 +112,8 @@
     "truncated": "partial",
     "diagramError": "This diagram couldn't be drawn. Here is its source.",
     "copySvg": "Copy SVG",
-    "image": "Image"
+    "image": "Image",
+    "linkData": "This link carries data in its address (such as an email address or a long code). Check it, then click the link again to open it:"
   },
   "history": {
     "title": "History",
@@ -130,6 +131,7 @@
     "network": "Couldn't reach the provider. Check your network, the base URL, and site access.",
     "noModel": "No model is selected. Choose one in settings.",
     "noKey": "This connection has no API key. Add one in settings.",
+    "insecure": "This would send your API key over unencrypted HTTP. Use an https:// address (plain http is only allowed for this computer, such as localhost).",
     "unknown": "Something went wrong."
   },
   "options": {
@@ -302,7 +304,12 @@
         "manualMode": "Manual approval mode is on.",
         "injection": "This page tried to give the assistant instructions, so for the rest of this task it asks before changing pages or opening new sites.",
         "exfiltration": "The address contains data (such as an email address, a card number or a long code). Make sure you want to send it to this site.",
-        "newSite": "This site has not come up in this task: it is not in your request, your tab or the search results."
+        "newSite": "This site has not come up in this task: it is not in your request, your tab or the search results.",
+        "secret": "The text looks like a key or token. Make sure you want to enter it on this site.",
+        "clipboard": "This pastes whatever is on your clipboard into the page. The assistant cannot see what that is.",
+        "frame": "This acts inside a frame from another site, which the assistant cannot read. Check what it will click or type into.",
+        "download": "This downloads a file. Programs and archives can harm your computer; only allow files you expect.",
+        "sensitivePage": "This page handles your account security, keys, payments or a cloud console, so every change is checked with you."
       },
       "allowOnce": "Allow once",
       "allowTask": "Allow for this task",

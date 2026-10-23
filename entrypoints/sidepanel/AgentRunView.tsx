@@ -15,7 +15,7 @@ import {
   X,
   XCircle,
 } from 'lucide-react';
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import { ALL_SITES_PATTERN, requestHostAccess } from '../../src/permissions/hosts';
@@ -190,7 +190,9 @@ export function AgentRunView({ task, onSend }: { task: AgentTask; onSend: (messa
           {t(`agent.overlay.paused.${task.pauseReason ?? 'user'}`)}
         </p>
       )}
-      {task.waiting && <WaitingCard task={task} waiting={task.waiting} onSend={onSend} />}
+      {task.waiting && (
+        <WaitingCard key={task.waiting.kind === 'approval' ? task.waiting.actionId : task.waiting.kind} task={task} waiting={task.waiting} onSend={onSend} />
+      )}
     </div>
   );
 }
@@ -221,24 +223,34 @@ function CardShell({ tone, icon, title, children, testId }: {
   );
 }
 
+/** Approvals are ignored this long after a card appears. */
+const APPROVAL_ARM_MS = 500;
+
 function WaitingCard({ task, waiting, onSend }: {
   task: AgentTask;
   waiting: WaitReason;
   onSend: (message: AgentClientMessage) => void;
 }) {
   const { t } = useTranslation();
+  // Allow buttons wake up shortly after a card appears, so a click meant for the previous card cannot approve this one.
+  const [armed, setArmed] = useState(false);
+  useEffect(() => {
+    const timer = setTimeout(() => setArmed(true), APPROVAL_ARM_MS);
+    return () => clearTimeout(timer);
+  }, []);
   const respond = (response: Extract<AgentClientMessage, { type: 'respond' }>['response']) =>
     onSend({ type: 'respond', taskId: task.id, response });
 
   if (waiting.kind === 'approval') {
-    const decide = (decision: ApprovalDecision) => respond({ kind: 'approval', decision });
+    const decide = (decision: ApprovalDecision) => respond({ kind: 'approval', actionId: waiting.actionId, decision });
     const action = task.steps.flatMap((step) => step.actions).find((a) => a.id === waiting.actionId);
     // Trusting a whole site makes no sense when the page itself is the problem.
-    const suspicious = waiting.reason === 'injection' || waiting.reason === 'exfiltration';
+    const suspicious = waiting.reason === 'injection' || waiting.reason === 'exfiltration' || waiting.reason === 'secret';
     const high = waiting.risk >= 3 || suspicious;
     // Site-wide trust makes no sense for these; high-risk steps are approved one at a time (§8.1).
-    const canAllowSite = waiting.risk < 3 && !suspicious && waiting.reason !== 'newSite';
-    const canAllowTask = waiting.risk < 3 && waiting.reason !== 'exfiltration';
+    const oneByOne = waiting.reason === 'exfiltration' || waiting.reason === 'secret' || waiting.reason === 'sensitivePage';
+    const canAllowSite = waiting.risk < 3 && !suspicious && !oneByOne && waiting.reason !== 'newSite' && waiting.reason !== 'download';
+    const canAllowTask = waiting.risk < 3 && !oneByOne;
     const typed = action?.tool === 'type' ? String(action.args.text ?? '') : '';
     const fullUrl = action?.tool === 'navigate' || action?.tool === 'open_tab' ? String(action.args.url ?? '') : '';
     return (
@@ -262,18 +274,22 @@ function WaitingCard({ task, waiting, onSend }: {
           <p className="text-xs text-muted">{t(`agent.approval.reason.${waiting.reason}`)}</p>
         </div>
         <div className="grid grid-cols-2 gap-1.5">
-          <Button variant="primary" onClick={() => decide('allowOnce')}>
+          <Button variant="primary" disabled={!armed} onClick={() => decide('allowOnce')}>
             {t('agent.approval.allowOnce')}
           </Button>
           <Button variant="danger" onClick={() => decide('deny')}>
             {t('agent.approval.deny')}
           </Button>
           {canAllowTask && (
-            <Button onClick={() => decide('allowTask')} className={canAllowSite ? '' : 'col-span-2'}>
+            <Button disabled={!armed} onClick={() => decide('allowTask')} className={canAllowSite ? '' : 'col-span-2'}>
               {t('agent.approval.allowTask')}
             </Button>
           )}
-          {canAllowSite && <Button onClick={() => decide('allowSite')}>{t('agent.approval.allowSite')}</Button>}
+          {canAllowSite && (
+            <Button disabled={!armed} onClick={() => decide('allowSite')}>
+              {t('agent.approval.allowSite')}
+            </Button>
+          )}
         </div>
       </CardShell>
     );
@@ -293,9 +309,12 @@ function WaitingCard({ task, waiting, onSend }: {
           <Button variant="danger" onClick={() => respond({ kind: 'permission', granted: false })}>
             {t('agent.permission.deny')}
           </Button>
-          <Button onClick={() => grant(ALL_SITES_PATTERN)} className="col-span-2">
-            {t('agent.permission.allowAll')}
-          </Button>
+          {/* After an injection attempt, access is granted one site at a time. */}
+          {!task.injection && (
+            <Button onClick={() => grant(ALL_SITES_PATTERN)} className="col-span-2">
+              {t('agent.permission.allowAll')}
+            </Button>
+          )}
         </div>
       </CardShell>
     );

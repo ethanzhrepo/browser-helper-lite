@@ -5,7 +5,7 @@ import { createOpenAI } from '@ai-sdk/openai';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import type { LanguageModel, Tool } from 'ai';
 import type { Connection } from '../shared/types';
-import { normalizeBaseURL } from './vendors';
+import { keyedBaseURL } from './vendors';
 
 /**
  * Builds an AI SDK language model for a connection. Runs in the service worker
@@ -17,7 +17,7 @@ export function createLanguageModel(
   modelId: string,
   fetch?: typeof globalThis.fetch,
 ): LanguageModel {
-  const baseURL = normalizeBaseURL(connection.baseURL);
+  const baseURL = keyedBaseURL(connection.baseURL, apiKey);
   switch (connection.vendor) {
     case 'openai':
       return createOpenAI({ apiKey, baseURL, fetch })(modelId);
@@ -54,7 +54,7 @@ export function providerOptionsFor(connection: Connection) {
  * The tool runs on the provider's side; the key is the name it must be given.
  */
 export function createNativeSearchTool(connection: Connection, apiKey: string | undefined): { name: string; tool: Tool } | undefined {
-  const baseURL = normalizeBaseURL(connection.baseURL);
+  const baseURL = keyedBaseURL(connection.baseURL, apiKey);
   switch (connection.vendor) {
     case 'openai':
       return { name: 'web_search', tool: createOpenAI({ apiKey, baseURL }).tools.webSearch({}) as Tool };

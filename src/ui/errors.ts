@@ -8,5 +8,5 @@ export function errorSummary(t: TFunction, error: ErrorInfo): string {
 
 /** Errors the user fixes in settings rather than by retrying. */
 export function isSettingsError(error: ErrorInfo): boolean {
-  return error.code === 'auth' || error.code === 'noKey' || error.code === 'noModel' || error.code === 'forbidden';
+  return error.code === 'auth' || error.code === 'noKey' || error.code === 'noModel' || error.code === 'forbidden' || error.code === 'insecure';
 }

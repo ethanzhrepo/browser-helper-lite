@@ -1,6 +1,6 @@
 import type { Vendor } from '../shared/types';
 import { HttpError } from './errors';
-import { normalizeBaseURL } from './vendors';
+import { keyedBaseURL } from './vendors';
 
 type FetchLike = typeof fetch;
 
@@ -35,7 +35,7 @@ export async function fetchModelList(
   apiKey: string | undefined,
   fetchImpl: FetchLike = fetch,
 ): Promise<string[]> {
-  const base = normalizeBaseURL(baseURL);
+  const base = keyedBaseURL(baseURL, apiKey);
   switch (vendor) {
     case 'anthropic': {
       const body = (await getJson(fetchImpl, `${base}/models?limit=1000`, anthropicHeaders(apiKey ?? ''))) as {

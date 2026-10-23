@@ -113,7 +113,8 @@
     "truncated": "parcial",
     "diagramError": "No se pudo dibujar este diagrama. Aquí está su código.",
     "copySvg": "Copiar SVG",
-    "image": "Imagen"
+    "image": "Imagen",
+    "linkData": "Este enlace lleva datos en su dirección (como un correo electrónico o un código largo). Compruébala y vuelve a hacer clic en el enlace para abrirlo:"
   },
   "history": {
     "title": "Historial",
@@ -131,6 +132,7 @@
     "network": "No se pudo contactar con el proveedor. Revisa tu red, la URL base y el acceso al sitio.",
     "noModel": "No hay ningún modelo seleccionado. Elige uno en los ajustes.",
     "noKey": "Esta conexión no tiene clave de API. Añade una en los ajustes.",
+    "insecure": "Tu clave de API se enviaría por HTTP sin cifrar. Usa una dirección https:// (http solo se permite para este equipo, como localhost).",
     "unknown": "Algo salió mal."
   },
   "options": {
@@ -306,7 +308,12 @@
         "manualMode": "El modo de aprobación manual está activado.",
         "injection": "Esta página intentó dar instrucciones al asistente, así que hasta el final de esta tarea pide permiso antes de cambiar páginas o abrir sitios nuevos.",
         "exfiltration": "La dirección contiene datos (como un correo, un número de tarjeta o un código largo). Asegúrate de que quieres enviarlos a este sitio.",
-        "newSite": "Este sitio no ha aparecido en esta tarea: no está en tu petición, en tu pestaña ni en los resultados de búsqueda."
+        "newSite": "Este sitio no ha aparecido en esta tarea: no está en tu petición, en tu pestaña ni en los resultados de búsqueda.",
+        "secret": "El texto parece una clave o un token. Asegúrate de que quieres introducirlo en este sitio.",
+        "clipboard": "Esto pega en la página lo que tengas en el portapapeles. El asistente no puede ver qué es.",
+        "frame": "Esto actúa dentro de un marco de otro sitio, que el asistente no puede leer. Comprueba dónde va a hacer clic o escribir.",
+        "download": "Esto descarga un archivo. Los programas y los archivos comprimidos pueden dañar tu equipo; permite solo los que esperas.",
+        "sensitivePage": "Esta página gestiona la seguridad de tu cuenta, claves, pagos o una consola en la nube, así que cada cambio se te consulta."
       },
       "allowOnce": "Permitir una vez",
       "allowTask": "Permitir en esta tarea",

@@ -1,5 +1,6 @@
 import { browser } from 'wxt/browser';
 import { parseKeyCombo } from '../keys';
+import { matchOption } from '../select';
 import { isTransparentColor } from '../../browser/visibility';
 import type {
   OverlayState,
@@ -198,7 +199,8 @@ function describe(el: Element): string {
     add('placeholder', el.placeholder);
     if (el.type === 'checkbox' || el.type === 'radio') {
       if (el.checked) attrs.push('checked');
-    } else if (el.type === 'password') {
+    } else if (el.type === 'password' || isPaymentInput(el) || isOneTimeCodeInput(el)) {
+      // The model never needs these values, so it never sees them.
       if (el.value) add('value', '••••');
     } else {
       add('value', el.value);
@@ -222,6 +224,50 @@ function describe(el: Element): string {
 
   const attrText = attrs.length > 0 ? ` ${attrs.join(' ')}` : '';
   return tag === 'input' ? `<${tag}${attrText}>` : `<${tag}${attrText}>${text}</${tag}>`;
+}
+
+/** A frame whose content the extension cannot read (another site's page). */
+function isOpaqueFrame(el: Element): el is HTMLIFrameElement | HTMLFrameElement {
+  if (!(el instanceof HTMLIFrameElement || el instanceof HTMLFrameElement)) return false;
+  try {
+    return !el.contentDocument;
+  } catch {
+    return true;
+  }
+}
+
+/** The opaque frame a click on the element's center would land in, if any. */
+function frameAtCenter(el: Element): HTMLIFrameElement | HTMLFrameElement | undefined {
+  if (isOpaqueFrame(el)) return el;
+  const rect = el.getBoundingClientRect();
+  const x = rect.left + rect.width / 2;
+  const y = rect.top + rect.height / 2;
+  for (const frame of el.querySelectorAll('iframe, frame')) {
+    const r = frame.getBoundingClientRect();
+    if (isOpaqueFrame(frame) && x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) return frame;
+  }
+  return undefined;
+}
+
+function frameOrigin(frame: HTMLIFrameElement | HTMLFrameElement): string {
+  try {
+    const origin = new URL(frame.src || 'about:blank', location.href).origin;
+    return origin === 'null' ? 'an embedded frame' : origin;
+  } catch {
+    return 'an embedded frame';
+  }
+}
+
+const autocompleteOf = (el: Element) => (el.getAttribute('autocomplete') ?? '').toLowerCase();
+
+/** Card number, expiry or security code fields. */
+function isPaymentInput(el: Element): boolean {
+  const input = el instanceof HTMLInputElement ? el : undefined;
+  return autocompleteOf(el).startsWith('cc-') || /card.?number|cvv|cvc/i.test(`${input?.name ?? ''} ${input?.id ?? ''}`);
+}
+
+function isOneTimeCodeInput(el: Element): boolean {
+  return autocompleteOf(el) === 'one-time-code';
 }
 
 function shortLabel(el: Element): string {
@@ -495,13 +541,14 @@ export function createPageAgent(): PageAgentApi {
 
   const targetInfo = (el: Element): TargetInfo => {
     const input = el instanceof HTMLInputElement ? el : undefined;
-    const autocomplete = (el.getAttribute('autocomplete') ?? '').toLowerCase();
+    // Clicks and keys that end up in another site's frame act on content the extension cannot see.
+    const frame = frameAtCenter(el);
     const form = (el as HTMLInputElement).form ?? el.closest('form');
     return {
       tag: el.tagName.toLowerCase(),
       type: input?.type ?? (el instanceof HTMLButtonElement ? el.type : undefined),
       role: el.getAttribute('role') ?? undefined,
-      text: elementText(el) || (input?.value ?? ''),
+      text: elementText(el) || (input && input.type !== 'password' ? input.value : ''),
       ariaLabel: el.getAttribute('aria-label') ?? undefined,
       // Only real destinations; "#" and javascript: links are buttons in disguise.
       href: el instanceof HTMLAnchorElement && /^(?!#|javascript:)./i.test(el.getAttribute('href') ?? '') ? el.href : undefined,
@@ -510,14 +557,17 @@ export function createPageAgent(): PageAgentApi {
         (el instanceof HTMLButtonElement && el.type === 'submit' && Boolean(el.form)) ||
         (input?.type === 'submit' && Boolean(input.form)),
       isPassword: input?.type === 'password',
-      isPaymentField: autocomplete.startsWith('cc-') || /card.?number|cvv|cvc/i.test(`${input?.name ?? ''} ${input?.id ?? ''}`),
-      isOneTimeCode: autocomplete === 'one-time-code',
+      isPaymentField: isPaymentInput(el),
+      isOneTimeCode: isOneTimeCodeInput(el),
       isSelect: el instanceof HTMLSelectElement,
       isSearchField: isSearchField(el),
       editable: isEditable(el),
       disabled: Boolean((el as HTMLButtonElement).disabled) || el.getAttribute('aria-disabled') === 'true',
       formSubmitText: submitterText(form),
-      label: shortLabel(el),
+      download: el instanceof HTMLAnchorElement && el.hasAttribute('download') ? true : undefined,
+      options: el instanceof HTMLSelectElement ? [...el.options].slice(0, 200).map((o) => ({ text: o.text.trim(), value: o.value })) : undefined,
+      frameOrigin: frame ? frameOrigin(frame) : undefined,
+      label: frame ? `${shortLabel(el)} (in a frame from ${frameOrigin(frame)})` : shortLabel(el),
     };
   };
 
@@ -545,6 +595,8 @@ export function createPageAgent(): PageAgentApi {
       const label = el instanceof HTMLInputElement ? [...(el.labels ?? [])] : [];
       if (hit && hit !== el && !el.contains(hit) && !hit.contains(el) && !label.some((l) => l.contains(hit))) {
         occludedBy = describe(hit).slice(0, 120);
+      } else if (hit && isOpaqueFrame(hit) && hit !== frameAtCenter(el)) {
+        occludedBy = `a frame from ${frameOrigin(hit)}`;
       }
     }
     return { ok: true, value: { x, y, occludedBy } };
@@ -680,12 +732,8 @@ export function createPageAgent(): PageAgentApi {
       if (!(el instanceof HTMLSelectElement)) {
         return { ok: false, error: `Element [${index}] is not a native <select>. Click it to open the list instead.` };
       }
-      const wanted = option.trim().toLowerCase();
       const options = [...el.options];
-      const match =
-        options.find((o) => o.text.trim().toLowerCase() === wanted) ??
-        options.find((o) => o.value.toLowerCase() === wanted) ??
-        options.find((o) => o.text.toLowerCase().includes(wanted));
+      const match = matchOption(options, option);
       if (!match) {
         return { ok: false, error: `No option matching "${option}". Options: ${options.map((o) => o.text.trim()).join(' | ')}` };
       }

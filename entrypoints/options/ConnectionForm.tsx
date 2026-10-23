@@ -6,6 +6,7 @@ import { requestHostAccess } from '../../src/permissions/hosts';
 import { suggestChatModel } from '../../src/providers/suggest';
 import {
   COMPATIBLE_PRESETS,
+  exposesKey,
   findPreset,
   normalizeBaseURL,
   VENDOR_ORDER,
@@ -69,6 +70,8 @@ export function ConnectionForm({ settings, initial, onDone }: {
   const validate = (): string | undefined => {
     if (!isValidUrl(baseURL.trim())) return 'connections.validation.baseURL';
     if (keyRequired && !apiKey.trim() && !initial) return 'connections.validation.apiKey';
+    // Keys travel only over https, or plain http to this computer.
+    if ((keyRequired || apiKey.trim()) && exposesKey(baseURL)) return 'errors.insecure';
     return undefined;
   };
 

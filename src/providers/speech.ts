@@ -4,7 +4,7 @@ import { getApiKey } from '../storage/settings';
 import { ConfigError, HttpError } from './errors';
 import { createLanguageModel } from './language-model';
 import { pickSlot } from './resolve';
-import { normalizeBaseURL } from './vendors';
+import { keyedBaseURL } from './vendors';
 
 const GEMINI_PROMPT =
   'Transcribe this recording verbatim, in the language spoken (keep mixed languages as spoken). Reply with the transcript only.';
@@ -25,7 +25,7 @@ export async function transcribeAudio(
   const connection = settings.connections.find((c) => c.id === ref?.connectionId);
   if (!ref || !connection) throw new ConfigError('noModel', 'No speech-to-text model is set under Model roles.');
   const apiKey = await getApiKey(connection.id);
-  const base = normalizeBaseURL(connection.baseURL);
+  const base = keyedBaseURL(connection.baseURL, apiKey);
 
   switch (connection.vendor) {
     case 'openai':
