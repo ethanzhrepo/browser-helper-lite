@@ -16,6 +16,7 @@ import { pickSlot } from '../providers/resolve';
 import type { Locale, Settings } from '../shared/types';
 import { appendMessage, db, getMessages, getTasks, markInterruptedTasks, saveTask } from '../storage/db';
 import { loadSettings, updateSettings, watchSettings } from '../storage/settings';
+import { linkTab, unlinkTab } from '../storage/tab-conversations';
 
 const runners = new Map<string, AgentRunner>();
 const ports = new Set<Browser.runtime.Port>();
@@ -148,8 +149,11 @@ async function startTask(message: Extract<AgentClientMessage, { type: 'start' }>
     updatedAt: now,
   };
 
+  // The tab the request was made in shows this conversation from now on.
+  await linkTab(tabId, task.conversationId);
   const runner = new AgentRunner(task, settings, locale, history, {
     t,
+    onTabOpened: (openedTabId) => linkTab(openedTabId, task.conversationId),
     update: (next) => {
       broadcast(next);
       void persist(next);
@@ -246,6 +250,9 @@ export function registerAgentService(): void {
     port.onDisconnect.addListener(() => ports.delete(port));
     port.onMessage.addListener((message: AgentClientMessage) => handleClientMessage(message, port));
   });
+
+  // A closed tab's conversation stays in the history; only the link goes.
+  browser.tabs.onRemoved.addListener((tabId) => void unlinkTab(tabId));
 
   // Switching the mode (or a site policy) applies to running turns at once.
   watchSettings((settings) => {

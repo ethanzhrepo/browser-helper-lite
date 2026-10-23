@@ -1,20 +1,24 @@
-import { History, Info, Plug, Settings as SettingsIcon, SquarePen, X } from 'lucide-react';
+import { History, Info, Pin, PinOff, Plug, Settings as SettingsIcon, SquarePen, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ACTIVE_STATUSES } from '../../src/agent/types';
+import { browser } from 'wxt/browser';
+import { ACTIVE_STATUSES, type AgentTask } from '../../src/agent/types';
 import { useAgentTasks } from '../../src/agent/useAgentTasks';
-import { capturePage, captureSelection } from '../../src/browser/page-context';
+import { capturePage, captureSelection, type ActiveTab } from '../../src/browser/page-context';
 import { SLASH_COMMANDS, type SlashCommand } from '../../src/chat/commands';
 import { useConversation } from '../../src/chat/useConversation';
-import { requestHostAccess } from '../../src/permissions/hosts';
+import { useTabConversation } from '../../src/chat/useTabConversation';
+import { isRestrictedUrl, requestHostAccess } from '../../src/permissions/hosts';
 import type { AgentMode, ContextKind, ContextSnapshot, ErrorInfo, Locale } from '../../src/shared/types';
 import { newId } from '../../src/storage/db';
 import { DEFAULT_VOICE_SETTINGS, updateSettings } from '../../src/storage/settings';
+import { linkTab, unlinkTab } from '../../src/storage/tab-conversations';
 import { Button, IconButton } from '../../src/ui/Button';
 import { errorSummary } from '../../src/ui/errors';
 import { openOptions } from '../../src/ui/navigation';
 import { useActiveTab } from '../../src/ui/useActiveTab';
 import { useSettings } from '../../src/ui/useSettings';
+import { useWindowTabs } from '../../src/ui/useWindowTabs';
 import { useVoiceInput, type VoiceProblem } from '../../src/voice/useVoiceInput';
 import { AgentControls } from './AgentControls';
 import { Composer } from './Composer';
@@ -22,6 +26,7 @@ import { EmptyState } from './EmptyState';
 import { HistoryPanel } from './HistoryPanel';
 import { MessageList } from './MessageList';
 import { ModelSwitcher } from './ModelSwitcher';
+import { OtherTasksBar } from './OtherTasksBar';
 
 export function App() {
   const { t, i18n } = useTranslation();
@@ -42,17 +47,46 @@ export function App() {
   const [selection, setSelection] = useState<ContextSnapshot>();
   const [notice, setNotice] = useState<string>();
   const [pendingTaskId, setPendingTaskId] = useState<string>();
+  /** Pages of other tabs attached with @. */
+  const [tabContexts, setTabContexts] = useState<ContextSnapshot[]>([]);
+  /** A pinned conversation stays when you switch tabs; otherwise each tab has its own. */
+  const [pinned, setPinned] = useState(false);
+  const windowTabs = useWindowTabs();
 
   // The request's turn has reported back.
   useEffect(() => {
     if (pendingTaskId && agent.tasks[pendingTaskId]) setPendingTaskId(undefined);
   }, [agent.tasks, pendingTaskId]);
 
-  // Opening the panel while a turn runs (e.g. from its notification) shows that conversation.
-  const runningConversation = Object.values(agent.tasks).find((task) => ACTIVE_STATUSES.includes(task.status))?.conversationId;
+  // One chat per tab: switching tabs shows that tab's conversation.
+  const currentTab = useRef(tab);
+  currentTab.current = tab;
+  const tabConversation = useTabConversation({
+    tabId: tab?.id,
+    pinned,
+    currentId: conversation.conversation?.id,
+    busy: Boolean(activeTask) || Boolean(pendingTaskId),
+    open: async (id) => {
+      setPendingTaskId(undefined);
+      await conversation.open(id);
+    },
+    reset: () => {
+      setPendingTaskId(undefined);
+      conversation.reset();
+    },
+  });
+
+  // What you typed stays with its tab.
+  const drafts = useRef(new Map<number, string>());
+  const draftTab = useRef<number | undefined>(undefined);
   useEffect(() => {
-    if (runningConversation && !conversation.conversation) void conversation.open(runningConversation);
-  }, [runningConversation]);
+    if (pinned || tab?.id === draftTab.current) return;
+    if (draftTab.current !== undefined) drafts.current.set(draftTab.current, text);
+    draftTab.current = tab?.id;
+    setText(tab ? (drafts.current.get(tab.id) ?? '') : '');
+    setSelection(undefined);
+    setTabContexts([]);
+  }, [tab?.id, pinned]);
 
   // A page toggle only applies to the tab it was turned on for.
   useEffect(() => setIncludePage(false), [tab?.id, tab?.url]);
@@ -101,16 +135,37 @@ export function App() {
     else void attachSelection(false);
   };
 
+  /** @-mention of another tab: attach its page. Called from the menu's click or key handler. */
+  const attachTab = (target: ActiveTab) => {
+    // Asks for site access within the user's gesture; resolves at once when it is already granted.
+    const access = isRestrictedUrl(target.url) ? Promise.resolve(false) : requestHostAccess(target.url);
+    void access.then(async (granted) => {
+      if (!granted) return setNotice(t('context.accessDenied'));
+      try {
+        const page = await capturePage(target.id);
+        setTabContexts((previous) => [...previous.filter((c) => c.url !== page.url), page]);
+      } catch (error) {
+        console.error(error);
+        setNotice(t('context.captureFailed'));
+      }
+    });
+  };
+
   /** Stores the request and starts the assistant's turn in the background. */
   const send = async (prompt: string, contexts: ContextSnapshot[]) => {
     setNotice(undefined);
     setText('');
     setIncludePage(false);
     setSelection(undefined);
+    setTabContexts([]);
     const taskId = newId();
     setPendingTaskId(taskId);
     const { conversationId, message } = await conversation.appendUser({ text: prompt, contexts, taskId });
+    // This tab shows the conversation from now on (the service links it too).
+    if (tab) await linkTab(tab.id, conversationId);
     agent.send({ type: 'start', taskId, conversationId, anchorMessageId: message.id, tabId: tab?.id });
+    // You switched tabs while it was being sent: show that tab's chat.
+    if (currentTab.current?.id !== tab?.id) tabConversation.resync();
   };
 
   /** Answers the assistant's question; the answer is part of the conversation. */
@@ -135,6 +190,7 @@ export function App() {
         return;
       }
     }
+    contexts.push(...tabContexts);
     if (selection) contexts.push(selection);
     if (!prompt && contexts.length === 0) return;
     await send(prompt || t('composer.defaultPrompt'), contexts);
@@ -173,9 +229,34 @@ export function App() {
     const previous = conversation.conversation;
     // Tabs this conversation grouped go back to how they were (M1.5 A4).
     if (previous) agent.send({ type: 'release', conversationId: previous.id });
+    if (tab) void unlinkTab(tab.id);
+    setPinned(false);
     conversation.reset();
     setPendingTaskId(undefined);
     setView('chat');
+  };
+
+  /** A conversation opened from the history continues in this tab. */
+  const openFromHistory = (id: string) => {
+    setPinned(false);
+    if (tab) void linkTab(tab.id, id);
+    setPendingTaskId(undefined);
+    void conversation.open(id);
+    setView('chat');
+  };
+
+  /** A turn of another tab's conversation: go to its tab, which shows that conversation. */
+  const showTask = (task: AgentTask) => {
+    setPinned(false);
+    void conversation.open(task.conversationId);
+    const tabId = task.tabId ?? task.startTabId;
+    void browser.tabs
+      .get(tabId)
+      .then(async (target) => {
+        await browser.tabs.update(tabId, { active: true });
+        await browser.windows.update(target.windowId, { focused: true });
+      })
+      .catch(() => undefined);
   };
 
   const voiceProblem = (problem: VoiceProblem, error?: ErrorInfo) =>
@@ -203,6 +284,9 @@ export function App() {
   const hasModel = Boolean(chatSlot);
   const showEmpty = conversation.messages.length === 0 && !pendingTaskId;
   const busy = Boolean((activeTask && !question) || pendingTaskId);
+  const otherTasks = Object.values(agent.tasks).filter(
+    (task) => task.conversationId !== conversation.conversation?.id && ACTIVE_STATUSES.includes(task.status),
+  );
 
   return (
     <div className="flex h-screen flex-col bg-bg text-fg">
@@ -217,6 +301,17 @@ export function App() {
           </Button>
         )}
         <div className="flex-1" />
+        {conversation.conversation && (
+          <IconButton
+            label={pinned ? t('header.unpin') : t('header.pin')}
+            onClick={() => setPinned(!pinned)}
+            aria-pressed={pinned}
+            data-testid="pin-chat"
+            className={pinned ? 'bg-accent-soft text-accent hover:bg-accent-soft-strong hover:text-accent' : ''}
+          >
+            {pinned ? <PinOff className="h-4 w-4" /> : <Pin className="h-4 w-4" />}
+          </IconButton>
+        )}
         <IconButton label={t('header.newChat')} onClick={newChat}>
           <SquarePen className="h-4 w-4" />
         </IconButton>
@@ -231,12 +326,7 @@ export function App() {
       {view === 'history' ? (
         <HistoryPanel
           currentId={conversation.conversation?.id}
-          onOpen={(id) => {
-            const previous = conversation.conversation;
-            if (previous && previous.id !== id) agent.send({ type: 'release', conversationId: previous.id });
-            void conversation.open(id);
-            setView('chat');
-          }}
+          onOpen={openFromHistory}
           onClose={() => setView('chat')}
         />
       ) : (
@@ -265,6 +355,7 @@ export function App() {
                 </button>
               </div>
             )}
+            <OtherTasksBar tasks={otherTasks} onShow={showTask} />
             {activeTask && (activeTask.steps.length > 0 || activeTask.waiting) && (
               <AgentControls task={activeTask} onSend={agent.send} />
             )}
@@ -282,6 +373,10 @@ export function App() {
               onRemoveSelection={() => setSelection(undefined)}
               onCommand={applyCommand}
               onMention={applyMention}
+              otherTabs={windowTabs}
+              onMentionTab={attachTab}
+              tabContexts={tabContexts}
+              onRemoveTabContext={(url) => setTabContexts((previous) => previous.filter((c) => c.url !== url))}
               onSend={() => void handleSend()}
               onStop={() => activeTask && agent.send({ type: 'stop', taskId: activeTask.id })}
               busy={busy}

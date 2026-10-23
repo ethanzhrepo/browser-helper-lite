@@ -12,7 +12,9 @@
   "header": {
     "newChat": "New chat",
     "history": "History",
-    "settings": "Settings"
+    "settings": "Settings",
+    "pin": "Keep this chat when switching tabs",
+    "unpin": "Stop keeping this chat across tabs"
   },
   "model": {
     "choose": "Choose a model",
@@ -36,14 +38,15 @@
       "translate": "Translate the selection or page",
       "explain": "Explain the selected text"
     },
-    "tip": "Type / for commands, @ to attach the page or your selection.",
+    "tip": "Type / for commands, @ to attach the page, your selection or another tab.",
     "body": "Ask anything. I can also read this page, search the web and work in your tabs.",
     "tasksTitle": "Or give me a task",
     "examples": {
       "plans": "Find the Rogers mobile plans under $60/month and compare them in a table",
       "compare": "Search Amazon and AliExpress for a 65W USB-C charger and compare price and delivery",
       "process": "Find out how to transfer my phone number to Rogers, step by step"
-    }
+    },
+    "tabsTip": "Each tab keeps its own chat. Pin a chat to keep it while you switch tabs."
   },
   "composer": {
     "placeholder": "Ask anything…",
@@ -61,7 +64,8 @@
       "queryHint": "Reads pages, searches and follows links. Never clicks buttons, fills in forms or submits anything.",
       "autoHint": "Reads and operates pages by itself. Only high-risk steps (payments, deletions, account changes) wait for you.",
       "manualHint": "Reads, scrolls and searches by itself. Every action that changes a page waits for your approval."
-    }
+    },
+    "removeAttachment": "Remove attachment"
   },
   "context": {
     "unavailable": "This page can't be read",
@@ -73,7 +77,8 @@
   },
   "mentions": {
     "page": "Current page",
-    "selection": "Selected text"
+    "selection": "Selected text",
+    "otherTabs": "Other tabs"
   },
   "commands": {
     "summarize": {
@@ -487,5 +492,10 @@
     "testOk_other": "Works. {{count}} results:",
     "testOkText": "Works. The model answered:",
     "verifyNote": "Whatever the provider, the assistant is asked to check facts on the source pages and to cite them."
+  },
+  "tasks": {
+    "running": "Working in another tab: {{title}}",
+    "waiting": "Needs you in another tab: {{title}}",
+    "show": "Show"
   }
 }

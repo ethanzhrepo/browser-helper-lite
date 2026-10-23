@@ -4,6 +4,7 @@ import {
   Check,
   ChevronDown,
   FileText,
+  Globe,
   Hand,
   Loader2,
   Mic,
@@ -14,7 +15,7 @@ import {
   X,
   type LucideIcon,
 } from 'lucide-react';
-import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { Fragment, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { ActiveTab } from '../../src/browser/page-context';
 import { matchCommands, type SlashCommand } from '../../src/chat/commands';
@@ -22,7 +23,20 @@ import type { AgentMode, ContextKind, ContextSnapshot } from '../../src/shared/t
 import type { PageAccess } from '../../src/ui/useActiveTab';
 import type { VoiceState } from '../../src/voice/useVoiceInput';
 
-type MenuItem = { kind: 'command'; command: SlashCommand } | { kind: 'mention'; target: ContextKind };
+type MenuItem =
+  | { kind: 'command'; command: SlashCommand }
+  | { kind: 'mention'; target: ContextKind }
+  | { kind: 'tab'; tab: ActiveTab };
+
+const MAX_TAB_MENTIONS = 6;
+
+const hostOf = (url: string) => {
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return url;
+  }
+};
 
 const MENTION_TARGETS: ContextKind[] = ['page', 'selection'];
 const MAX_TEXTAREA_HEIGHT = 200;
@@ -50,6 +64,12 @@ export function Composer(props: {
   onRemoveSelection: () => void;
   onCommand: (command: SlashCommand) => void;
   onMention: (target: ContextKind) => void;
+  /** Other tabs of the window, offered after @. */
+  otherTabs: ActiveTab[];
+  onMentionTab: (tab: ActiveTab) => void;
+  /** Pages of other tabs attached with @. */
+  tabContexts: ContextSnapshot[];
+  onRemoveTabContext: (url: string) => void;
   onSend: () => void;
   onStop: () => void;
   /** A reply is in progress: the send button becomes a stop button. */
@@ -84,9 +104,15 @@ export function Composer(props: {
       items = matchCommands(commandQuery, commandLabel).map((command) => ({ kind: 'command', command }));
     } else if (mentionQuery !== undefined) {
       const q = mentionQuery.toLowerCase();
-      items = MENTION_TARGETS.filter((target) => !q || target.startsWith(q) || mentionLabel(target).toLowerCase().includes(q)).map(
-        (target) => ({ kind: 'mention', target }),
-      );
+      items = [
+        ...MENTION_TARGETS.filter((target) => !q || target.startsWith(q) || mentionLabel(target).toLowerCase().includes(q)).map(
+          (target): MenuItem => ({ kind: 'mention', target }),
+        ),
+        ...props.otherTabs
+          .filter((tab) => tab.id !== props.tab?.id && (!q || `${tab.title} ${tab.url}`.toLowerCase().includes(q)))
+          .slice(0, MAX_TAB_MENTIONS)
+          .map((tab): MenuItem => ({ kind: 'tab', tab })),
+      ];
     }
   }
   const menuOpen = items.length > 0;
@@ -99,7 +125,8 @@ export function Composer(props: {
     } else {
       const remaining = beforeCaret.replace(/@\S*$/, '') + text.slice(caret);
       onTextChange(remaining);
-      props.onMention(item.target);
+      if (item.kind === 'mention') props.onMention(item.target);
+      else props.onMentionTab(item.tab);
     }
     textareaRef.current?.focus();
   };
@@ -132,7 +159,7 @@ export function Composer(props: {
     }
   };
 
-  const canSend = !disabled && !busy && Boolean(text.trim() || props.selection || props.includePage);
+  const canSend = !disabled && !busy && Boolean(text.trim() || props.selection || props.includePage || props.tabContexts.length > 0);
   const listening = props.voice.state === 'listening';
 
   return (
@@ -143,34 +170,45 @@ export function Composer(props: {
           className="absolute bottom-full left-0 right-0 z-10 mb-2 animate-fade-in overflow-hidden rounded-xl border border-line bg-surface p-1 shadow-float"
         >
           {items.map((item, index) => (
-            <button
-              key={item.kind === 'command' ? item.command.id : item.target}
-              type="button"
-              role="option"
-              aria-selected={index === activeIndex}
-              onMouseEnter={() => setActiveIndex(index)}
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => select(item)}
-              className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm ${index === activeIndex ? 'bg-hover' : ''}`}
-            >
-              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-accent-soft text-accent">
-                {item.kind === 'command' ? (
-                  <span className="font-mono text-xs font-semibold">/</span>
-                ) : item.target === 'page' ? (
-                  <FileText className="h-3.5 w-3.5" />
-                ) : (
-                  <TextQuote className="h-3.5 w-3.5" />
-                )}
-              </span>
-              {item.kind === 'command' ? (
-                <span className="min-w-0">
-                  <span className="block font-medium">{commandLabel(item.command)}</span>
-                  <span className="block truncate text-xs text-muted">{t(`commands.${item.command.id}.description`)}</span>
-                </span>
-              ) : (
-                <span className="font-medium">{mentionLabel(item.target)}</span>
+            <Fragment key={item.kind === 'command' ? item.command.id : item.kind === 'mention' ? item.target : `tab-${item.tab.id}`}>
+              {item.kind === 'tab' && items[index - 1]?.kind !== 'tab' && (
+                <p className="px-2.5 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-faint">{t('mentions.otherTabs')}</p>
               )}
-            </button>
+              <button
+                type="button"
+                role="option"
+                aria-selected={index === activeIndex}
+                onMouseEnter={() => setActiveIndex(index)}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => select(item)}
+                className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm ${index === activeIndex ? 'bg-hover' : ''}`}
+              >
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-accent-soft text-accent">
+                  {item.kind === 'command' ? (
+                    <span className="font-mono text-xs font-semibold">/</span>
+                  ) : item.kind === 'tab' ? (
+                    item.tab.favIconUrl ? <img src={item.tab.favIconUrl} alt="" className="h-3.5 w-3.5 rounded-sm" /> : <Globe className="h-3.5 w-3.5" />
+                  ) : item.target === 'page' ? (
+                    <FileText className="h-3.5 w-3.5" />
+                  ) : (
+                    <TextQuote className="h-3.5 w-3.5" />
+                  )}
+                </span>
+                {item.kind === 'command' ? (
+                  <span className="min-w-0">
+                    <span className="block font-medium">{commandLabel(item.command)}</span>
+                    <span className="block truncate text-xs text-muted">{t(`commands.${item.command.id}.description`)}</span>
+                  </span>
+                ) : item.kind === 'tab' ? (
+                  <span className="min-w-0">
+                    <span className="block truncate font-medium">{item.tab.title || item.tab.url}</span>
+                    <span className="block truncate text-xs text-muted">{hostOf(item.tab.url)}</span>
+                  </span>
+                ) : (
+                  <span className="font-medium">{mentionLabel(item.target)}</span>
+                )}
+              </button>
+            </Fragment>
           ))}
         </div>
       )}
@@ -183,6 +221,24 @@ export function Composer(props: {
         <div className="rounded-[15px] bg-surface">
           <div className="flex flex-wrap gap-1.5 px-3 pt-3">
             <PageChip tab={props.tab} access={props.access} included={props.includePage} onToggle={props.onTogglePage} />
+            {props.tabContexts.map((context) => (
+              <span
+                key={context.url}
+                data-testid="tab-context-chip"
+                className="flex max-w-full animate-fade-in items-center gap-1.5 rounded-full border border-accent/25 bg-accent-soft py-1 pl-2.5 pr-1.5 text-xs text-accent"
+              >
+                <Globe className="h-3.5 w-3.5 shrink-0" />
+                <span className="truncate">{preview(context.title || context.url)}</span>
+                <button
+                  type="button"
+                  aria-label={t('composer.removeAttachment')}
+                  onClick={() => props.onRemoveTabContext(context.url)}
+                  className="rounded-full p-0.5 hover:bg-accent-soft-strong"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+            ))}
             {props.selection && (
               <span className="flex max-w-full animate-fade-in items-center gap-1.5 rounded-full border border-accent/25 bg-accent-soft py-1 pl-2.5 pr-1.5 text-xs text-accent">
                 <TextQuote className="h-3.5 w-3.5 shrink-0" />

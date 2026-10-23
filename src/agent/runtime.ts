@@ -23,6 +23,8 @@ import type { AgentAction, AgentStep, AgentTask, PauseReason, WaitReason, WaitRe
 export interface RunnerDeps {
   /** Called after every state change: broadcast and persist. */
   update(task: AgentTask): void;
+  /** The agent opened a tab; it shows the same conversation. */
+  onTabOpened(tabId: number): Promise<void>;
   /** The task started waiting for the user. */
   onWaiting(task: AgentTask): void;
   saveSitePolicy(host: string, policy: SitePolicy): Promise<void>;
@@ -116,6 +118,7 @@ export class AgentRunner {
   ) {
     this.ctl = new AgentBrowser(task.startTabId, {
       groupTitle: deps.t('agent.groupTitle'),
+      onTabOpened: (tabId) => deps.onTabOpened(tabId),
       onDebuggerDetached: (reason) => {
         if (this.task.driver) this.task.driver = 'dom';
         // The user closed Chrome's debugging bar: pause so they can decide.
@@ -144,6 +147,7 @@ export class AgentRunner {
     clearTimeout(this.draftTimer);
     this.draftTimer = undefined;
     this.task.updatedAt = Date.now();
+    this.task.tabId = this.ctl.currentTabId;
     this.deps.update(this.task);
   }
 

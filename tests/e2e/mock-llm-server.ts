@@ -189,6 +189,12 @@ export function scriptedAssistant(messages: ChatMessage[]): Reply {
 
   if (request.includes('TEST-STOP')) return say('Waiting.', 'wait', { seconds: 1 });
 
+  if (request.includes('TEST-OPEN')) {
+    const origin = /url="(https?:\/\/[^/"]+)/.exec(request)?.[1] ?? '';
+    if (!used('open_tab')) return say('Opening the guide.', 'open_tab', { url: `${origin}/review.html` });
+    return say('Opened the cable guide in a new tab.');
+  }
+
   if (request.includes('TEST-SEARCH')) {
     if (!used('web_search')) return say('Searching.', 'web_search', { query: 'braided cable durability' });
     const top = /1\. (.+?) —/.exec(results)?.[1] ?? 'nothing';

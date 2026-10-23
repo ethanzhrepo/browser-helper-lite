@@ -12,7 +12,9 @@
   "header": {
     "newChat": "新对话",
     "history": "历史记录",
-    "settings": "设置"
+    "settings": "设置",
+    "pin": "切换标签页时保留这个对话",
+    "unpin": "不再跨标签页保留这个对话"
   },
   "model": {
     "choose": "选择模型",
@@ -35,14 +37,15 @@
       "translate": "翻译选中内容或整页",
       "explain": "解释选中的文字"
     },
-    "tip": "输入 / 使用指令，输入 @ 附带页面或选中内容。",
+    "tip": "输入 / 使用指令，输入 @ 附带页面、选中内容或其他标签页。",
     "body": "直接提问就行。我也可以读取这个页面、上网搜索，或在标签页里替你操作。",
     "tasksTitle": "或者交给我一个任务",
     "examples": {
       "plans": "在 Rogers 官网找出月费 60 加元以内的手机套餐，并用表格对比",
       "compare": "在 Amazon 和 AliExpress 上搜索 65W USB-C 充电器，对比价格和配送时间",
       "process": "查一下把手机号转入 Rogers 的办理流程，按步骤列出来"
-    }
+    },
+    "tabsTip": "每个标签页有自己的对话。想在切换标签页时保留对话，点顶栏的图钉。"
   },
   "composer": {
     "placeholder": "有什么想问的…",
@@ -60,7 +63,8 @@
       "queryHint": "读页面、搜索、打开链接。不会点击按钮、填写表单或提交任何东西。",
       "autoHint": "自动读取和操作页面。只有付款、删除、改账户设置等高风险操作会等你确认。",
       "manualHint": "读取、滚动、搜索自动进行；每一个会改动页面的操作都要你批准。"
-    }
+    },
+    "removeAttachment": "移除附件"
   },
   "context": {
     "unavailable": "无法读取此页面",
@@ -72,7 +76,8 @@
   },
   "mentions": {
     "page": "当前页面",
-    "selection": "选中的文字"
+    "selection": "选中的文字",
+    "otherTabs": "其他标签页"
   },
   "commands": {
     "summarize": {
@@ -481,5 +486,10 @@
     "testOk_other": "可以用。共 {{count}} 条结果：",
     "testOkText": "可以用。模型回答：",
     "verifyNote": "无论用哪种方式，助手都会被要求回到原网页核实，并标明来源。"
+  },
+  "tasks": {
+    "running": "正在另一个标签页工作：{{title}}",
+    "waiting": "另一个标签页需要你处理：{{title}}",
+    "show": "查看"
   }
 }

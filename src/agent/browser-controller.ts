@@ -69,7 +69,12 @@ export class AgentBrowser {
 
   constructor(
     readonly startTabId: number,
-    private readonly options: { groupTitle: string; onDebuggerDetached: (reason: string) => void },
+    private readonly options: {
+      groupTitle: string;
+      onDebuggerDetached: (reason: string) => void;
+      /** A tab the agent opened (or a page opened for it); it belongs to the same conversation. */
+      onTabOpened?: (tabId: number) => Promise<void>;
+    },
   ) {
     this.currentTabId = startTabId;
     this.tabs.add(startTabId);
@@ -262,14 +267,18 @@ export class AgentBrowser {
   /** Opens a tab for the agent. A `scratch` tab (e.g. for a search) is closed again soon and not grouped. */
   async openTab(url: string, { active = true, scratch = false } = {}): Promise<number> {
     const opener = await browser.tabs.get(this.currentTabId).catch(() => undefined);
+    // Opened in the background and linked to the conversation first, so the side
+    // panel keeps showing this conversation when the tab comes to the front.
     const tab = await browser.tabs.create({
       url,
-      active,
+      active: false,
       openerTabId: opener?.id,
       index: opener ? opener.index + 1 : undefined,
     });
+    await this.options.onTabOpened?.(tab.id!).catch(() => undefined);
     if (scratch) this.tabs.add(tab.id!);
     else await this.adopt(tab.id!);
+    if (active) await browser.tabs.update(tab.id!, { active: true });
     return tab.id!;
   }
 
@@ -312,7 +321,9 @@ export class AgentBrowser {
   private async followNewTabs(action: () => Promise<void>): Promise<number | undefined> {
     const created: number[] = [];
     const onCreated = (tab: Browser.tabs.Tab) => {
-      if (tab.id !== undefined && tab.openerTabId === this.currentTabId) created.push(tab.id);
+      if (tab.id === undefined || tab.openerTabId !== this.currentTabId) return;
+      created.push(tab.id);
+      void this.options.onTabOpened?.(tab.id).catch(() => undefined);
     };
     browser.tabs.onCreated.addListener(onCreated);
     try {

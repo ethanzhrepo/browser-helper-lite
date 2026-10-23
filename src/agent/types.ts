@@ -68,6 +68,8 @@ export interface AgentTask {
   /** The model rejected tools, so this turn is plain chat. */
   chatOnly?: boolean;
   startTabId: number;
+  /** The tab the turn is working in now. */
+  tabId?: number;
   /** Tabs this turn moved into its tab group (restored on a new chat). */
   groupedTabs?: number[];
   /** Tabs this turn opened. */

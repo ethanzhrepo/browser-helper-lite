@@ -12,7 +12,9 @@
   "header": {
     "newChat": "Nouvelle conversation",
     "history": "Historique",
-    "settings": "Paramètres"
+    "settings": "Paramètres",
+    "pin": "Garder cette conversation en changeant d'onglet",
+    "unpin": "Ne plus garder cette conversation entre les onglets"
   },
   "model": {
     "choose": "Choisir un modèle",
@@ -37,14 +39,15 @@
       "translate": "Traduire la sélection ou la page",
       "explain": "Expliquer le texte sélectionné"
     },
-    "tip": "Tapez / pour les commandes, @ pour joindre la page ou votre sélection.",
+    "tip": "Tapez / pour les commandes, @ pour joindre la page, votre sélection ou un autre onglet.",
     "body": "Posez votre question. Je peux aussi lire cette page, chercher sur le web et agir dans vos onglets.",
     "tasksTitle": "Ou confiez-moi une tâche",
     "examples": {
       "plans": "Trouve les forfaits mobiles Rogers à moins de 60 $/mois et compare-les dans un tableau",
       "compare": "Cherche un chargeur USB-C 65 W sur Amazon et AliExpress et compare prix et délais de livraison",
       "process": "Explique-moi étape par étape comment transférer mon numéro chez Rogers"
-    }
+    },
+    "tabsTip": "Chaque onglet a sa propre conversation. Épinglez-en une pour la garder en changeant d'onglet."
   },
   "composer": {
     "placeholder": "Posez votre question…",
@@ -62,7 +65,8 @@
       "queryHint": "Lit les pages, cherche et suit les liens. Ne clique jamais sur un bouton, ne remplit ni n’envoie aucun formulaire.",
       "autoHint": "Lit et utilise les pages tout seul. Seules les étapes à haut risque (paiements, suppressions, compte) attendent votre accord.",
       "manualHint": "Lit, fait défiler et cherche tout seul. Chaque action qui modifie une page attend votre accord."
-    }
+    },
+    "removeAttachment": "Retirer la pièce jointe"
   },
   "context": {
     "unavailable": "Impossible de lire cette page",
@@ -74,7 +78,8 @@
   },
   "mentions": {
     "page": "Page actuelle",
-    "selection": "Texte sélectionné"
+    "selection": "Texte sélectionné",
+    "otherTabs": "Autres onglets"
   },
   "commands": {
     "summarize": {
@@ -493,5 +498,10 @@
     "testOk_other": "Ça marche. {{count}} résultats :",
     "testOkText": "Ça marche. Le modèle a répondu :",
     "verifyNote": "Quel que soit le service, l'assistant doit vérifier les faits sur les pages sources et les citer."
+  },
+  "tasks": {
+    "running": "Travaille dans un autre onglet : {{title}}",
+    "waiting": "Un autre onglet a besoin de vous : {{title}}",
+    "show": "Afficher"
   }
 }

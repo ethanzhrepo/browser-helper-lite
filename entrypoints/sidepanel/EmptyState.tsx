@@ -88,7 +88,11 @@ export function EmptyState({ hasModel, onQuickAction, onExample }: {
             </Suggestion>
           ))}
         </div>
-        <p className="text-center text-xs text-faint">{t('empty.tip')}</p>
+        <p className="text-center text-xs leading-relaxed text-faint">
+          {t('empty.tip')}
+          <br />
+          {t('empty.tabsTip')}
+        </p>
       </div>
     </div>
   );
