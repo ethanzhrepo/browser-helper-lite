@@ -37,7 +37,28 @@ export type WaitReason =
   | { kind: 'handoff'; reason: HandoffReason; message?: string; site: string }
   | { kind: 'permission'; origin: string; url: string };
 
-export type RiskReason = 'payment' | 'destructive' | 'submit' | 'confirmEach' | 'manualMode' | 'sensitiveField';
+export type RiskReason =
+  | 'payment'
+  | 'destructive'
+  | 'submit'
+  | 'confirmEach'
+  | 'manualMode'
+  | 'sensitiveField'
+  /** The turn read content that tried to instruct the assistant (§8.2). */
+  | 'injection'
+  /** A URL the model built carries data such as an email address or a long code. */
+  | 'exfiltration'
+  /** A URL the model built leads to a site that has not come up in the task. */
+  | 'newSite';
+
+/** Content that looked like it was trying to instruct the assistant. */
+export interface InjectionWarning {
+  source: 'page' | 'search' | 'attachment';
+  url?: string;
+  excerpt: string;
+  /** The text was hidden from people (invisible on the page). */
+  hidden: boolean;
+}
 
 export type PauseReason = 'user' | 'interference' | 'debuggerDetached';
 
@@ -67,6 +88,8 @@ export interface AgentTask {
   mode: AgentMode;
   /** The model rejected tools, so this turn is plain chat. */
   chatOnly?: boolean;
+  /** Set when the turn read content that tried to instruct it; from then on it is cautious. */
+  injection?: InjectionWarning;
   startTabId: number;
   /** The tab the turn is working in now. */
   tabId?: number;

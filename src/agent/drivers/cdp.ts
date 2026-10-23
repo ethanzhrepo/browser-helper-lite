@@ -54,8 +54,10 @@ export class CdpDriver {
     this.mouse.set(tabId, { x, y });
   }
 
-  async click(tabId: number, x: number, y: number): Promise<void> {
+  /** `beforePress` runs after the pointer arrived, right before the button goes down; it may throw to cancel. */
+  async click(tabId: number, x: number, y: number, beforePress?: () => Promise<void>): Promise<void> {
     await this.moveTo(tabId, x, y);
+    await beforePress?.();
     const base = { x, y, button: 'left', clickCount: 1 };
     await this.send(tabId, 'Input.dispatchMouseEvent', { ...base, type: 'mousePressed', buttons: 1 });
     await this.send(tabId, 'Input.dispatchMouseEvent', { ...base, type: 'mouseReleased', buttons: 0 });

@@ -42,6 +42,8 @@ export interface TargetInfo {
   isSearchField: boolean;
   editable: boolean;
   disabled: boolean;
+  /** For an element inside a form: the text of the button that submits it. */
+  formSubmitText?: string;
   /** Short human label, e.g. `button "Add to cart"`. */
   label: string;
 }
@@ -73,6 +75,8 @@ export type PageResult<T> = { ok: true; value: T } | { ok: false; error: string 
 export interface PageAgentApi {
   snapshot(params: { maxChars: number }): PageSnapshot;
   describeTarget(index: number): PageResult<TargetInfo>;
+  /** The focused element, which a key press acts on. */
+  describeFocused(): PageResult<TargetInfo | null>;
   /** Scrolls the element into view and returns its center in top-frame viewport pixels. */
   locate(index: number): PageResult<TargetPoint>;
   focus(index: number): PageResult<true>;

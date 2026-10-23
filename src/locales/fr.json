@@ -112,7 +112,8 @@
     "retry": "Réessayer",
     "truncated": "partiel",
     "diagramError": "Ce diagramme n'a pas pu être dessiné. Voici sa source.",
-    "copySvg": "Copier le SVG"
+    "copySvg": "Copier le SVG",
+    "image": "Image"
   },
   "history": {
     "title": "Historique",
@@ -302,12 +303,16 @@
         "submit": "Cela envoie, soumet ou enregistre quelque chose.",
         "confirmEach": "Votre règle pour ce site demande de confirmer chaque étape.",
         "sensitiveField": "Cela concerne des informations sensibles.",
-        "manualMode": "Le mode validation manuelle est activé."
+        "manualMode": "Le mode validation manuelle est activé.",
+        "injection": "Cette page a tenté de donner des instructions à l'assistant : jusqu'à la fin de cette tâche, il demande avant de modifier une page ou d'ouvrir un nouveau site.",
+        "exfiltration": "L'adresse contient des données (adresse e-mail, numéro de carte ou long code). Vérifiez que vous voulez les envoyer à ce site.",
+        "newSite": "Ce site n'est pas encore apparu dans cette tâche : il ne figure ni dans votre demande, ni dans votre onglet, ni dans les résultats de recherche."
       },
       "allowOnce": "Autoriser une fois",
       "allowTask": "Autoriser pour cette tâche",
       "allowSite": "Toujours autoriser sur ce site",
-      "deny": "Refuser"
+      "deny": "Refuser",
+      "titleSuspicious": "Vérifiez avant d'autoriser"
     },
     "permission": {
       "title": "Autoriser l'accès à ce site ?",
@@ -332,7 +337,8 @@
     },
     "question": {
       "title": "L'assistant demande :",
-      "hint": "Répondez dans la zone ci-dessous."
+      "hint": "Répondez dans la zone ci-dessous.",
+      "noSecrets": "Ne donnez jamais ici de mot de passe, de numéro de carte ou de code de vérification."
     },
     "controls": {
       "pause": "Pause",
@@ -366,7 +372,8 @@
         "permission": "Accès au site nécessaire"
       },
       "approval": "{{site}} : {{target}}",
-      "permission": "Autoriser l'accès à {{origin}} ?"
+      "permission": "Autoriser l'accès à {{origin}} ?",
+      "question": "Ouvrez le panneau latéral pour répondre."
     },
     "maxStepsSummary": "Je me suis arrêté après {{count}} étapes sans terminer. Consultez les étapes ci-dessus, puis donnez-moi une tâche plus précise ou augmentez la limite d'étapes dans les paramètres.",
     "stoppedSummary": "La tâche a été arrêtée.",
@@ -375,7 +382,12 @@
     "emptyAnswer": "(Pas de réponse.)",
     "closeTabs_one": "Fermer l'onglet que j'ai ouvert",
     "closeTabs_many": "Fermer les {{count}} onglets que j'ai ouverts",
-    "closeTabs_other": "Fermer les {{count}} onglets que j'ai ouverts"
+    "closeTabs_other": "Fermer les {{count}} onglets que j'ai ouverts",
+    "injection": {
+      "title": "Cette page a tenté de donner des instructions à l'assistant",
+      "titleHidden": "Cette page cache des instructions pour les assistants IA",
+      "body": "On a demandé à l'assistant de les ignorer. Jusqu'à la fin de cette tâche, modifier une page ou ouvrir un nouveau site demande votre accord."
+    }
   },
   "agentSettings": {
     "title": "Agent",

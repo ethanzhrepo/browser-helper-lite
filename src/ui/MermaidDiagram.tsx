@@ -10,8 +10,12 @@ const darkQuery = () => window.matchMedia('(prefers-color-scheme: dark)');
 async function renderDiagram(source: string, dark: boolean): Promise<string> {
   mermaid.initialize({
     startOnLoad: false,
-    // Strict: no HTML labels, no click handlers, sanitized output.
+    // Strict: no click handlers, sanitized output.
     securityLevel: 'strict',
+    // Plain SVG text labels: HTML labels could carry <img> tags that load remote URLs (§8.2).
+    htmlLabels: false,
+    flowchart: { htmlLabels: false },
+    dompurifyConfig: { FORBID_TAGS: ['img', 'image', 'foreignObject', 'a'], FORBID_ATTR: ['href', 'xlink:href'] },
     theme: dark ? 'dark' : 'neutral',
     fontFamily: 'inherit',
   });

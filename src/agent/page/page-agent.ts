@@ -1,5 +1,6 @@
 import { browser } from 'wxt/browser';
 import { parseKeyCombo } from '../keys';
+import { isTransparentColor } from '../../browser/visibility';
 import type {
   OverlayState,
   PageAgentApi,
@@ -46,8 +47,22 @@ function clip(text: string, limit: number): string {
   return collapsed.length > limit ? `${collapsed.slice(0, limit - 1)}…` : collapsed;
 }
 
+/**
+ * Page text must not look like our element markers: "[12]<button>…" written
+ * in a page could make the model act on the wrong element.
+ */
+function escapeMarkers(text: string): string {
+  return text.replace(/\[(\d+)\]/g, '($1)');
+}
+
 function attr(value: string): string {
-  return clip(value, 60).replace(/"/g, "'");
+  return escapeMarkers(clip(value, 60).replace(/"/g, "'"));
+}
+
+/** Text a person cannot read: transparent or tiny (a place to hide instructions for AI). */
+function unreadableText(style: CSSStyleDeclaration): boolean {
+  if (parseFloat(style.fontSize) < 4) return true;
+  return isTransparentColor(style.color);
 }
 
 function isTopVisible(rect: DOMRect | { width: number; height: number }) {
@@ -80,10 +95,10 @@ function inViewport(rect: { left: number; top: number; width: number; height: nu
 
 function elementText(el: Element): string {
   const text = clip((el as HTMLElement).innerText ?? el.textContent ?? '', LABEL_LIMIT);
-  if (text) return text;
+  if (text) return escapeMarkers(text);
   const img = el.querySelector('img[alt]');
   const svgTitle = el.querySelector('svg title');
-  return clip(img?.getAttribute('alt') || svgTitle?.textContent || '', LABEL_LIMIT);
+  return escapeMarkers(clip(img?.getAttribute('alt') || svgTitle?.textContent || '', LABEL_LIMIT));
 }
 
 /** Text of a form control's <label>, without the text of controls inside it. */
@@ -99,6 +114,20 @@ function labelText(el: Element): string {
   };
   walk(labels[0]!);
   return clip(text, LABEL_LIMIT);
+}
+
+/**
+ * Text of the button that submits a form (what pressing Enter in one of its
+ * fields does), so the risk check sees "Place order" rather than "Coupon".
+ */
+function submitterText(form: HTMLFormElement | null): string | undefined {
+  if (!form) return undefined;
+  const own = form.querySelector('button[type="submit"], button:not([type]), input[type="submit"], input[type="image"]');
+  const outside = form.id ? document.querySelector(`[form="${CSS.escape(form.id)}"][type="submit"]`) : null;
+  const button = own ?? outside;
+  if (!button) return undefined;
+  const parts = [elementText(button), button.getAttribute('aria-label'), (button as HTMLInputElement).value, button.getAttribute('alt')];
+  return clip(parts.filter(Boolean).join(' '), LABEL_LIMIT) || undefined;
 }
 
 function shortHref(href: string): string {
@@ -233,7 +262,15 @@ export function createPageAgent(): PageAgentApi {
 
   // ---- Overlay: glow border, status bar, virtual cursor, highlight boxes ----
   const host = document.createElement('browser-helper-overlay');
-  host.style.cssText = 'all: initial; position: fixed; inset: 0; pointer-events: none; z-index: 2147483647;';
+  // !important inline styles: page CSS cannot hide or move the overlay and its Stop button.
+  const HOST_STYLE: [string, string][] = [
+    ['all', 'initial'], ['position', 'fixed'], ['inset', '0'], ['pointer-events', 'none'], ['z-index', '2147483647'],
+    ['display', 'block'], ['opacity', '1'], ['visibility', 'visible'], ['transform', 'none'], ['filter', 'none'], ['clip-path', 'none'],
+  ];
+  const styleHost = () => {
+    for (const [name, value] of HOST_STYLE) host.style.setProperty(name, value, 'important');
+  };
+  styleHost();
   const root = host.attachShadow({ mode: 'closed' });
   root.innerHTML = `
     <style>
@@ -291,6 +328,15 @@ export function createPageAgent(): PageAgentApi {
   const mount = () => {
     if (!host.isConnected) document.documentElement.appendChild(host);
   };
+  // Put the overlay back if the page removes it or changes its style while the agent works.
+  new MutationObserver(() => {
+    if (overlayMode === 'hidden') return;
+    mount();
+    if (HOST_STYLE.some(([name, value]) => host.style.getPropertyValue(name) !== value || host.style.getPropertyPriority(name) !== 'important')) styleHost();
+  }).observe(document.documentElement, { childList: true, subtree: false });
+  new MutationObserver(() => {
+    if (HOST_STYLE.some(([name, value]) => host.style.getPropertyValue(name) !== value)) styleHost();
+  }).observe(host, { attributes: true, attributeFilter: ['style', 'hidden', 'class'] });
 
   // Real (trusted) input from the user while the agent runs pauses the task (§4.3).
   const onUserInput = (event: Event) => {
@@ -346,7 +392,10 @@ export function createPageAgent(): PageAgentApi {
         if (node.nodeType === Node.TEXT_NODE) out += node.textContent ?? '';
         else if (node instanceof Element && INLINE_TAGS.has(node.tagName) && node.tagName !== 'A') {
           const style = getComputedStyle(node);
-          if (style.display === 'none' || isInteractive(node, style)) {
+          // Hidden or unreadable inline text (a common place to hide instructions for AI) is left out.
+          const invisible = style.visibility === 'hidden' || style.opacity === '0' || unreadableText(style);
+          if (style.display === 'none' || invisible || isInteractive(node, style)) {
+            if (invisible) folded.add(node);
             out += ' ';
             continue;
           }
@@ -404,8 +453,8 @@ export function createPageAgent(): PageAgentApi {
         return;
       }
       if (isSvg) return;
-      if (!inInteractive && visible && inViewport(rect)) {
-        const text = clip(inlineText(el), TEXT_LIMIT);
+      if (!inInteractive && visible && inViewport(rect) && !unreadableText(style)) {
+        const text = escapeMarkers(clip(inlineText(el), TEXT_LIMIT));
         if (text.length > 1) emit(text);
       }
       visitChildren(el, inInteractive, transparent);
@@ -444,36 +493,43 @@ export function createPageAgent(): PageAgentApi {
     };
   };
 
-  const describeTarget = (index: number): PageResult<TargetInfo> => {
-    const el = get(index);
-    if (!el) return missing(index);
+  const targetInfo = (el: Element): TargetInfo => {
     const input = el instanceof HTMLInputElement ? el : undefined;
     const autocomplete = (el.getAttribute('autocomplete') ?? '').toLowerCase();
     const form = (el as HTMLInputElement).form ?? el.closest('form');
     return {
-      ok: true,
-      value: {
-        tag: el.tagName.toLowerCase(),
-        type: input?.type ?? (el instanceof HTMLButtonElement ? el.type : undefined),
-        role: el.getAttribute('role') ?? undefined,
-        text: elementText(el) || (input?.value ?? ''),
-        ariaLabel: el.getAttribute('aria-label') ?? undefined,
-        // Only real destinations; "#" and javascript: links are buttons in disguise.
-        href: el instanceof HTMLAnchorElement && /^(?!#|javascript:)./i.test(el.getAttribute('href') ?? '') ? el.href : undefined,
-        inForm: Boolean(form),
-        isSubmit:
-          (el instanceof HTMLButtonElement && el.type === 'submit' && Boolean(el.form)) ||
-          (input?.type === 'submit' && Boolean(input.form)),
-        isPassword: input?.type === 'password',
-        isPaymentField: autocomplete.startsWith('cc-') || /card.?number|cvv|cvc/i.test(`${input?.name ?? ''} ${input?.id ?? ''}`),
-        isOneTimeCode: autocomplete === 'one-time-code',
-        isSelect: el instanceof HTMLSelectElement,
-        isSearchField: isSearchField(el),
-        editable: isEditable(el),
-        disabled: Boolean((el as HTMLButtonElement).disabled) || el.getAttribute('aria-disabled') === 'true',
-        label: shortLabel(el),
-      },
+      tag: el.tagName.toLowerCase(),
+      type: input?.type ?? (el instanceof HTMLButtonElement ? el.type : undefined),
+      role: el.getAttribute('role') ?? undefined,
+      text: elementText(el) || (input?.value ?? ''),
+      ariaLabel: el.getAttribute('aria-label') ?? undefined,
+      // Only real destinations; "#" and javascript: links are buttons in disguise.
+      href: el instanceof HTMLAnchorElement && /^(?!#|javascript:)./i.test(el.getAttribute('href') ?? '') ? el.href : undefined,
+      inForm: Boolean(form),
+      isSubmit:
+        (el instanceof HTMLButtonElement && el.type === 'submit' && Boolean(el.form)) ||
+        (input?.type === 'submit' && Boolean(input.form)),
+      isPassword: input?.type === 'password',
+      isPaymentField: autocomplete.startsWith('cc-') || /card.?number|cvv|cvc/i.test(`${input?.name ?? ''} ${input?.id ?? ''}`),
+      isOneTimeCode: autocomplete === 'one-time-code',
+      isSelect: el instanceof HTMLSelectElement,
+      isSearchField: isSearchField(el),
+      editable: isEditable(el),
+      disabled: Boolean((el as HTMLButtonElement).disabled) || el.getAttribute('aria-disabled') === 'true',
+      formSubmitText: submitterText(form),
+      label: shortLabel(el),
     };
+  };
+
+  const describeTarget = (index: number): PageResult<TargetInfo> => {
+    const el = get(index);
+    return el ? { ok: true, value: targetInfo(el) } : missing(index);
+  };
+
+  /** What a key press would act on: the focused element, if any. */
+  const describeFocused = (): PageResult<TargetInfo | null> => {
+    const el = deepActiveElement();
+    return { ok: true, value: el && el !== document.body && el !== document.documentElement ? targetInfo(el) : null };
   };
 
   const locate = (index: number): PageResult<TargetPoint> => {
@@ -554,6 +610,7 @@ export function createPageAgent(): PageAgentApi {
   return {
     snapshot,
     describeTarget,
+    describeFocused,
     locate,
     detectBlockers,
 

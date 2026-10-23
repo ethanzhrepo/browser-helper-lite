@@ -112,7 +112,8 @@
     "retry": "Reintentar",
     "truncated": "parcial",
     "diagramError": "No se pudo dibujar este diagrama. Aquí está su código.",
-    "copySvg": "Copiar SVG"
+    "copySvg": "Copiar SVG",
+    "image": "Imagen"
   },
   "history": {
     "title": "Historial",
@@ -302,12 +303,16 @@
         "submit": "Esto envía o guarda algo.",
         "confirmEach": "Tu regla para este sitio pide confirmar cada paso.",
         "sensitiveField": "Esto implica información sensible.",
-        "manualMode": "El modo de aprobación manual está activado."
+        "manualMode": "El modo de aprobación manual está activado.",
+        "injection": "Esta página intentó dar instrucciones al asistente, así que hasta el final de esta tarea pide permiso antes de cambiar páginas o abrir sitios nuevos.",
+        "exfiltration": "La dirección contiene datos (como un correo, un número de tarjeta o un código largo). Asegúrate de que quieres enviarlos a este sitio.",
+        "newSite": "Este sitio no ha aparecido en esta tarea: no está en tu petición, en tu pestaña ni en los resultados de búsqueda."
       },
       "allowOnce": "Permitir una vez",
       "allowTask": "Permitir en esta tarea",
       "allowSite": "Permitir siempre en este sitio",
-      "deny": "Denegar"
+      "deny": "Denegar",
+      "titleSuspicious": "Revisa antes de permitir"
     },
     "permission": {
       "title": "¿Permitir el acceso a este sitio?",
@@ -332,7 +337,8 @@
     },
     "question": {
       "title": "El asistente pregunta:",
-      "hint": "Responde en el cuadro de abajo."
+      "hint": "Responde en el cuadro de abajo.",
+      "noSecrets": "Nunca compartas aquí contraseñas, números de tarjeta ni códigos de verificación."
     },
     "controls": {
       "pause": "Pausar",
@@ -366,7 +372,8 @@
         "permission": "Se necesita acceso al sitio"
       },
       "approval": "{{site}}: {{target}}",
-      "permission": "¿Permitir el acceso a {{origin}}?"
+      "permission": "¿Permitir el acceso a {{origin}}?",
+      "question": "Abre el panel lateral para responder."
     },
     "maxStepsSummary": "Me detuve tras {{count}} pasos sin terminar. Revisa los pasos de arriba y dame una tarea más concreta o sube el límite de pasos en los ajustes.",
     "stoppedSummary": "La tarea se detuvo.",
@@ -375,7 +382,12 @@
     "emptyAnswer": "(Sin respuesta.)",
     "closeTabs_one": "Cerrar la pestaña que abrí",
     "closeTabs_many": "Cerrar las {{count}} pestañas que abrí",
-    "closeTabs_other": "Cerrar las {{count}} pestañas que abrí"
+    "closeTabs_other": "Cerrar las {{count}} pestañas que abrí",
+    "injection": {
+      "title": "Esta página intentó dar instrucciones al asistente",
+      "titleHidden": "Esta página oculta instrucciones para asistentes de IA",
+      "body": "Se le indicó al asistente que las ignore. Hasta que termine esta tarea, cambiar páginas y abrir sitios nuevos necesita tu aprobación."
+    }
   },
   "agentSettings": {
     "title": "Agente",

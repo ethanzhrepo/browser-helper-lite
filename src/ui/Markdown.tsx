@@ -1,5 +1,5 @@
 import 'katex/dist/katex.min.css';
-import { Check, Copy } from 'lucide-react';
+import { Check, Copy, ImageOff } from 'lucide-react';
 import { lazy, memo, Suspense, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import ReactMarkdown from 'react-markdown';
@@ -49,6 +49,39 @@ export function CopyButton({ text, label }: { text: string; label?: string }) {
       {copied ? <Check className="h-3 w-3 text-success" /> : <Copy className="h-3 w-3" />}
       {copied ? t('message.copied') : (label ?? t('message.copy'))}
     </button>
+  );
+}
+
+function hostOf(url: string): string {
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return url;
+  }
+}
+
+/**
+ * Images in replies are not loaded: a reply shaped by a malicious page could
+ * point an image at an attacker's server with your data in the URL (§8.2).
+ * They are shown as a link you can open yourself.
+ */
+function BlockedImage({ src, alt }: { src?: string; alt?: string }) {
+  const { t } = useTranslation();
+  const label = alt?.trim() || t('message.image');
+  const safe = src && /^https?:/i.test(src) ? src : undefined;
+  return (
+    <a
+      href={safe}
+      target="_blank"
+      rel="noreferrer noopener"
+      title={src}
+      data-testid="blocked-image"
+      className="inline-flex max-w-full items-center gap-1.5 rounded-md border border-line bg-subtle px-2 py-0.5 align-middle text-xs text-muted no-underline hover:text-fg"
+    >
+      <ImageOff className="h-3.5 w-3.5 shrink-0" />
+      <span className="truncate">{label}</span>
+      {safe && <span className="shrink-0 text-faint">· {hostOf(safe)}</span>}
+    </a>
   );
 }
 
@@ -112,7 +145,9 @@ export const Markdown = memo(function Markdown({ text, streaming = false }: { te
           [rehypeHighlight, { detect: false, plainText: ['mermaid', 'text', 'txt', 'plain'] }],
         ]}
         components={{
-          a: ({ node: _node, ...props }) => <a {...props} target="_blank" rel="noreferrer" />,
+          // The full address on hover, so a link's real target is visible before clicking.
+          a: ({ node: _node, ...props }) => <a {...props} title={props.href} target="_blank" rel="noreferrer noopener" />,
+          img: ({ src, alt }) => <BlockedImage src={typeof src === 'string' ? src : undefined} alt={alt} />,
           pre: ({ node, children }) => (
             <CodeBlock node={node as HastNode | undefined} streaming={streaming}>
               {children}

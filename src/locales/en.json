@@ -111,7 +111,8 @@
     "retry": "Retry",
     "truncated": "partial",
     "diagramError": "This diagram couldn't be drawn. Here is its source.",
-    "copySvg": "Copy SVG"
+    "copySvg": "Copy SVG",
+    "image": "Image"
   },
   "history": {
     "title": "History",
@@ -298,12 +299,16 @@
         "submit": "This submits, sends or saves something.",
         "confirmEach": "Your policy for this site asks to confirm every step.",
         "sensitiveField": "This involves sensitive information.",
-        "manualMode": "Manual approval mode is on."
+        "manualMode": "Manual approval mode is on.",
+        "injection": "This page tried to give the assistant instructions, so for the rest of this task it asks before changing pages or opening new sites.",
+        "exfiltration": "The address contains data (such as an email address, a card number or a long code). Make sure you want to send it to this site.",
+        "newSite": "This site has not come up in this task: it is not in your request, your tab or the search results."
       },
       "allowOnce": "Allow once",
       "allowTask": "Allow for this task",
       "allowSite": "Always allow on this site",
-      "deny": "Deny"
+      "deny": "Deny",
+      "titleSuspicious": "Check before allowing"
     },
     "permission": {
       "title": "Allow access to this site?",
@@ -328,7 +333,8 @@
     },
     "question": {
       "title": "The assistant asks:",
-      "hint": "Answer in the box below."
+      "hint": "Answer in the box below.",
+      "noSecrets": "Never share passwords, card numbers or verification codes here."
     },
     "controls": {
       "pause": "Pause",
@@ -362,7 +368,8 @@
         "permission": "Site access needed"
       },
       "approval": "{{site}}: {{target}}",
-      "permission": "Allow access to {{origin}}?"
+      "permission": "Allow access to {{origin}}?",
+      "question": "Open the side panel to answer."
     },
     "maxStepsSummary": "I stopped after {{count}} steps without finishing. Review the steps above, then give me a narrower task or raise the step limit in settings.",
     "stoppedSummary": "The task was stopped.",
@@ -370,7 +377,12 @@
     "thinking": "Thinking…",
     "emptyAnswer": "(No answer.)",
     "closeTabs_one": "Close the tab I opened",
-    "closeTabs_other": "Close the {{count}} tabs I opened"
+    "closeTabs_other": "Close the {{count}} tabs I opened",
+    "injection": {
+      "title": "This page tried to instruct the assistant",
+      "titleHidden": "This page hides instructions for AI assistants",
+      "body": "The assistant was told to ignore them. Until this task ends, changing pages and opening new sites need your approval."
+    }
   },
   "agentSettings": {
     "title": "Agent",

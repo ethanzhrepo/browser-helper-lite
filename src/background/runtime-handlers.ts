@@ -15,6 +15,7 @@ import type {
   TranscribeResult,
 } from '../shared/protocol';
 import { getApiKey, getSearchKey, loadSettings } from '../storage/settings';
+import { isExtensionPage } from './trust';
 
 export async function testConnection(request: ConnectionTestRequest): Promise<ConnectionTestResult> {
   const apiKey = request.apiKey || (request.connectionId ? await getApiKey(request.connectionId) : undefined);
@@ -60,7 +61,9 @@ async function transcribe(request: TranscribeRequest): Promise<TranscribeResult>
 }
 
 export function registerRuntimeHandlers(): void {
-  browser.runtime.onMessage.addListener((message: RuntimeRequest, _sender, sendResponse) => {
+  browser.runtime.onMessage.addListener((message: RuntimeRequest, sender, sendResponse) => {
+    // These use stored API keys: only our own pages may ask.
+    if (!isExtensionPage(sender)) return undefined;
     if (message?.type === 'connection.test') {
       void testConnection(message).then(sendResponse);
       return true;

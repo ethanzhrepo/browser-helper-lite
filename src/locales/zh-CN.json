@@ -110,7 +110,8 @@
     "retry": "重试",
     "truncated": "部分内容",
     "diagramError": "这个图表画不出来，下面是它的源码。",
-    "copySvg": "复制 SVG"
+    "copySvg": "复制 SVG",
+    "image": "图片"
   },
   "history": {
     "title": "历史记录",
@@ -294,12 +295,16 @@
         "submit": "这会提交、发送或保存内容。",
         "confirmEach": "你为这个网站设置了每步都要确认。",
         "sensitiveField": "这涉及敏感信息。",
-        "manualMode": "当前是「手动批准」模式。"
+        "manualMode": "当前是「手动批准」模式。",
+        "injection": "这个页面试图给助手下指令，所以在本次任务剩下的步骤里，改动页面或打开新网站前都会先问你。",
+        "exfiltration": "这个网址里带着数据（比如邮箱、银行卡号或一长串编码）。确认你愿意把它发给这个网站。",
+        "newSite": "这个网站在本次任务里没出现过：不在你的请求、当前标签页或搜索结果里。"
       },
       "allowOnce": "允许一次",
       "allowTask": "本任务内都允许",
       "allowSite": "总是允许此网站",
-      "deny": "拒绝"
+      "deny": "拒绝",
+      "titleSuspicious": "请先核实再允许"
     },
     "permission": {
       "title": "允许访问这个网站吗？",
@@ -324,7 +329,8 @@
     },
     "question": {
       "title": "助手想问你：",
-      "hint": "请在下方输入框里回答。"
+      "hint": "请在下方输入框里回答。",
+      "noSecrets": "不要在这里提供密码、银行卡号或验证码。"
     },
     "controls": {
       "pause": "暂停",
@@ -358,14 +364,20 @@
         "permission": "需要网站访问授权"
       },
       "approval": "{{site}}：{{target}}",
-      "permission": "允许访问 {{origin}} 吗？"
+      "permission": "允许访问 {{origin}} 吗？",
+      "question": "打开侧边栏回答。"
     },
     "maxStepsSummary": "已经执行了 {{count}} 步，任务仍未完成，我先停下了。可以看看上面的步骤，然后给我一个更具体的任务，或者在设置里调高步数上限。",
     "stoppedSummary": "任务已停止。",
     "failedSummary": "任务失败：{{message}}",
     "thinking": "思考中…",
     "emptyAnswer": "（没有回答。）",
-    "closeTabs_other": "关闭我打开的 {{count}} 个标签页"
+    "closeTabs_other": "关闭我打开的 {{count}} 个标签页",
+    "injection": {
+      "title": "这个页面试图给助手下指令",
+      "titleHidden": "这个页面藏着给 AI 助手的指令",
+      "body": "已经要求助手忽略这些内容。在这个任务结束前，改动页面和打开新网站都需要你批准。"
+    }
   },
   "agentSettings": {
     "title": "Agent",

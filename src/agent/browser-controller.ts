@@ -18,9 +18,10 @@ type InvokeResult = { status: 'missing' } | { status: 'ok'; value: unknown } | {
 
 /** Serialized into the page by scripting.executeScript, so it must be self-contained. */
 function invokePageAgent(method: string, args: unknown[]): InvokeResult {
-  const api = (globalThis as unknown as Record<string, Record<string, (...a: unknown[]) => unknown> | undefined>)
-    .__browserHelperAgent;
-  if (!api) return { status: 'missing' };
+  const api = (globalThis as unknown as Record<symbol, Record<string, (...a: unknown[]) => unknown> | undefined>)[
+    Symbol.for('browser-helper-agent')
+  ];
+  if (typeof api?.[method] !== 'function') return { status: 'missing' };
   try {
     return { status: 'ok', value: api[method]!(...args) };
   } catch (error) {
@@ -365,9 +366,16 @@ export class AgentBrowser {
   async click(index: number): Promise<number | undefined> {
     const point = await this.pointAt(index, true);
     const tabId = this.currentTabId;
+    // Right before the button goes down, the target must still be under the pointer: a page could
+    // slide something else there while the pointer moves.
+    const recheck = async () => {
+      const now = unwrap(await this.page('locate', index));
+      if (now.occludedBy) throw new ActionError(`Element [${index}] is covered by ${now.occludedBy}. Look at the page again.`);
+      if (Math.abs(now.x - point.x) > 4 || Math.abs(now.y - point.y) > 4) throw new ActionError(`Element [${index}] moved. Look at the page again.`);
+    };
     return this.followNewTabs(() =>
       this.input(
-        (cdp) => cdp.click(tabId, point.x, point.y),
+        (cdp) => cdp.click(tabId, point.x, point.y, recheck),
         async () => void unwrap(await this.page('domClick', index)),
       ),
     );

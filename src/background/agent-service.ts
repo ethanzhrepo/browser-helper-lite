@@ -17,6 +17,7 @@ import type { Locale, Settings } from '../shared/types';
 import { appendMessage, db, getMessages, getTasks, markInterruptedTasks, saveTask } from '../storage/db';
 import { loadSettings, updateSettings, watchSettings } from '../storage/settings';
 import { linkTab, unlinkTab } from '../storage/tab-conversations';
+import { isExtensionPage } from './trust';
 
 const runners = new Map<string, AgentRunner>();
 const ports = new Set<Browser.runtime.Port>();
@@ -79,11 +80,12 @@ async function notifyWaiting(task: AgentTask, settings: Settings, t: TFunction) 
   if (!waiting || !settings.agent.notifications || !browser.notifications) return;
   // Hand-offs always notify (the user may be elsewhere); other waits only when no panel is open.
   if (waiting.kind !== 'handoff' && ports.size > 0) return;
+  // Fixed wording: model-written text (which a page may have shaped) never appears as a system notification.
   const message =
     waiting.kind === 'handoff'
-      ? waiting.message || t(`agent.handoff.${waiting.reason}`, { site: waiting.site })
+      ? t(`agent.handoff.${waiting.reason}`, { site: waiting.site })
       : waiting.kind === 'question'
-        ? waiting.question
+        ? t('agent.notification.question')
         : waiting.kind === 'approval'
           ? t('agent.notification.approval', { site: waiting.site, target: waiting.target })
           : t('agent.notification.permission', { origin: waiting.origin });
@@ -246,6 +248,11 @@ export function registerAgentService(): void {
 
   browser.runtime.onConnect.addListener((port: Browser.runtime.Port) => {
     if (port.name !== AGENT_PORT_NAME) return;
+    // Starting turns and approving actions is for our own pages only, never for scripts in web pages.
+    if (!isExtensionPage(port.sender)) {
+      port.disconnect();
+      return;
+    }
     ports.add(port);
     port.onDisconnect.addListener(() => ports.delete(port));
     port.onMessage.addListener((message: AgentClientMessage) => handleClientMessage(message, port));

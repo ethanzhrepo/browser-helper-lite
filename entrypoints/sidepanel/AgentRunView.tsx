@@ -10,6 +10,7 @@ import {
   Minus,
   Pause,
   ShieldAlert,
+  ShieldX,
   Square,
   X,
   XCircle,
@@ -165,6 +166,16 @@ export function AgentRunView({ task, onSend }: { task: AgentTask; onSend: (messa
         </ol>
       )}
 
+      {task.injection && (
+        <div className="space-y-1 border-t border-danger/20 bg-danger-soft px-3.5 py-2.5 text-xs" data-testid="injection-warning" role="alert">
+          <p className="flex items-center gap-1.5 font-semibold text-danger">
+            <ShieldX className="h-3.5 w-3.5 shrink-0" />
+            {t(task.injection.hidden ? 'agent.injection.titleHidden' : 'agent.injection.title')}
+          </p>
+          <p className="leading-relaxed text-fg">{t('agent.injection.body')}</p>
+          <p className="break-words font-mono text-[11px] leading-relaxed text-muted">“{task.injection.excerpt}”</p>
+        </div>
+      )}
       {!active && openedTabs > 0 && expanded && (
         <div className="flex justify-end border-t border-line px-3 py-2">
           <Button size="sm" variant="ghost" onClick={() => onSend({ type: 'closeTabs', taskId: task.id })}>
@@ -222,12 +233,19 @@ function WaitingCard({ task, waiting, onSend }: {
   if (waiting.kind === 'approval') {
     const decide = (decision: ApprovalDecision) => respond({ kind: 'approval', decision });
     const action = task.steps.flatMap((step) => step.actions).find((a) => a.id === waiting.actionId);
-    const high = waiting.risk >= 3;
+    // Trusting a whole site makes no sense when the page itself is the problem.
+    const suspicious = waiting.reason === 'injection' || waiting.reason === 'exfiltration';
+    const high = waiting.risk >= 3 || suspicious;
+    // Site-wide trust makes no sense for these; high-risk steps are approved one at a time (§8.1).
+    const canAllowSite = waiting.risk < 3 && !suspicious && waiting.reason !== 'newSite';
+    const canAllowTask = waiting.risk < 3 && waiting.reason !== 'exfiltration';
+    const typed = action?.tool === 'type' ? String(action.args.text ?? '') : '';
+    const fullUrl = action?.tool === 'navigate' || action?.tool === 'open_tab' ? String(action.args.url ?? '') : '';
     return (
       <CardShell
         tone={high ? 'danger' : 'accent'}
         icon={ShieldAlert}
-        title={high ? t('agent.approval.titleHigh') : t('agent.approval.title')}
+        title={suspicious ? t('agent.approval.titleSuspicious') : high ? t('agent.approval.titleHigh') : t('agent.approval.title')}
         testId="approval-card"
       >
         <div className="space-y-1">
@@ -235,6 +253,12 @@ function WaitingCard({ task, waiting, onSend }: {
           <p className="rounded-lg border border-line bg-surface px-3 py-2 font-medium leading-snug shadow-soft">
             {actionLabel(t, action ?? { id: '', tool: waiting.tool, args: {}, target: waiting.target, risk: waiting.risk, status: 'awaiting' })}
           </p>
+          {/* The whole text or address, so nothing is approved unseen. */}
+          {(typed || fullUrl) && (
+            <p className="max-h-32 overflow-y-auto whitespace-pre-wrap break-all rounded-lg bg-subtle px-3 py-2 font-mono text-[11px] leading-relaxed text-muted" data-testid="approval-detail">
+              {clip(typed || fullUrl, 1000)}
+            </p>
+          )}
           <p className="text-xs text-muted">{t(`agent.approval.reason.${waiting.reason}`)}</p>
         </div>
         <div className="grid grid-cols-2 gap-1.5">
@@ -244,10 +268,12 @@ function WaitingCard({ task, waiting, onSend }: {
           <Button variant="danger" onClick={() => decide('deny')}>
             {t('agent.approval.deny')}
           </Button>
-          <Button onClick={() => decide('allowTask')} className={waiting.risk < 3 ? '' : 'col-span-2'}>
-            {t('agent.approval.allowTask')}
-          </Button>
-          {waiting.risk < 3 && <Button onClick={() => decide('allowSite')}>{t('agent.approval.allowSite')}</Button>}
+          {canAllowTask && (
+            <Button onClick={() => decide('allowTask')} className={canAllowSite ? '' : 'col-span-2'}>
+              {t('agent.approval.allowTask')}
+            </Button>
+          )}
+          {canAllowSite && <Button onClick={() => decide('allowSite')}>{t('agent.approval.allowSite')}</Button>}
         </div>
       </CardShell>
     );
@@ -301,6 +327,7 @@ function WaitingCard({ task, waiting, onSend }: {
     <CardShell tone="accent" icon={MessageCircleQuestion} title={t('agent.question.title')} testId="question-card">
       <p className="whitespace-pre-wrap text-[13px] leading-relaxed">{waiting.question}</p>
       <p className="text-xs text-muted">{t('agent.question.hint')}</p>
+      <p className="text-xs text-muted">{t('agent.question.noSecrets')}</p>
     </CardShell>
   );
 }

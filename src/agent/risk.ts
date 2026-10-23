@@ -1,4 +1,7 @@
+import { containsCardNumber } from './injection';
+import { parseKeyCombo } from './keys';
 import type { TargetInfo } from './page/types';
+import type { ActionKind } from './policy';
 import type { RiskLevel, RiskReason } from './types';
 
 /**
@@ -72,26 +75,66 @@ export function isNavigationLink(target: TargetInfo): boolean {
 
 const READ_ONLY_TOOLS = new Set(['read_page', 'view_page', 'scroll', 'wait', 'extract', 'look', 'web_search', 'hover', 'switch_tab', 'ask_user', 'hand_off']);
 
+/** Submitting the form a field belongs to, judged by the form's submit button ("Place order" is a payment). */
+function classifySubmit(target: TargetInfo): Classification {
+  if (target.isSearchField) return { risk: 1 };
+  return classifyText(target.formSubmitText ?? '') ?? { risk: 2, reason: 'submit' };
+}
+
+/** Clicking (or pressing Enter/Space on) an element. Links get the same text check as buttons. */
+function classifyActivation(target: TargetInfo): Classification {
+  const byText = classifyText([target.text, target.ariaLabel].filter(Boolean).join(' '));
+  if (byText) return byText;
+  // Following a real link only navigates; effects happen on the next page.
+  if (isNavigationLink(target)) return { risk: 1 };
+  if (target.isSubmit) return classifyText(target.formSubmitText ?? '') ?? { risk: 2, reason: 'submit' };
+  return { risk: 1 };
+}
+
+/**
+ * A key press acts on the focused element, so it is judged like what it
+ * triggers: Enter or Space on a button is a click, Enter in a form field
+ * submits the form, and shortcuts such as paste get no less than L2.
+ */
+function classifyPress(keys: string, target: TargetInfo | undefined): Classification {
+  const combo = parseKeyCombo(keys);
+  const shortcut = combo.ctrlKey || combo.metaKey || combo.altKey;
+  if (shortcut) return /^a$/i.test(combo.key) ? { risk: 1 } : { risk: 2, reason: 'submit' };
+  if (!target || (combo.key !== 'Enter' && combo.key !== ' ')) return { risk: 1 };
+  if (target.editable) {
+    if (combo.key === ' ') return { risk: 1 };
+    // Enter in a text area or rich editor may send a message.
+    return target.tag === 'input' ? classifySubmit(target) : { risk: 2, reason: 'submit' };
+  }
+  return classifyActivation(target);
+}
+
 export function classifyAction(tool: string, args: Record<string, unknown>, target?: TargetInfo): Classification {
   if (READ_ONLY_TOOLS.has(tool)) return { risk: 0 };
   if (tool === 'navigate' || tool === 'go_back' || tool === 'open_tab' || tool === 'close_tab') return { risk: 1 };
+  if (tool === 'press') return classifyPress(String(args.keys ?? ''), target);
   if (!target) return { risk: 1 };
 
   if (tool === 'type') {
     if (target.isPassword) return { risk: 3, reason: 'sensitiveField', forbidden: 'password' };
     if (target.isPaymentField) return { risk: 3, reason: 'sensitiveField', forbidden: 'payment' };
     if (target.isOneTimeCode) return { risk: 3, reason: 'sensitiveField', forbidden: 'oneTimeCode' };
-    // Enter in a search box only searches; elsewhere it may submit a form or send a message.
-    return args.submit === true && !target.isSearchField ? { risk: 2, reason: 'submit' } : { risk: 1 };
+    // A card number in any field (a page can label its fields however it likes).
+    if (containsCardNumber(String(args.text ?? ''))) return { risk: 3, reason: 'sensitiveField', forbidden: 'payment' };
+    // Enter in a search box only searches; elsewhere it submits the form, judged by its submit button.
+    if (args.submit !== true) return { risk: 1 };
+    return target.tag === 'input' ? classifySubmit(target) : target.isSearchField ? { risk: 1 } : { risk: 2, reason: 'submit' };
   }
 
-  if (tool === 'click') {
-    // Following a real link only navigates; effects happen on the next page.
-    if (isNavigationLink(target)) return { risk: 1 };
-    const text = [target.text, target.ariaLabel].filter(Boolean).join(' ');
-    const byText = classifyText(text);
-    if (byText) return byText;
-    if (target.isSubmit) return { risk: 2, reason: 'submit' };
-  }
+  if (tool === 'click') return classifyActivation(target);
   return { risk: 1 };
+}
+
+/** What kind of action this is for the modes (§M1.5 B6): following a link, searching, or changing the page. */
+export function actionKind(tool: string, args: Record<string, unknown>, target: TargetInfo | undefined, classification: Classification): ActionKind {
+  if (classification.risk > 1 || !target) return 'change';
+  const key = tool === 'press' ? parseKeyCombo(String(args.keys ?? '')).key : undefined;
+  if ((tool === 'click' || key === 'Enter') && isNavigationLink(target)) return 'browse';
+  if ((tool === 'type' || key === 'Enter') && target.isSearchField) return 'search';
+  return 'change';
 }

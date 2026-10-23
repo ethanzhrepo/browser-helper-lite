@@ -20,6 +20,7 @@ import { useTranslation } from 'react-i18next';
 import type { ActiveTab } from '../../src/browser/page-context';
 import { matchCommands, type SlashCommand } from '../../src/chat/commands';
 import type { AgentMode, ContextKind, ContextSnapshot } from '../../src/shared/types';
+import { faviconUrl } from '../../src/ui/favicon';
 import type { PageAccess } from '../../src/ui/useActiveTab';
 import type { VoiceState } from '../../src/voice/useVoiceInput';
 
@@ -187,7 +188,7 @@ export function Composer(props: {
                   {item.kind === 'command' ? (
                     <span className="font-mono text-xs font-semibold">/</span>
                   ) : item.kind === 'tab' ? (
-                    item.tab.favIconUrl ? <img src={item.tab.favIconUrl} alt="" className="h-3.5 w-3.5 rounded-sm" /> : <Globe className="h-3.5 w-3.5" />
+                    <img src={faviconUrl(item.tab.url)} alt="" className="h-3.5 w-3.5 rounded-sm" />
                   ) : item.target === 'page' ? (
                     <FileText className="h-3.5 w-3.5" />
                   ) : (
@@ -440,11 +441,7 @@ function PageChip({ tab, access, included, onToggle }: {
           : 'border-line bg-surface text-muted hover:border-line-strong hover:text-fg'
       }`}
     >
-      {tab.favIconUrl ? (
-        <img src={tab.favIconUrl} alt="" className="h-3.5 w-3.5 shrink-0 rounded-sm" />
-      ) : (
-        <FileText className="h-3.5 w-3.5 shrink-0" />
-      )}
+      <img src={faviconUrl(tab.url)} alt="" className="h-3.5 w-3.5 shrink-0 rounded-sm" />
       <span className="truncate">{title}</span>
       {included ? <Check className="h-3.5 w-3.5 shrink-0" strokeWidth={2.5} /> : <Plus className="h-3.5 w-3.5 shrink-0" />}
     </button>

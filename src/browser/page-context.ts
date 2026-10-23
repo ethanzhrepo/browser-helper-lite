@@ -15,6 +15,8 @@ export interface PageExtraction {
   lang: string;
   markdown: string;
   method: 'readability' | 'innerText';
+  /** A sample of the text a person cannot see, which was left out (checked for injected instructions). */
+  hiddenText?: string;
 }
 
 /** Character budgets per attachment (roughly 15k and 5k tokens). */

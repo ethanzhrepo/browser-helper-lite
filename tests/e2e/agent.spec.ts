@@ -81,7 +81,7 @@ test.describe.serial('assistant operating pages', () => {
     const last = JSON.stringify(server.chatRequests.at(-1)!.messages);
     expect(last).toContain('USB-C cable buying guide');
     expect(last).toContain('Older page view removed');
-    expect(last.match(/<page_view>/g)).toHaveLength(1);
+    expect(last.match(/<page_view id=/g)).toHaveLength(1);
     expect(server.chatRequests.at(-1)!.tools?.map((t) => t.function.name)).toContain('read_page');
     expect(JSON.stringify(server.extractRequests[0]?.messages)).toContain('Cable B');
     const image = server.lookRequests[0]?.messages[0]?.content;

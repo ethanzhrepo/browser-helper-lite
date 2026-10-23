@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { parseKeyCombo } from '../../src/agent/keys';
 import type { TargetInfo } from '../../src/agent/page/types';
 import { decide, modeDecision, policyFor, siteDecision } from '../../src/agent/policy';
-import { classifyAction } from '../../src/agent/risk';
+import { actionKind, classifyAction } from '../../src/agent/risk';
 import { buildSearchUrl } from '../../src/search/search';
 import { DEFAULT_SEARCH_SETTINGS } from '../../src/storage/settings';
 
@@ -47,9 +47,42 @@ describe('classifyAction', () => {
     expect(clickRisk({ text: 'Next' }).risk).toBe(1);
   });
 
-  it('treats real links as navigation', () => {
-    expect(clickRisk({ tag: 'a', text: 'Buy now', href: 'https://shop.example/checkout' }).risk).toBe(1);
+  it('treats real links as navigation, unless their text says otherwise', () => {
+    expect(clickRisk({ tag: 'a', text: 'Plan details', href: 'https://shop.example/plans' }).risk).toBe(1);
+    // GET links can delete or pay too.
+    expect(clickRisk({ tag: 'a', text: 'Buy now', href: 'https://shop.example/checkout' }).risk).toBe(3);
+    expect(clickRisk({ tag: 'a', text: 'Delete account', href: 'https://shop.example/account/delete' }).risk).toBe(3);
     expect(clickRisk({ tag: 'a', text: 'Buy now' }).risk).toBe(3);
+  });
+
+  it('judges a form submit by the form\'s submit button', () => {
+    const coupon = target({ tag: 'input', inForm: true, editable: true, formSubmitText: 'Place order' });
+    expect(classifyAction('type', { index: 1, text: 'SAVE10', submit: true }, coupon)).toMatchObject({ risk: 3, reason: 'payment' });
+    expect(classifyAction('type', { index: 1, text: 'SAVE10', submit: true }, target({ tag: 'input', inForm: true, editable: true, formSubmitText: 'Apply' })).risk).toBe(2);
+    expect(classifyAction('type', { index: 1, text: 'cables', submit: true }, target({ tag: 'input', inForm: true, editable: true, isSearchField: true, formSubmitText: 'Pay' })).risk).toBe(1);
+  });
+
+  it('judges key presses by what they act on', () => {
+    const press = (keys: string, focused?: Partial<TargetInfo>) => classifyAction('press', { keys }, focused ? target(focused) : undefined);
+    expect(press('Enter', { text: 'Place order' })).toMatchObject({ risk: 3, reason: 'payment' });
+    expect(press('Space', { text: 'Delete account' })).toMatchObject({ risk: 3 });
+    expect(press('Enter', { tag: 'input', editable: true, inForm: true, formSubmitText: 'Pay now' })).toMatchObject({ risk: 3 });
+    expect(press('Enter', { tag: 'textarea', editable: true })).toMatchObject({ risk: 2 });
+    expect(press('Control+V', { tag: 'input', editable: true })).toMatchObject({ risk: 2 });
+    expect(press('Control+A').risk).toBe(1);
+    expect(press('Tab').risk).toBe(1);
+    expect(press('Escape', { text: 'Pay now' }).risk).toBe(1);
+    expect(press('Enter').risk).toBe(1);
+  });
+
+  it('sorts actions into browsing, searching and changing', () => {
+    const link = target({ tag: 'a', text: 'Plans', href: 'https://x.example/plans' });
+    const search = target({ tag: 'input', editable: true, isSearchField: true });
+    expect(actionKind('click', { index: 1 }, link, classifyAction('click', { index: 1 }, link))).toBe('browse');
+    expect(actionKind('press', { keys: 'Enter' }, link, classifyAction('press', { keys: 'Enter' }, link))).toBe('browse');
+    expect(actionKind('type', { index: 1, text: 'x', submit: true }, search, classifyAction('type', { index: 1, text: 'x', submit: true }, search))).toBe('search');
+    const payLink = target({ tag: 'a', text: 'Pay now', href: 'https://x.example/pay' });
+    expect(actionKind('click', { index: 1 }, payLink, classifyAction('click', { index: 1 }, payLink))).toBe('change');
   });
 
   it('forbids typing secrets and flags typing that submits a form', () => {

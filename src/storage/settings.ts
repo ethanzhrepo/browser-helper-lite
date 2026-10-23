@@ -4,7 +4,9 @@ import type { AgentSettings, Connection, SearchProviderId, SearchSettings, Setti
 const SETTINGS_KEY = 'settings:v1';
 /**
  * API keys live under their own key so settings can later be synced to Drive
- * without them (§9.6). Only extension pages and the service worker read it.
+ * without them (§9.6). Local storage is restricted to extension pages and the
+ * service worker at startup (see background/trust.ts), so the scripts we
+ * inject into web pages cannot read it.
  */
 const SECRETS_KEY = 'secrets:v1';
 
