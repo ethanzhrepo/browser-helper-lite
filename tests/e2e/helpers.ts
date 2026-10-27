@@ -14,17 +14,19 @@ export async function screenshot(page: Page, name: string) {
   await page.screenshot({ path: path.join(SCREENSHOT_DIR, `${name}.png`) });
 }
 
-export async function launch(): Promise<{ context: BrowserContext; extensionId: string }> {
+export async function launch(options: { args?: string[]; deviceScaleFactor?: number } = {}): Promise<{ context: BrowserContext; extensionId: string }> {
   const context = await chromium.launchPersistentContext('', {
     headless: true,
     executablePath: CHROMIUM,
     locale: 'en-US',
+    deviceScaleFactor: options.deviceScaleFactor,
     args: [
       `--disable-extensions-except=${EXTENSION_PATH}`,
       `--load-extension=${EXTENSION_PATH}`,
       // Voice input: accept the microphone prompt and feed a test tone.
       '--use-fake-ui-for-media-stream',
       '--use-fake-device-for-media-stream',
+      ...(options.args ?? []),
     ],
   });
   const worker = context.serviceWorkers()[0] ?? (await context.waitForEvent('serviceworker'));

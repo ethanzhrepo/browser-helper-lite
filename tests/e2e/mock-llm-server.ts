@@ -146,7 +146,7 @@ interface ToolCall {
 }
 
 /** The assistant's next move: text to stream, then tool calls (none = final answer). */
-interface Reply {
+export interface Reply {
   text: string;
   calls: ToolCall[];
 }
@@ -154,7 +154,7 @@ interface Reply {
 export const textOf = (content: Content | undefined): string =>
   typeof content === 'string' ? content : (content ?? []).map((part) => part.text ?? '').join('\n');
 
-function indexOf(state: string, pattern: RegExp): number {
+export function indexOf(state: string, pattern: RegExp): number {
   const match = pattern.exec(state);
   if (!match) throw new Error(`Mock agent: no element matching ${pattern} in view:\n${state}`);
   return Number(match[1]);
@@ -186,7 +186,7 @@ export function readTurn(messages: ChatMessage[]) {
   return { request, history: lines.join('\n'), results: results.join('\n'), view };
 }
 
-const say = (text: string, name?: string, args: Record<string, unknown> = {}): Reply => ({ text, calls: name ? [{ name, args }] : [] });
+export const say = (text: string, name?: string, args: Record<string, unknown> = {}): Reply => ({ text, calls: name ? [{ name, args }] : [] });
 
 /** Scripted assistant: picks the next step from the request, the tools used so far and the view. */
 export function scriptedAssistant(messages: ChatMessage[]): Reply {
@@ -324,12 +324,21 @@ async function streamReply(res: import('node:http').ServerResponse, reply: Reply
   res.end('data: [DONE]\n\n');
 }
 
+export interface MockOptions {
+  /** Plays the assistant instead of the scripted test scenarios. */
+  assistant?: (messages: ChatMessage[]) => Reply;
+  /** Extra pages by path. */
+  pages?: Record<string, string>;
+  /** What the `extract` tool's model answers. */
+  extractAnswer?: string;
+}
+
 /**
  * Minimal OpenAI-compatible server: /v1/models, streaming
  * /v1/chat/completions, and a test page. No CORS headers on purpose, so the
  * extension must rely on its host permission like it does for real providers.
  */
-export async function startMockServer() {
+export async function startMockServer({ assistant = scriptedAssistant, pages = {}, extractAnswer }: MockOptions = {}) {
   const chatRequests: ChatRequest[] = [];
   const extractRequests: ChatRequest[] = [];
   const lookRequests: ChatRequest[] = [];
@@ -351,6 +360,8 @@ export async function startMockServer() {
     const html = (body: string) => res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }).end(body);
     const json = (body: unknown, status = 200) => res.writeHead(status, { 'content-type': 'application/json' }).end(JSON.stringify(body));
     const unauthorized = () => json({ error: { message: 'Invalid API key' } }, 401);
+    const page = pages[req.url ?? ''];
+    if (page) return void html(page);
     if (req.url === '/page.html') return void html(TEST_PAGE_HTML);
     if (req.url === '/shop.html') return void html(SHOP_HTML);
     if (req.url === '/park.html') return void html(PARK_HTML);
@@ -390,14 +401,14 @@ export async function startMockServer() {
       if (body.tools && body.model === 'mock-notools') return void json({ error: { message: 'tools are not supported by this model' } }, 400);
       if (textOf(body.messages[0]?.content).includes('You extract information')) {
         extractRequests.push(body);
-        return void res.writeHead(200, { 'content-type': 'application/json' }).end(completion('Cable A: $9.99 (plain white). Cable B: $5.49 (braided black).'));
+        return void res.writeHead(200, { 'content-type': 'application/json' }).end(completion(extractAnswer ?? 'Cable A: $9.99 (plain white). Cable B: $5.49 (braided black).'));
       }
       if (body.messages.some((m) => Array.isArray(m.content) && m.content.some((part) => part.type === 'image_url'))) {
         lookRequests.push(body);
         return void res.writeHead(200, { 'content-type': 'application/json' }).end(completion('The product with the braided black cable is Cable B.'));
       }
       chatRequests.push(body);
-      return void (await streamReply(res, body.tools ? scriptedAssistant(body.messages) : { text: MOCK_REPLY.join(''), calls: [] }));
+      return void (await streamReply(res, body.tools ? assistant(body.messages) : { text: MOCK_REPLY.join(''), calls: [] }));
     }
     res.writeHead(404).end();
   });

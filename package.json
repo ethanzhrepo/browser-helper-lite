@@ -20,6 +20,7 @@
     "compile": "tsc --noEmit",
     "test": "vitest run",
     "test:e2e": "E2E_GRANT_ALL_HOSTS=true wxt build && playwright test",
+    "screenshots": "E2E_GRANT_ALL_HOSTS=true wxt build && README_SCREENSHOTS=docs/images playwright test readme-screenshots",
     "postinstall": "wxt prepare"
   },
   "dependencies": {
