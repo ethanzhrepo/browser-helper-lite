@@ -1,132 +1,63 @@
 # Browser Helper Lite
 
-一个自带 Key（BYOK）、模型厂商中立、本地优先的 Chrome 侧边栏 AI 助手：
-既能对话、读网页，也能在你授权的网站上替你点击、输入、滚动、导航。
+English | [简体中文](README.zh-CN.md)
 
-> **English:** Browser Helper Lite is a bring-your-own-key, vendor-neutral, local-first AI assistant in Chrome's side panel. It chats about the page you are on and, on sites you allow, acts for you: clicking, typing, scrolling and navigating, with approvals for risky steps. It works with OpenAI, Anthropic, Google Gemini, DeepSeek and any OpenAI-compatible endpoint (including local models), and has no server of its own. The interface is available in English, 简体中文, Français and Español. Documentation is currently in Chinese; see [Install](#安装) below and [SECURITY.md](SECURITY.md) for reporting vulnerabilities.
+An AI assistant in Chrome's side panel that works with the model and API key of your choice. It answers questions about the page you are on and, on sites you allow, clicks, types and navigates for you, asking first before anything risky.
 
-- 产品构思与技术方案：[docs/product-design.md](docs/product-design.md)
-- 安全：[docs/security/](docs/security/README.md)（当前状况、提示词注入防护、[2026-10-23 审计记录](docs/security/2026-10-23-audit.md)、[第二轮加固](docs/security/2026-10-23-hardening.md)）；发现漏洞请按 [SECURITY.md](SECURITY.md) 私下报告
+![The assistant has found a cable and added it to the cart, and asks before placing the order](docs/images/agent.png)
 
-## 安装
+## Features
 
-需要 Chrome 116 或更新版本。
+- **Any model, your own key**: OpenAI, Anthropic, Google Gemini, DeepSeek, and any OpenAI-compatible API (Qwen, Kimi, GLM, Doubao, OpenRouter, Groq, Ollama, LM Studio and more).
+- **Chat about pages**: summaries and comparisons of the page you are on, other tabs with `@`, Markdown with code, math and Mermaid diagrams, and voice input.
+- **Acts on websites**: searches, clicks, types, scrolls and opens tabs to finish a task, and hands CAPTCHAs and logins back to you.
+- **You stay in control**: three modes, Query (read only), Auto (asks before payments, deletions and other high-risk steps) and Manual approval (asks before every change), plus per-site rules. Pause, stop or take over at any time.
+- **Defends against prompt injection**: hidden page text never reaches the model, page content cannot pass as instructions, and links that would carry your data out need your approval. See [docs/security](docs/security/README.md).
+- **No server of its own**: conversations stay in your browser, and requests go straight to the provider you configure.
 
-1. 从 [Releases](https://github.com/ethanzhrepo/browser-helper-lite/releases) 下载 `browser-helper-lite-<版本>-chrome.zip` 并解压。
-2. 打开 `chrome://extensions`，开启「开发者模式」，点「加载已解压的扩展程序」，选择解压出来的文件夹。
-3. 点工具栏上的扩展图标打开侧边栏，先在设置里添加一个模型连接（自带 API Key）。
+The interface is available in English, 简体中文, Français and Español.
 
-助手动手操作网页时默认通过 Chrome 调试接口（CDP）发送真实的鼠标键盘事件，这时 Chrome 会在页面上方显示「正在调试此浏览器」的提示条，任务结束后消失。不想授予 `debugger` 权限可以自己用 `pnpm build:no-cdp` 构建，助手会改用模拟的页面事件。
+| Ask about the page you are reading | Connect the providers you use |
+| --- | --- |
+| ![Comparing the machines in a buying guide](docs/images/chat.png) | ![Model providers in Settings](docs/images/settings.png) |
 
-> **English:** Requires Chrome 116+. Download `browser-helper-lite-<version>-chrome.zip` from [Releases](https://github.com/ethanzhrepo/browser-helper-lite/releases), unzip it, open `chrome://extensions`, turn on Developer mode, click "Load unpacked" and pick the unzipped folder. Then open the side panel from the toolbar and add a model connection with your own API key in Settings. While the assistant acts on a page it drives Chrome through the debugger API, so Chrome shows a "started debugging this browser" bar; build with `pnpm build:no-cdp` to leave out the `debugger` permission.
+## Install
 
-## 当前进度：M1.5 体验改进
+Requires Chrome 116 or later.
 
-- **侧边栏只属于打开它的标签页**（和 Claude 一样）：在哪个标签页点工具栏图标，侧边栏就只在那个标签页出现，切走就收起，切回来还在；每个标签页一个对话；助手新开的标签页属于同一个对话，点页面上方提示条里的「打开侧边栏」就能在那里看到；输入 `@` 可以把别的标签页带进当前对话；别的标签页里的任务在跑或在等你时，输入框上方会提示
-- **一个助手，自己判断**：不再分「问答 / 操作」。能直接回答就流式回答；问到当前页面就自己读页面；你让它在网上做事时才动手操作，步骤以卡片形式显示在回复里
-- **三种模式**（输入框左下角）：查询模式（只读、搜索、打开链接，不点按钮不填表）、**自动模式（默认，只有付款、删除等高风险操作要确认）**、手动批准（每个会改动页面的操作都要确认）。切换后对正在进行的任务立即生效
-- **顶栏显示「供应商 · 模型」**，点开切换，可以给常用模型加星标；不再重复显示插件名（那一行是 Chrome 自己的）
-- **标签组**：助手第一次动手时把标签页放进「Browser Helper」组，颜色表示状态（绿＝进行中、黄＝需要你、灰＝已完成）；你自己建的组不动；开新对话时还原
-- **Markdown 增强**：代码高亮和复制、数学公式（KaTeX）、Mermaid 图表（可复制 SVG）
-- **语音输入**：输入框里的麦克风。默认用 Chrome 自带语音识别（音频发往 Google），也可以改用自己的语音识别模型（OpenAI / Groq 等兼容接口的 Whisper、gpt-4o-transcribe，或 Gemini）
-- **搜索 API**（设置 › 搜索）：DeepSeek 搜索 API（复用 DeepSeek 连接的 Key）、Cloudflare Web Search、Tavily、Brave、Exa，或模型自带的联网搜索；出错时可退回浏览器搜索；设置页可以直接测试
-- 不支持工具调用的模型会自动退回纯聊天，并附带当前页面
+1. Download `browser-helper-lite-<version>-chrome.zip` from [Releases](https://github.com/ethanzhrepo/browser-helper-lite/releases) and unzip it.
+2. Open `chrome://extensions`, turn on **Developer mode**, click **Load unpacked** and choose the unzipped folder.
+3. Click the toolbar icon to open the side panel, then add a model connection in Settings.
 
-## M1 Agent MVP
+While the assistant acts on a page, Chrome shows a "started debugging this browser" bar: the extension uses Chrome's debugger API to send real mouse and keyboard input. To build without the `debugger` permission, run `pnpm build:no-cdp`; the assistant then simulates page events instead.
 
-用一句话描述任务，助手就会在当前标签页里替你操作：
+## Development
 
-- **看懂页面**：把视口里的可点击元素编号（`[12]<button>…`），连同可见文字一起交给模型；支持同源 iframe 和 Shadow DOM，被弹窗遮住的元素会提示先关闭弹窗
-- **动作**：打开网址、点击、输入、按键、悬停、滚动、选择下拉项、后退、新开/切换/关闭标签页、等待
-- **辅助工具**：`read_page` 读整页；`extract` 读取整页并提取信息；`look` 截图并由视觉模型回答问题（DeepSeek 这类纯文本模型也能用）；`web_search` 搜索；`ask_user` 向你提问；`hand_off` 把登录、验证码交给你
-- **两种驱动**：默认用 CDP 发送真实的鼠标键盘事件，屏幕上有虚拟光标；CDP 不可用时自动改用模拟的页面事件。只读页面时不挂调试器
-- **防网页提示词注入**：看不见的文字不给模型；网页内容包在带随机边界的数据块里；发现网页在给 AI 下指令时提醒你，并在本次任务剩下的步骤里改为逐一确认；模型写的网址带数据或去新网站要确认；回复里的图片不自动加载（详见 [安全文档](docs/security/README.md)）
-- **安全**：按风险分级；可以按网站设置策略（禁止 / 只读 / 每步确认 / 有风险才确认 / 全自动），和模式冲突时取更严格的；助手从不填写密码、银行卡号、验证码；网页内容一律当作不可信数据
-- **加固**：批准只对你看到的那一步有效（页面在你确认时变了就不执行）；卡号和密钥不给模型看；账户安全、令牌、云控制台、支付等敏感页面每一步都确认；粘贴、下载程序、在别的网站的框架里操作都按高风险处理；带 Key 的请求只走 https 或本机
-- **可控**：页面边框发光并显示「停止」按钮；侧边栏有暂停、继续、停止、「我来接管」；你在页面上操作时任务自动暂停
-- **交接**：检测到验证码时暂停任务、发 Chrome 通知，你解决后自动继续
-
-## M0 地基
-
-- 侧边栏聊天：流式回复、Markdown（含表格）、思考过程折叠、复制、重试、停止
-- 页面上下文：附带当前页面（Readability 提取正文转 Markdown）、`@` 附带页面或选中文字、`/` 指令（总结、翻译、解释、提取表格）
-- 模型供应商：OpenAI、Anthropic、Google Gemini、DeepSeek，以及 OpenAI 兼容接口（预设通义千问、Kimi、智谱、豆包、OpenRouter、硅基流动、xAI、Mistral、Groq、Ollama、LM Studio，或自定义地址）
-- 能力分配：当前模型、快速、视觉、语音识别四个槽位（M1.5 起「Agent 模型」并入当前模型）
-- 网站权限：安装时不申请任何网站；第一次读取某个网站或连接某个 API 地址时再请求授权
-- 历史记录：保存在本地 IndexedDB，按「方便同步」的方式设计（ULID、消息只追加、删除用墓碑）
-- 界面四种语言：简体中文、English、Français、Español，可在设置里即时切换
-
-## 开发
-
-需要 Node.js 20+ 和 pnpm。
+Requires Node.js 20+ and pnpm.
 
 ```bash
 pnpm install
-pnpm dev          # 启动开发模式，自动打开一个加载了扩展的 Chrome
-pnpm build        # 生产构建，输出到 .output/chrome-mv3
-pnpm zip          # 打包成 zip
+pnpm dev           # opens Chrome with the extension loaded
+pnpm build         # builds into .output/chrome-mv3
+pnpm zip           # packs the release zip
+pnpm compile       # type check
+pnpm test          # unit tests
+pnpm test:e2e      # end-to-end tests in Chromium against a mock model server
+pnpm screenshots   # regenerates the screenshots in this README
 ```
 
-手动加载：打开 `chrome://extensions`，开启「开发者模式」，点「加载已解压的扩展程序」，选择 `.output/chrome-mv3`。
-点工具栏上的扩展图标即可打开侧边栏，首次使用先在设置里添加一个模型连接。
+Before the first end-to-end run, install Playwright's browser with `pnpm exec playwright install chromium`, or point `CHROMIUM_PATH` at Chromium 141 or later.
 
-### 构建开关
+The design notes ([docs/product-design.md](docs/product-design.md)) and security records are in Chinese.
 
-| 环境变量 | 默认 | 作用 |
-| --- | --- | --- |
-| `ENABLE_CDP_DRIVER` | `true` | 为 `false` 时 manifest 不声明 `debugger` 权限（`pnpm build:no-cdp`），供将来上架评估使用 |
-| `E2E_GRANT_ALL_HOSTS` | 未设置 | 仅用于端到端测试：安装时授予所有网站权限，避免 Playwright 无法点击的权限弹窗。正式构建不要设置 |
+## Privacy
 
-### 测试
+Conversations are stored locally in the browser. Requests go directly from the extension to your model provider. API keys stay in the extension's storage and are never exposed to web pages. Requests to OpenAI set `store: false`.
 
-```bash
-pnpm compile      # TypeScript 类型检查
-pnpm test         # 单元测试（Vitest）
-pnpm test:e2e     # 端到端测试：构建测试版扩展，用 Playwright 在 Chromium 里跑完整流程
-```
+## Security
 
-端到端测试会启动一个本地的模拟 OpenAI 兼容服务器（流式返回文字和工具调用，按脚本决定下一步），覆盖：
+Please report vulnerabilities privately as described in [SECURITY.md](SECURITY.md).
 
-- 对话：添加连接（含错误 Key）、自动分配当前模型、附带页面并流式回复、没有附带时自己读页面、`/` 指令菜单、`@` 附带选中文字、历史记录、语言即时切换
-- 模型切换和星标；Mermaid、公式、代码高亮；DeepSeek 搜索 API（含设置页测试）；录音转文字；模型不支持工具时退回纯聊天
-- 提示词注入：藏着指令的攻击页面 → 隐藏文字不进模型、出现警告、带邮箱的网址被拦、之后的点击要确认、回复里的图片不加载、攻击者的地址收不到任何请求
-- 标签页：每个标签页一个对话、未发送文字按标签页保留、侧边栏只属于自己的标签页、`@` 其他标签页、助手新开的标签页属于同一个对话、别的标签页里的任务提示条、页面提示条里的「打开侧边栏」（会真的打开 Chrome 的侧边栏）
-- 操作：手动批准模式下网页搜索 → 输入 → 提取 → 看图 → 确认 → 加购物车，标签组变色、新对话还原；自动模式下验证码交接后自动继续 → 提问 → 高风险付款被拒绝；查询模式拒绝点按钮；用户操作页面时自动暂停、继续、停止；关闭 CDP 后用 DOM 驱动完成任务
-
-第一次运行前先装 Playwright 用的浏览器：`pnpm exec playwright install chromium`。也可以用 `CHROMIUM_PATH` 指定别的 Chromium（需要 141 或更新版本，测试会用到 `chrome.sidePanel.close`）；设置 `E2E_SCREENSHOT_DIR` 会保存界面截图。
-
-## 目录结构
-
-```
-entrypoints/
-  background.ts        Service Worker：助手回合、连接测试、搜索测试、语音识别
-  sidepanel/           侧边栏界面
-  options/             设置页
-  extract-page.ts      按需注入的页面正文提取脚本
-  agent-page.ts        按需注入的 Agent 页面脚本（感知、动作、覆盖层）
-  mic-permission/      第一次用语音输入时请求麦克风权限的页面
-src/
-  agent/               Agent：运行时、工具、提示词、风险与策略、CDP 驱动、页面脚本
-  background/          后台服务实现
-  browser/             页面内容与选中文字的读取
-  chat/                对话历史、指令、会话
-  search/              浏览器搜索和搜索 API
-  voice/               语音输入
-  i18n/  locales/      多语言
-  permissions/         网站权限
-  providers/           各厂商适配、模型列表、错误归类
-  shared/              类型与消息协议
-  storage/             设置、Key、IndexedDB
-  ui/                  共享界面组件
-tests/unit/            单元测试
-tests/e2e/             端到端测试
-```
-
-## 隐私
-
-没有自有服务器。对话保存在浏览器本地；请求直接从扩展发往你配置的模型供应商；API Key 只保存在扩展存储里，不会发送给任何网页。
-连接 OpenAI 时设置了 `store: false`，不让 OpenAI 在服务端保留回复内容。
-
-## 许可证
+## License
 
 [Apache License 2.0](LICENSE)
