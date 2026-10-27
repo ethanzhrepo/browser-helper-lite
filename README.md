@@ -3,8 +3,22 @@
 一个自带 Key（BYOK）、模型厂商中立、本地优先的 Chrome 侧边栏 AI 助手：
 既能对话、读网页，也能在你授权的网站上替你点击、输入、滚动、导航。
 
+> **English:** Browser Helper Lite is a bring-your-own-key, vendor-neutral, local-first AI assistant in Chrome's side panel. It chats about the page you are on and, on sites you allow, acts for you: clicking, typing, scrolling and navigating, with approvals for risky steps. It works with OpenAI, Anthropic, Google Gemini, DeepSeek and any OpenAI-compatible endpoint (including local models), and has no server of its own. The interface is available in English, 简体中文, Français and Español. Documentation is currently in Chinese; see [Install](#安装) below and [SECURITY.md](SECURITY.md) for reporting vulnerabilities.
+
 - 产品构思与技术方案：[docs/product-design.md](docs/product-design.md)
-- 安全：[docs/security/](docs/security/README.md)（当前状况、提示词注入防护、[2026-10-23 审计记录](docs/security/2026-10-23-audit.md)、[第二轮加固](docs/security/2026-10-23-hardening.md)）
+- 安全：[docs/security/](docs/security/README.md)（当前状况、提示词注入防护、[2026-10-23 审计记录](docs/security/2026-10-23-audit.md)、[第二轮加固](docs/security/2026-10-23-hardening.md)）；发现漏洞请按 [SECURITY.md](SECURITY.md) 私下报告
+
+## 安装
+
+需要 Chrome 116 或更新版本。
+
+1. 从 [Releases](https://github.com/ethanzhrepo/browser-helper-lite/releases) 下载 `browser-helper-lite-<版本>-chrome.zip` 并解压。
+2. 打开 `chrome://extensions`，开启「开发者模式」，点「加载已解压的扩展程序」，选择解压出来的文件夹。
+3. 点工具栏上的扩展图标打开侧边栏，先在设置里添加一个模型连接（自带 API Key）。
+
+助手动手操作网页时默认通过 Chrome 调试接口（CDP）发送真实的鼠标键盘事件，这时 Chrome 会在页面上方显示「正在调试此浏览器」的提示条，任务结束后消失。不想授予 `debugger` 权限可以自己用 `pnpm build:no-cdp` 构建，助手会改用模拟的页面事件。
+
+> **English:** Requires Chrome 116+. Download `browser-helper-lite-<version>-chrome.zip` from [Releases](https://github.com/ethanzhrepo/browser-helper-lite/releases), unzip it, open `chrome://extensions`, turn on Developer mode, click "Load unpacked" and pick the unzipped folder. Then open the side panel from the toolbar and add a model connection with your own API key in Settings. While the assistant acts on a page it drives Chrome through the debugger API, so Chrome shows a "started debugging this browser" bar; build with `pnpm build:no-cdp` to leave out the `debugger` permission.
 
 ## 当前进度：M1.5 体验改进
 
@@ -79,7 +93,7 @@ pnpm test:e2e     # 端到端测试：构建测试版扩展，用 Playwright 在
 - 标签页：每个标签页一个对话、未发送文字按标签页保留、侧边栏只属于自己的标签页、`@` 其他标签页、助手新开的标签页属于同一个对话、别的标签页里的任务提示条、页面提示条里的「打开侧边栏」（会真的打开 Chrome 的侧边栏）
 - 操作：手动批准模式下网页搜索 → 输入 → 提取 → 看图 → 确认 → 加购物车，标签组变色、新对话还原；自动模式下验证码交接后自动继续 → 提问 → 高风险付款被拒绝；查询模式拒绝点按钮；用户操作页面时自动暂停、继续、停止；关闭 CDP 后用 DOM 驱动完成任务
 
-Chromium 路径可以用 `CHROMIUM_PATH` 指定；设置 `E2E_SCREENSHOT_DIR` 会保存界面截图。
+第一次运行前先装 Playwright 用的浏览器：`pnpm exec playwright install chromium`。也可以用 `CHROMIUM_PATH` 指定别的 Chromium（需要 141 或更新版本，测试会用到 `chrome.sidePanel.close`）；设置 `E2E_SCREENSHOT_DIR` 会保存界面截图。
 
 ## 目录结构
 
@@ -112,3 +126,7 @@ tests/e2e/             端到端测试
 
 没有自有服务器。对话保存在浏览器本地；请求直接从扩展发往你配置的模型供应商；API Key 只保存在扩展存储里，不会发送给任何网页。
 连接 OpenAI 时设置了 `store: false`，不让 OpenAI 在服务端保留回复内容。
+
+## 许可证
+
+[Apache License 2.0](LICENSE)
