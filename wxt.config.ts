@@ -24,6 +24,8 @@ export default defineConfig({
     name: '__MSG_extName__',
     description: '__MSG_extDescription__',
     default_locale: 'en',
+    // sidePanel.open() for a single tab (background.ts, §4.7).
+    minimum_chrome_version: '116',
     action: {
       default_title: '__MSG_actionTitle__',
     },
