@@ -12,9 +12,7 @@
   "header": {
     "newChat": "New chat",
     "history": "History",
-    "settings": "Settings",
-    "pin": "Keep this chat when switching tabs",
-    "unpin": "Stop keeping this chat across tabs"
+    "settings": "Settings"
   },
   "model": {
     "choose": "Choose a model",
@@ -46,7 +44,7 @@
       "compare": "Search Amazon and AliExpress for a 65W USB-C charger and compare price and delivery",
       "process": "Find out how to transfer my phone number to Rogers, step by step"
     },
-    "tabsTip": "Each tab keeps its own chat. Pin a chat to keep it while you switch tabs."
+    "tabsTip": "This panel belongs to this tab; other tabs get their own chat when you open it there."
   },
   "composer": {
     "placeholder": "Ask anything…",
@@ -355,6 +353,7 @@
       "stop": "Stop",
       "resume": "Resume",
       "continue": "Continue",
+      "openPanel": "Open panel",
       "paused": {
         "user": "Paused. Resume when you are ready.",
         "interference": "Paused because you used the page. Resume when you are done.",

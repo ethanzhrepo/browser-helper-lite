@@ -12,9 +12,7 @@
   "header": {
     "newChat": "Nueva conversación",
     "history": "Historial",
-    "settings": "Ajustes",
-    "pin": "Mantener este chat al cambiar de pestaña",
-    "unpin": "Dejar de mantener este chat entre pestañas"
+    "settings": "Ajustes"
   },
   "model": {
     "choose": "Elegir un modelo",
@@ -47,7 +45,7 @@
       "compare": "Busca un cargador USB-C de 65 W en Amazon y AliExpress y compara precio y plazo de entrega",
       "process": "Averigua paso a paso cómo transferir mi número a Rogers"
     },
-    "tabsTip": "Cada pestaña tiene su propio chat. Fija uno para mantenerlo al cambiar de pestaña."
+    "tabsTip": "Este panel pertenece a esta pestaña; otras pestañas tienen su propio chat al abrirlo allí."
   },
   "composer": {
     "placeholder": "Pregunta lo que quieras…",
@@ -359,6 +357,7 @@
       "stop": "Detener",
       "resume": "Reanudar",
       "continue": "Continuar",
+      "openPanel": "Abrir panel",
       "paused": {
         "user": "En pausa. Reanuda cuando quieras.",
         "interference": "En pausa porque usaste la página. Reanuda cuando termines.",

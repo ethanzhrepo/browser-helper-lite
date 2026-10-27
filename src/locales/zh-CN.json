@@ -12,9 +12,7 @@
   "header": {
     "newChat": "新对话",
     "history": "历史记录",
-    "settings": "设置",
-    "pin": "切换标签页时保留这个对话",
-    "unpin": "不再跨标签页保留这个对话"
+    "settings": "设置"
   },
   "model": {
     "choose": "选择模型",
@@ -45,7 +43,7 @@
       "compare": "在 Amazon 和 AliExpress 上搜索 65W USB-C 充电器，对比价格和配送时间",
       "process": "查一下把手机号转入 Rogers 的办理流程，按步骤列出来"
     },
-    "tabsTip": "每个标签页有自己的对话。想在切换标签页时保留对话，点顶栏的图钉。"
+    "tabsTip": "侧边栏只属于这个标签页；在别的标签页打开时，那里是它自己的对话。"
   },
   "composer": {
     "placeholder": "有什么想问的…",
@@ -351,6 +349,7 @@
       "stop": "停止",
       "resume": "继续",
       "continue": "继续",
+      "openPanel": "打开侧边栏",
       "paused": {
         "user": "已暂停。准备好后点继续。",
         "interference": "你操作了页面，任务已暂停。完成后点继续。",

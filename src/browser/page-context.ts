@@ -1,4 +1,4 @@
-import { browser } from 'wxt/browser';
+import { browser, type Browser } from 'wxt/browser';
 import type { ContextSnapshot } from '../shared/types';
 
 export interface ActiveTab {
@@ -23,10 +23,17 @@ export interface PageExtraction {
 export const PAGE_CHAR_LIMIT = 60_000;
 export const SELECTION_CHAR_LIMIT = 20_000;
 
+const toActiveTab = (tab: Browser.tabs.Tab | undefined): ActiveTab | undefined =>
+  tab?.id === undefined ? undefined : { id: tab.id, title: tab.title ?? '', url: tab.url ?? '', favIconUrl: tab.favIconUrl };
+
+export async function getTab(tabId: number): Promise<ActiveTab | undefined> {
+  return toActiveTab(await browser.tabs.get(tabId).catch(() => undefined));
+}
+
 /**
  * The active tab of the window hosting the calling extension page. When the
- * panel itself is open as a tab (popped out, or in tests), the most recently
- * used other tab of the window is the target instead.
+ * panel itself is open as a tab (in tests), the most recently used other tab
+ * of the window is the target instead.
  */
 export async function getActiveTab(): Promise<ActiveTab | undefined> {
   const ownOrigin = new URL(browser.runtime.getURL('/')).origin;
@@ -38,8 +45,7 @@ export async function getActiveTab(): Promise<ActiveTab | undefined> {
       .filter((candidate) => !isOwnPage(candidate.url))
       .sort((a, b) => (b.lastAccessed ?? 0) - (a.lastAccessed ?? 0))[0];
   }
-  if (tab?.id === undefined) return undefined;
-  return { id: tab.id, title: tab.title ?? '', url: tab.url ?? '', favIconUrl: tab.favIconUrl };
+  return toActiveTab(tab);
 }
 
 export function truncate(text: string, limit: number): { text: string; truncated: boolean } {

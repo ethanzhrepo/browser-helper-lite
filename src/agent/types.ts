@@ -142,5 +142,5 @@ export type AgentServerMessage = { type: 'task'; task: AgentTask };
 /** Sent by the in-page overlay buttons and the user-input watcher. */
 export interface OverlayMessage {
   type: 'agent.overlay';
-  action: 'stop' | 'continue' | 'interference';
+  action: 'stop' | 'continue' | 'panel' | 'interference';
 }

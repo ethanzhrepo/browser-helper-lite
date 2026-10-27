@@ -12,9 +12,7 @@
   "header": {
     "newChat": "Nouvelle conversation",
     "history": "Historique",
-    "settings": "Paramètres",
-    "pin": "Garder cette conversation en changeant d'onglet",
-    "unpin": "Ne plus garder cette conversation entre les onglets"
+    "settings": "Paramètres"
   },
   "model": {
     "choose": "Choisir un modèle",
@@ -47,7 +45,7 @@
       "compare": "Cherche un chargeur USB-C 65 W sur Amazon et AliExpress et compare prix et délais de livraison",
       "process": "Explique-moi étape par étape comment transférer mon numéro chez Rogers"
     },
-    "tabsTip": "Chaque onglet a sa propre conversation. Épinglez-en une pour la garder en changeant d'onglet."
+    "tabsTip": "Ce panneau appartient à cet onglet ; ouvert dans un autre onglet, il y a sa propre conversation."
   },
   "composer": {
     "placeholder": "Posez votre question…",
@@ -359,6 +357,7 @@
       "stop": "Arrêter",
       "resume": "Reprendre",
       "continue": "Continuer",
+      "openPanel": "Ouvrir le panneau",
       "paused": {
         "user": "En pause. Reprenez quand vous êtes prêt.",
         "interference": "En pause car vous avez utilisé la page. Reprenez quand vous avez fini.",

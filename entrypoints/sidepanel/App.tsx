@@ -1,10 +1,11 @@
-import { History, Info, Pin, PinOff, Plug, Settings as SettingsIcon, SquarePen, X } from 'lucide-react';
+import { History, Info, Plug, Settings as SettingsIcon, SquarePen, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { browser } from 'wxt/browser';
 import { ACTIVE_STATUSES, type AgentTask } from '../../src/agent/types';
 import { useAgentTasks } from '../../src/agent/useAgentTasks';
 import { capturePage, captureSelection, type ActiveTab } from '../../src/browser/page-context';
+import { openPanel, panelTabOf } from '../../src/browser/side-panel';
 import { SLASH_COMMANDS, type SlashCommand } from '../../src/chat/commands';
 import { useConversation } from '../../src/chat/useConversation';
 import { useTabConversation } from '../../src/chat/useTabConversation';
@@ -28,6 +29,9 @@ import { MessageList } from './MessageList';
 import { ModelSwitcher } from './ModelSwitcher';
 import { OtherTasksBar } from './OtherTasksBar';
 
+/** A side panel belongs to one tab (§4.7); opened as a page (in tests), the panel follows the active tab. */
+const ownTab = panelTabOf(location.href) !== undefined;
+
 export function App() {
   const { t, i18n } = useTranslation();
   const settings = useSettings();
@@ -49,8 +53,6 @@ export function App() {
   const [pendingTaskId, setPendingTaskId] = useState<string>();
   /** Pages of other tabs attached with @. */
   const [tabContexts, setTabContexts] = useState<ContextSnapshot[]>([]);
-  /** A pinned conversation stays when you switch tabs; otherwise each tab has its own. */
-  const [pinned, setPinned] = useState(false);
   const windowTabs = useWindowTabs();
 
   // The request's turn has reported back.
@@ -58,12 +60,11 @@ export function App() {
     if (pendingTaskId && agent.tasks[pendingTaskId]) setPendingTaskId(undefined);
   }, [agent.tasks, pendingTaskId]);
 
-  // One chat per tab: switching tabs shows that tab's conversation.
+  // One chat per tab: the panel shows its tab's conversation.
   const currentTab = useRef(tab);
   currentTab.current = tab;
   const tabConversation = useTabConversation({
     tabId: tab?.id,
-    pinned,
     currentId: conversation.conversation?.id,
     busy: Boolean(activeTask) || Boolean(pendingTaskId),
     open: async (id) => {
@@ -76,17 +77,27 @@ export function App() {
     },
   });
 
-  // What you typed stays with its tab.
+  // Another tab's panel may have continued this conversation while this one was hidden.
+  const reload = conversation.reload;
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') void reload();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [reload]);
+
+  // What you typed stays with its tab (for the panel opened as a page, which follows tabs).
   const drafts = useRef(new Map<number, string>());
   const draftTab = useRef<number | undefined>(undefined);
   useEffect(() => {
-    if (pinned || tab?.id === draftTab.current) return;
+    if (tab?.id === draftTab.current) return;
     if (draftTab.current !== undefined) drafts.current.set(draftTab.current, text);
     draftTab.current = tab?.id;
     setText(tab ? (drafts.current.get(tab.id) ?? '') : '');
     setSelection(undefined);
     setTabContexts([]);
-  }, [tab?.id, pinned]);
+  }, [tab?.id]);
 
   // A page toggle only applies to the tab it was turned on for.
   useEffect(() => setIncludePage(false), [tab?.id, tab?.url]);
@@ -230,7 +241,6 @@ export function App() {
     // Tabs this conversation grouped go back to how they were (M1.5 A4).
     if (previous) agent.send({ type: 'release', conversationId: previous.id });
     if (tab) void unlinkTab(tab.id);
-    setPinned(false);
     conversation.reset();
     setPendingTaskId(undefined);
     setView('chat');
@@ -238,7 +248,6 @@ export function App() {
 
   /** A conversation opened from the history continues in this tab. */
   const openFromHistory = (id: string) => {
-    setPinned(false);
     if (tab) void linkTab(tab.id, id);
     setPendingTaskId(undefined);
     void conversation.open(id);
@@ -247,9 +256,10 @@ export function App() {
 
   /** A turn of another tab's conversation: go to its tab, which shows that conversation. */
   const showTask = (task: AgentTask) => {
-    setPinned(false);
-    void conversation.open(task.conversationId);
     const tabId = task.tabId ?? task.startTabId;
+    // This panel stays with its own tab; that tab gets its panel (we are in a click, which Chrome needs).
+    if (ownTab) openPanel(tabId).catch(() => undefined);
+    else void conversation.open(task.conversationId);
     void browser.tabs
       .get(tabId)
       .then(async (target) => {
@@ -301,17 +311,6 @@ export function App() {
           </Button>
         )}
         <div className="flex-1" />
-        {conversation.conversation && (
-          <IconButton
-            label={pinned ? t('header.unpin') : t('header.pin')}
-            onClick={() => setPinned(!pinned)}
-            aria-pressed={pinned}
-            data-testid="pin-chat"
-            className={pinned ? 'bg-accent-soft text-accent hover:bg-accent-soft-strong hover:text-accent' : ''}
-          >
-            {pinned ? <PinOff className="h-4 w-4" /> : <Pin className="h-4 w-4" />}
-          </IconButton>
-        )}
         <IconButton label={t('header.newChat')} onClick={newChat}>
           <SquarePen className="h-4 w-4" />
         </IconButton>

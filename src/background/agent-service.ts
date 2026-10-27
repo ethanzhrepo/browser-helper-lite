@@ -2,6 +2,7 @@ import type { TFunction } from 'i18next';
 import { browser, type Browser } from 'wxt/browser';
 import { z } from 'zod';
 import { AgentRunner } from '../agent/runtime';
+import { openPanel, panelTabOf } from '../browser/side-panel';
 import {
   ACTIVE_STATUSES,
   AGENT_PORT_NAME,
@@ -66,6 +67,16 @@ function persist(task: AgentTask, { now = false } = {}) {
     );
   }
   return Promise.resolve();
+}
+
+/** Each open side panel keeps a port to us, and its URL names its tab (§4.7). */
+const hasPanel = (tabId: number) => [...ports].some((port) => panelTabOf(port.sender?.url) === tabId);
+
+/** A side panel opened or closed: the overlay on its tab drops or shows its "Open panel" button. */
+function refreshOverlays(port: Browser.runtime.Port) {
+  const tabId = panelTabOf(port.sender?.url);
+  if (tabId === undefined) return;
+  for (const runner of runners.values()) if (runner.currentTabId === tabId) void runner.refreshOverlay();
 }
 
 function runnerForTab(tabId: number | undefined): AgentRunner | undefined {
@@ -156,6 +167,7 @@ async function startTask(message: Extract<AgentClientMessage, { type: 'start' }>
   const runner = new AgentRunner(task, settings, locale, history, {
     t,
     onTabOpened: (openedTabId) => linkTab(openedTabId, task.conversationId),
+    hasPanel,
     update: (next) => {
       broadcast(next);
       void persist(next);
@@ -254,7 +266,11 @@ export function registerAgentService(): void {
       return;
     }
     ports.add(port);
-    port.onDisconnect.addListener(() => ports.delete(port));
+    refreshOverlays(port);
+    port.onDisconnect.addListener(() => {
+      ports.delete(port);
+      refreshOverlays(port);
+    });
     port.onMessage.addListener((message: AgentClientMessage) => handleClientMessage(message, port));
   });
 
@@ -272,6 +288,8 @@ export function registerAgentService(): void {
     if (!runner) return undefined;
     if (message.action === 'stop') runner.stop();
     else if (message.action === 'continue') runner.overlayContinue();
+    // Synchronously, while Chrome still counts the click on the overlay as a user gesture.
+    else if (message.action === 'panel') openPanel(sender.tab!.id!).catch(() => undefined);
     else if (message.action === 'interference') runner.pause('interference');
     return undefined;
   });
@@ -281,6 +299,8 @@ export function registerAgentService(): void {
     if (!runner) return;
     const tabId = runner.currentTabId;
     void browser.notifications.clear(id);
+    // The click lets us open the side panel there, if it is not open yet.
+    openPanel(tabId).catch(() => undefined);
     void browser.tabs.get(tabId).then(async (tab) => {
       await browser.windows.update(tab.windowId, { focused: true });
       await browser.tabs.update(tabId, { active: true });

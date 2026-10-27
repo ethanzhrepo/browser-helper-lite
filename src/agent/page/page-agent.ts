@@ -358,7 +358,7 @@ export function createPageAgent(): PageAgentApi {
       [hidden] { display: none !important; }
     </style>
     <div class="frame" hidden></div>
-    <div class="bar" hidden><i class="dot"></i><span></span><button class="primary" data-action="continue" hidden></button><button data-action="stop"></button></div>
+    <div class="bar" hidden><i class="dot"></i><span></span><button class="primary" data-action="continue" hidden></button><button data-action="panel" hidden></button><button data-action="stop"></button></div>
     <svg class="cursor" viewBox="0 0 24 24"><defs><linearGradient id="bh-g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2a7d66"/><stop offset="1" stop-color="#185747"/></linearGradient></defs><path d="M4 2l15 11-6.5 1 4 7.5-3 1.5-4-7.5L4 20z" fill="url(#bh-g)" stroke="#fff" stroke-width="1.6" stroke-linejoin="round"/></svg>
     <div class="boxes"></div>`;
   const frame = root.querySelector<HTMLDivElement>('.frame')!;
@@ -366,14 +366,16 @@ export function createPageAgent(): PageAgentApi {
   const barText = bar.querySelector('span')!;
   const stopButton = bar.querySelector<HTMLButtonElement>('[data-action="stop"]')!;
   const continueButton = bar.querySelector<HTMLButtonElement>('[data-action="continue"]')!;
+  const panelButton = bar.querySelector<HTMLButtonElement>('[data-action="panel"]')!;
   const cursor = root.querySelector<SVGElement>('.cursor')!;
   const boxes = root.querySelector<HTMLDivElement>('.boxes')!;
 
-  const notify = (action: 'stop' | 'continue' | 'interference') => {
+  const notify = (action: 'stop' | 'continue' | 'panel' | 'interference') => {
     void browser.runtime.sendMessage({ type: 'agent.overlay', action }).catch(() => undefined);
   };
   stopButton.addEventListener('click', () => notify('stop'));
   continueButton.addEventListener('click', () => notify('continue'));
+  panelButton.addEventListener('click', () => notify('panel'));
 
   const mount = () => {
     if (!host.isConnected) document.documentElement.appendChild(host);
@@ -779,6 +781,10 @@ export function createPageAgent(): PageAgentApi {
       stopButton.textContent = state.stopLabel;
       continueButton.hidden = !state.continueLabel;
       continueButton.textContent = state.continueLabel ?? '';
+      panelButton.hidden = !state.panelLabel;
+      panelButton.textContent = state.panelLabel ?? '';
+      // Waiting for an answer in the panel: opening it is the next step.
+      panelButton.classList.toggle('primary', state.mode === 'waiting' && !state.continueLabel);
       if (state.mode !== 'running') cursor.style.display = 'none';
       return true;
     },

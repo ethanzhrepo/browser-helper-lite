@@ -58,6 +58,46 @@ export async function openPanel(context: BrowserContext, extensionId: string, he
   return panel;
 }
 
+/** The browser's id for a page's tab (pages must have distinct URLs). */
+export async function tabIdOf(context: BrowserContext, page: Page): Promise<number> {
+  const worker = context.serviceWorkers()[0] ?? (await context.waitForEvent('serviceworker'));
+  return worker.evaluate(async (url) => (await chrome.tabs.query({})).find((tab) => tab.url === url)!.id!, page.url());
+}
+
+/** The panel page of one tab, as Chrome opens it in that tab's side panel, but opened as a tab here. */
+export async function openPanelFor(context: BrowserContext, extensionId: string, site: Page): Promise<Page> {
+  const panel = await context.newPage();
+  await panel.setViewportSize({ width: 420, height: 820 });
+  await panel.goto(`chrome-extension://${extensionId}/sidepanel.html?tab=${await tabIdOf(context, site)}`);
+  return panel;
+}
+
+/**
+ * A button of the agent's overlay, read through its closed shadow root with
+ * CDP: undefined while hidden, else its label and a way to click it.
+ */
+export async function overlayButton(site: Page, action: 'stop' | 'continue' | 'panel') {
+  type DomNode = { nodeId: number; nodeType: number; nodeValue: string; attributes?: string[]; children?: DomNode[]; shadowRoots?: DomNode[] };
+  const cdp = await site.context().newCDPSession(site);
+  try {
+    const { root } = (await cdp.send('DOM.getDocument', { depth: -1, pierce: true })) as { root: DomNode };
+    const attribute = (node: DomNode, name: string) => {
+      const index = node.attributes?.findIndex((value, i) => i % 2 === 0 && value === name) ?? -1;
+      return index < 0 ? undefined : node.attributes![index + 1];
+    };
+    const find = (node: DomNode): DomNode | undefined =>
+      attribute(node, 'data-action') === action ? node : [...(node.children ?? []), ...(node.shadowRoots ?? [])].map(find).find(Boolean);
+    const button = find(root);
+    if (!button || attribute(button, 'hidden') !== undefined) return undefined;
+    const { model } = (await cdp.send('DOM.getBoxModel', { nodeId: button.nodeId })) as { model: { content: number[] } };
+    const [x1, y1, , , x3, y3] = model.content;
+    const label = button.children?.find((child) => child.nodeType === 3)?.nodeValue ?? '';
+    return { label, click: () => site.mouse.click((x1! + x3!) / 2, (y1! + y3!) / 2) };
+  } finally {
+    await cdp.detach();
+  }
+}
+
 /** Opens a site, then the panel as a tab; the panel targets the site (its most recent other tab). */
 export async function openSiteAndPanel(context: BrowserContext, extensionId: string, url: string) {
   const site = await context.newPage();

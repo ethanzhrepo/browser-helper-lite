@@ -49,6 +49,13 @@ export default defineConfig({
     optional_host_permissions: ['<all_urls>'],
     ...(e2eGrantAllHosts ? { host_permissions: ['<all_urls>'] } : {}),
   },
+  hooks: {
+    // No global side panel, which would show on every tab: it opens per tab,
+    // from the toolbar button (background.ts, §4.7).
+    'build:manifestGenerated': (_wxt, manifest) => {
+      delete manifest.side_panel;
+    },
+  },
   vite: () => ({
     plugins: [tailwindcss()],
     define: {

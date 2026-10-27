@@ -75,6 +75,9 @@ export class AgentBrowser {
       onDebuggerDetached: (reason: string) => void;
       /** A tab the agent opened (or a page opened for it); it belongs to the same conversation. */
       onTabOpened?: (tabId: number) => Promise<void>;
+      /** Whether the side panel is open on a tab; where it is not, the overlay offers to open it. */
+      hasPanel?: (tabId: number) => boolean;
+      panelLabel?: string;
     },
   ) {
     this.currentTabId = startTabId;
@@ -159,12 +162,18 @@ export class AgentBrowser {
 
   async setOverlay(state: OverlayState): Promise<void> {
     this.overlay = state;
-    await this.quiet('setOverlay', state);
+    await this.showOverlay();
   }
 
-  /** Re-applies the overlay after navigation wiped it. */
+  /** Re-applies the overlay after navigation wiped it, or the side panel opened or closed. */
   async refreshOverlay(): Promise<void> {
-    if (this.overlay.mode !== 'hidden') await this.quiet('setOverlay', this.overlay);
+    if (this.overlay.mode !== 'hidden') await this.showOverlay();
+  }
+
+  private async showOverlay(): Promise<void> {
+    const { hasPanel, panelLabel } = this.options;
+    const offerPanel = this.overlay.mode !== 'hidden' && hasPanel && !hasPanel(this.currentTabId);
+    await this.quiet('setOverlay', { ...this.overlay, panelLabel: offerPanel ? panelLabel : undefined });
   }
 
   // ---- Tabs ----

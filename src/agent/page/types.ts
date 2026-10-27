@@ -74,6 +74,8 @@ export interface OverlayState {
   message: string;
   stopLabel: string;
   continueLabel?: string;
+  /** A button that opens the side panel, on a tab where it is not open (§4.7). */
+  panelLabel?: string;
 }
 
 export type PageResult<T> = { ok: true; value: T } | { ok: false; error: string };

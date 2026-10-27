@@ -28,6 +28,8 @@ export interface RunnerDeps {
   update(task: AgentTask): void;
   /** The agent opened a tab; it shows the same conversation. */
   onTabOpened(tabId: number): Promise<void>;
+  /** Whether the side panel is open on a tab (§4.7). */
+  hasPanel(tabId: number): boolean;
   /** The task started waiting for the user. */
   onWaiting(task: AgentTask): void;
   saveSitePolicy(host: string, policy: SitePolicy): Promise<void>;
@@ -160,6 +162,8 @@ export class AgentRunner {
     this.ctl = new AgentBrowser(task.startTabId, {
       groupTitle: deps.t('agent.groupTitle'),
       onTabOpened: (tabId) => deps.onTabOpened(tabId),
+      hasPanel: (tabId) => deps.hasPanel(tabId),
+      panelLabel: deps.t('agent.overlay.openPanel'),
       onDebuggerDetached: (reason) => {
         if (this.task.driver) this.task.driver = 'dom';
         // The user closed Chrome's debugging bar: pause so they can decide.
@@ -175,6 +179,11 @@ export class AgentRunner {
 
   get currentTabId(): number {
     return this.ctl.currentTabId;
+  }
+
+  /** The side panel opened or closed somewhere: the overlay offers it where it is not open. */
+  refreshOverlay(): Promise<void> {
+    return this.ctl.refreshOverlay();
   }
 
   /** Mode and site policy changes apply to the running turn right away. */
