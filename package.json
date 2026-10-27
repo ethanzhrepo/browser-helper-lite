@@ -3,6 +3,14 @@
   "description": "BYOK, vendor-neutral AI side panel assistant for Chrome",
   "private": true,
   "version": "0.1.0",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ethanzhrepo/browser-helper-lite.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ethanzhrepo/browser-helper-lite/issues"
+  },
   "type": "module",
   "scripts": {
     "dev": "wxt",

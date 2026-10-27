@@ -1,5 +1,7 @@
 import tailwindcss from '@tailwindcss/vite';
+import path from 'node:path';
 import { defineConfig } from 'wxt';
+import { thirdPartyLicenses } from './scripts/third-party-licenses';
 
 /**
  * Build flag: when true (default) the manifest declares the `debugger`
@@ -54,6 +56,14 @@ export default defineConfig({
     // from the toolbar button (background.ts, §4.7).
     'build:manifestGenerated': (_wxt, manifest) => {
       delete manifest.side_panel;
+    },
+    // The license, and the notices of the dependencies bundled into it, ship
+    // with every build anyone could pass on.
+    'build:publicAssets': (wxt, files) => {
+      files.push({ absoluteSrc: path.resolve('LICENSE'), relativeDest: 'LICENSE' });
+      if (wxt.config.command === 'build') {
+        files.push({ contents: thirdPartyLicenses(), relativeDest: 'THIRD_PARTY_LICENSES.txt' });
+      }
     },
   },
   vite: () => ({
