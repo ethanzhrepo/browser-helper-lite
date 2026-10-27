@@ -313,8 +313,12 @@ export function createPageAgent(): PageAgentApi {
     ['all', 'initial'], ['position', 'fixed'], ['inset', '0'], ['pointer-events', 'none'], ['z-index', '2147483647'],
     ['display', 'block'], ['opacity', '1'], ['visibility', 'visible'], ['transform', 'none'], ['filter', 'none'], ['clip-path', 'none'],
   ];
+  // Compared as the browser serializes it: Chrome reads `inset: 0` back as `0px` and
+  // `all` as empty, so comparing with HOST_STYLE would restyle (and observe) forever.
+  let hostCss = '';
   const styleHost = () => {
     for (const [name, value] of HOST_STYLE) host.style.setProperty(name, value, 'important');
+    hostCss = host.style.cssText;
   };
   styleHost();
   const root = host.attachShadow({ mode: 'closed' });
@@ -378,10 +382,10 @@ export function createPageAgent(): PageAgentApi {
   new MutationObserver(() => {
     if (overlayMode === 'hidden') return;
     mount();
-    if (HOST_STYLE.some(([name, value]) => host.style.getPropertyValue(name) !== value || host.style.getPropertyPriority(name) !== 'important')) styleHost();
+    if (host.style.cssText !== hostCss) styleHost();
   }).observe(document.documentElement, { childList: true, subtree: false });
   new MutationObserver(() => {
-    if (HOST_STYLE.some(([name, value]) => host.style.getPropertyValue(name) !== value)) styleHost();
+    if (host.style.cssText !== hostCss) styleHost();
   }).observe(host, { attributes: true, attributeFilter: ['style', 'hidden', 'class'] });
 
   // Real (trusted) input from the user while the agent runs pauses the task (§4.3).
