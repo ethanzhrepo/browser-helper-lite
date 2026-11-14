@@ -270,6 +270,13 @@ export function scriptedAssistant(messages: ChatMessage[]): Reply {
     return say('Opened the cable guide in a new tab.');
   }
 
+  // Searches, then reads a result by address when the read_url tool is offered.
+  if (request.includes('TEST-READURL')) {
+    if (!used('web_search')) return say('Searching.', 'web_search', { query: 'braided cable durability' });
+    if (!used('read_url')) return say('Reading the guide.', 'read_url', { url: 'https://cables.example/guide' });
+    return say(`The guide says: ${/Fetched guide: [^\n<]+/.exec(results)?.[0] ?? 'nothing'}`);
+  }
+
   if (request.includes('TEST-SEARCH')) {
     if (!used('web_search')) return say('Searching.', 'web_search', { query: 'braided cable durability' });
     const top = /1\. (.+?) —/.exec(results)?.[1] ?? 'nothing';
@@ -344,7 +351,9 @@ export async function startMockServer({ assistant = scriptedAssistant, pages = {
   const chatRequests: ChatRequest[] = [];
   const extractRequests: ChatRequest[] = [];
   const lookRequests: ChatRequest[] = [];
-  const searchRequests: { query: string; count?: number }[] = [];
+  const searchRequests: { query: string; count?: number; ori_question?: string }[] = [];
+  const fetchRequests: { url: string }[] = [];
+  const webSearchRequests: ChatRequest[] = [];
   /** Every path requested, to prove that nothing reached an attacker endpoint. */
   const hits: string[] = [];
   const transcriptions: { bytes: number; contentType: string }[] = [];
@@ -382,12 +391,60 @@ export async function startMockServer({ assistant = scriptedAssistant, pages = {
     // DeepSeek's search tool.
     if (req.url === '/v1/tools/search' && req.method === 'POST') {
       if (!authorized) return void unauthorized();
-      const body = JSON.parse((await readBody(req)).toString()) as { query: string; count?: number };
+      const body = JSON.parse((await readBody(req)).toString()) as { query: string; count?: number; ori_question?: string };
       searchRequests.push(body);
       return void json({
         results: [
-          { title: 'Braided cables last longer – Lab test', url: `http://${req.headers.host}/review.html`, snippet: 'short', summary: 'Braided cables survived 10x more bends.', rerank_score: 2.4 },
+          { title: 'Braided cables last longer – Lab test', url: `http://${req.headers.host}/review.html`, snippet: 'short', summary: 'Braided cables survived 10x more bends.', rerank_score: 2.4, site_name: 'Cable Lab', date: '2026-06-01T00:00:00+00:00', authority: 3 },
+          // The same page in another language.
+          { title: 'Les câbles tressés durent plus longtemps', url: `http://${req.headers.host}/review.html?hl=fr`, snippet: 'court', summary: 'Dix fois plus de pliages.', rerank_score: 2.3 },
           { title: 'Cable buying guide', url: `http://${req.headers.host}/shop.html`, snippet: 'Cables from $5.' },
+          { title: 'How long cables last', url: 'https://cables.example/guide', summary: 'A public guide.', site_name: 'Cables Example' },
+        ],
+      });
+    }
+    // DeepSeek's fetch tool: any public page, as Markdown.
+    if (req.url === '/v1/tools/fetch' && req.method === 'POST') {
+      if (!authorized) return void unauthorized();
+      const body = JSON.parse((await readBody(req)).toString()) as { url: string };
+      fetchRequests.push(body);
+      if (body.url.includes('missing')) return void json({ error: { message: 'failed to fetch URL', type: 'not_found_error', param: null, code: 'invalid_request_error' } }, 404);
+      return void json({ title: 'How long cables last', content: `# How long cables last\n\nFetched guide: braided cables last 10 years. (${body.url})` });
+    }
+    // DeepSeek's chat endpoint with its own web search tool (no /v1 in the path).
+    if (req.url === '/chat/completions' && req.method === 'POST') {
+      if (!authorized) return void unauthorized();
+      const body = JSON.parse((await readBody(req)).toString()) as ChatRequest;
+      webSearchRequests.push(body);
+      return void json({
+        choices: [
+          {
+            finish_reason: 'stop',
+            message: {
+              role: 'assistant',
+              content: '1. **Cable lab test** — braided cables survived ten times more bends.',
+              annotations: [{ type: 'url_citation', url_citation: { url: 'https://lab.example/test#1', title: 'Cable lab test', start_index: 0, end_index: 10 } }],
+              server_tool_calls: [
+                {
+                  index: 0,
+                  calls: [
+                    {
+                      index: 0,
+                      id: 'srvtoolu_s_00',
+                      type: 'deepseek_web_search',
+                      kind: 'search',
+                      action: { type: 'search', queries: ['braided cables'] },
+                      status: 'completed',
+                      sources: [
+                        { type: 'url', url: 'https://lab.example/test?hl=fr', title: 'Test de câbles' },
+                        { type: 'url', url: 'https://shop.example/cables', title: 'Cable shop', snippet: 'From $5.' },
+                      ],
+                    },
+                  ],
+                },
+              ],
+            },
+          },
         ],
       });
     }
@@ -427,6 +484,8 @@ export async function startMockServer({ assistant = scriptedAssistant, pages = {
     extractRequests,
     lookRequests,
     searchRequests,
+    fetchRequests,
+    webSearchRequests,
     transcriptions,
     hits,
     close: () => new Promise<void>((resolve) => server.close(() => resolve())),

@@ -147,7 +147,7 @@ export function AgentRunView({ task, onSend }: { task: AgentTask; onSend: (messa
                         >
                           {actionLabel(t, action)}
                         </span>
-                        {action.tool === 'web_search' && action.target && (
+                        {(action.tool === 'web_search' || action.tool === 'read_url') && action.target && (
                           <span className="ml-1.5 rounded bg-subtle px-1 py-px text-[10px] text-faint">{action.target}</span>
                         )}
                         {(action.status === 'error' || action.status === 'rejected') && action.result && (

@@ -25,6 +25,8 @@ export const DEFAULT_SEARCH_SETTINGS: SearchSettings = {
   provider: 'browser',
   engine: 'google',
   customUrl: '',
+  deepseekQuestion: false,
+  deepseekFetch: true,
   cloudflare: { accountId: '', gatewayId: 'default', source: 'ceramic' },
   fallbackToBrowser: true,
 };

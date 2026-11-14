@@ -2,7 +2,8 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { fakeBrowser } from 'wxt/testing/fake-browser';
 import type { AgentTask } from '../../src/agent/types';
 import type { Connection } from '../../src/shared/types';
-import { buildBackup, parseBackup, restoreBackup } from '../../src/storage/backup';
+import { buildBackup, decryptBackup, parseBackup, readBackupFile, restoreBackup, serializeBackup } from '../../src/storage/backup';
+import { seal, unseal, WrongPasswordError } from '../../src/storage/backup-crypto';
 import {
   appendMessage,
   clearConversations,
@@ -278,6 +279,59 @@ describe('backups', () => {
     expect(await getApiKey('a')).toBeUndefined();
     // The connection whose address did not change keeps its key.
     expect(await getApiKey('b')).toBe('sk-other');
+  });
+
+  it('encrypts a backup with a password and opens it only with that password', async () => {
+    await saveConnection(connection('a'), 'sk-secret');
+    const conversation = await createConversation('Private plans');
+    await appendMessage({ conversationId: conversation.id, role: 'user', content: 'My salary is 1234', status: 'done' });
+    const text = await serializeBackup(await buildBackup({ includeKeys: true }), 'correct horse');
+    // Nothing of the content is readable in the file.
+    for (const secret of ['sk-secret', 'Private plans', 'salary', 'api.example']) expect(text).not.toContain(secret);
+    const read = readBackupFile(text);
+    if (!('encrypted' in read)) throw new Error('expected an encrypted file');
+    expect(read.encrypted.encrypted).toMatchObject({ cipher: 'AES-256-GCM', kdf: 'PBKDF2-SHA256', iterations: 600_000 });
+    await expect(decryptBackup(read.encrypted, 'wrong horse')).rejects.toBeInstanceOf(WrongPasswordError);
+
+    await clearConversations();
+    fakeBrowser.reset();
+    const summary = await restoreBackup(await decryptBackup(read.encrypted, 'correct horse'));
+    expect(summary).toMatchObject({ settings: true, conversations: 1, keys: 1 });
+    expect(await getApiKey('a')).toBe('sk-secret');
+    expect((await getMessages(conversation.id))[0]!.content).toBe('My salary is 1234');
+  });
+
+  it('writes API keys only into an encrypted file, and can leave conversations out', async () => {
+    await saveConnection(connection('a'), 'sk-secret');
+    await createConversation('Hello');
+    await expect(serializeBackup(await buildBackup({ includeKeys: true }))).rejects.toThrow(/encrypted/);
+    const settingsOnly = await buildBackup({ includeKeys: false, includeConversations: false });
+    expect(settingsOnly.conversations).toBeUndefined();
+    const read = readBackupFile(await serializeBackup(settingsOnly));
+    if (!('backup' in read)) throw new Error('expected a plain file');
+    expect(read.backup.settings!.connections).toHaveLength(1);
+    // Applying it changes the settings and leaves the conversations here alone.
+    expect(await restoreBackup(read.backup)).toMatchObject({ settings: true, conversations: 0 });
+    expect(await listConversations()).toHaveLength(1);
+  });
+
+  it('gives a different file each time, and notices any change to one', async () => {
+    const first = await seal('{"a":1}', 'password-1', 100_000);
+    const second = await seal('{"a":1}', 'password-1', 100_000);
+    expect(first.salt).not.toBe(second.salt);
+    expect(first.data).not.toBe(second.data);
+    expect(await unseal(first, 'password-1')).toBe('{"a":1}');
+    // The same password however it was typed (full-width letters, here).
+    expect(await unseal(first, 'ｐａｓｓｗｏｒｄ-1')).toBe('{"a":1}');
+    const flipped = atob(first.data).split('');
+    flipped[0] = String.fromCharCode(flipped[0]!.charCodeAt(0) ^ 1);
+    await expect(unseal({ ...first, data: btoa(flipped.join('')) }, 'password-1')).rejects.toBeInstanceOf(WrongPasswordError);
+    // A file may not ask for a key derivation too weak to protect it, or too long to wait for.
+    await expect(unseal({ ...first, iterations: 1 }, 'password-1')).rejects.toThrow(/Damaged/);
+    await expect(unseal({ ...first, iterations: 1e12 }, 'password-1')).rejects.toThrow(/Damaged/);
+    await expect(unseal({ ...first, iv: btoa('short') }, 'password-1')).rejects.toThrow(/Damaged/);
+    expect(() => readBackupFile(JSON.stringify({ app: 'browser-helper-lite', version: 1, exportedAt: 1, encrypted: { ...first, iterations: 1 } }))).toThrow();
+    expect(() => readBackupFile(JSON.stringify({ app: 'something-else', version: 1, exportedAt: 1, encrypted: first }))).toThrow();
   });
 
   it('rejects files that are not backups', () => {

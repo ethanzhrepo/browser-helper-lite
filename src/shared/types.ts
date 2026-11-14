@@ -77,8 +77,12 @@ export interface SearchSettings {
   engine: SearchEngineSetting;
   /** For the custom engine; `%s` is replaced by the query. */
   customUrl: string;
-  /** DeepSeek search reuses the key of a DeepSeek connection. */
+  /** DeepSeek search uses the key of this DeepSeek connection, or its own key (DEEPSEEK_OWN_KEY). */
   deepseekConnectionId?: string;
+  /** Send the start of the user's message with each DeepSeek search (`ori_question`), so it understands the search better. */
+  deepseekQuestion: boolean;
+  /** With DeepSeek search: let the assistant read public pages through DeepSeek's Fetch API, without opening a tab. */
+  deepseekFetch: boolean;
   cloudflare: { accountId: string; gatewayId: string; source: CloudflareSearchSource };
   /** Search in the browser when the API fails. */
   fallbackToBrowser: boolean;

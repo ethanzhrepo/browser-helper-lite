@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { browser } from 'wxt/browser';
 import { requestHostAccess } from '../../src/permissions/hosts';
-import { SEARCH_KEY_URLS, searchEndpoint } from '../../src/search/search';
+import { DEEPSEEK_OWN_KEY, deepseekConnection, deepseekConnections, SEARCH_KEY_URLS, searchEndpoint } from '../../src/search/search';
 import type { SearchTestRequest, SearchTestResult } from '../../src/shared/protocol';
 import type { CloudflareSearchSource, SearchEngineSetting, SearchProviderId, SearchSettings, Settings } from '../../src/shared/types';
 import { getSearchKey, saveSearchKey, updateSettings } from '../../src/storage/settings';
@@ -24,7 +24,7 @@ const PROVIDERS: { id: SearchProviderId; icon: LucideIcon }[] = [
 const ENGINES: SearchEngineSetting[] = ['google', 'bing', 'duckduckgo', 'custom'];
 const CLOUDFLARE_SOURCES: CloudflareSearchSource[] = ['ceramic', 'exa', 'linkup'];
 
-/** Providers whose key is entered here (DeepSeek reuses a connection's key). */
+/** Providers whose key is always entered here. DeepSeek can use a connection's key instead. */
 const OWN_KEY = new Set<SearchProviderId>(['cloudflare', 'tavily', 'brave', 'exa']);
 
 function saveSearch(patch: Partial<SearchSettings>) {
@@ -183,7 +183,8 @@ export function SearchSection({ settings }: { settings: Settings }) {
   const [accountId, setAccountId] = useDraft(search.cloudflare.accountId);
   const [gatewayId, setGatewayId] = useDraft(search.cloudflare.gatewayId);
   const [keyDraft, setKeyDraft] = useState('');
-  const deepseekConnections = settings.connections.filter((c) => c.vendor === 'deepseek');
+  const deepseek = deepseekConnections(settings.connections);
+  const deepseekUses = deepseekConnection(search, settings.connections);
 
   const engineField = (
     <Field label={t('search.engine')} htmlFor="search-engine" hint={provider === 'browser' ? undefined : t('search.engineFallbackHint')}>
@@ -221,30 +222,23 @@ export function SearchSection({ settings }: { settings: Settings }) {
       </div>
 
       <Card className="space-y-4 p-5">
-        {provider === 'deepseek' &&
-          (deepseekConnections.length === 0 ? (
-            <p className="text-sm text-muted">
-              {t('search.deepseekNoConnection')}{' '}
-              <a href="#providers" className="text-accent underline">
-                {t('slots.addConnection')}
-              </a>
-            </p>
-          ) : (
-            <Field label={t('search.deepseekConnection')} htmlFor="deepseek-connection" hint={t('search.deepseekHint')}>
-              <select
-                id="deepseek-connection"
-                className={inputClass}
-                value={search.deepseekConnectionId ?? deepseekConnections[0]!.id}
-                onChange={(e) => saveSearch({ deepseekConnectionId: e.target.value })}
-              >
-                {deepseekConnections.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
-            </Field>
-          ))}
+        {provider === 'deepseek' && deepseek.length > 0 && (
+          <Field label={t('search.deepseekConnection')} htmlFor="deepseek-connection" hint={deepseekUses ? t('search.deepseekHint') : undefined}>
+            <select
+              id="deepseek-connection"
+              className={inputClass}
+              value={deepseekUses?.id ?? DEEPSEEK_OWN_KEY}
+              onChange={(e) => saveSearch({ deepseekConnectionId: e.target.value })}
+            >
+              {deepseek.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+              <option value={DEEPSEEK_OWN_KEY}>{t('search.deepseekOwnKey')}</option>
+            </select>
+          </Field>
+        )}
 
         {provider === 'cloudflare' && (
           <div className="grid gap-4 sm:grid-cols-2">
@@ -285,7 +279,25 @@ export function SearchSection({ settings }: { settings: Settings }) {
           </div>
         )}
 
-        {OWN_KEY.has(provider) && <KeyField provider={provider} onDraft={setKeyDraft} />}
+        {(OWN_KEY.has(provider) || (provider === 'deepseek' && !deepseekUses)) && <KeyField provider={provider} onDraft={setKeyDraft} />}
+        {provider === 'deepseek' && (
+          <Toggle
+            id="deepseek-question"
+            checked={search.deepseekQuestion}
+            onChange={(deepseekQuestion) => saveSearch({ deepseekQuestion })}
+            label={t('search.deepseekQuestion')}
+            hint={t('search.deepseekQuestionHint')}
+          />
+        )}
+        {provider === 'deepseek' && (
+          <Toggle
+            id="deepseek-fetch"
+            checked={search.deepseekFetch}
+            onChange={(deepseekFetch) => saveSearch({ deepseekFetch })}
+            label={t('search.deepseekFetch')}
+            hint={t('search.deepseekFetchHint')}
+          />
+        )}
         {provider === 'native' && <p className="text-sm leading-relaxed text-muted">{t('search.nativeHint')}</p>}
 
         <div className="grid gap-4 sm:grid-cols-2">

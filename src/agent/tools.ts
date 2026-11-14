@@ -4,6 +4,15 @@ import { z } from 'zod';
 const index = z.number().int().min(1).describe('Element number from the latest page view, e.g. 12 for [12]');
 const url = z.string().describe('Absolute URL, e.g. https://www.example.com/page');
 
+const SEARCH_DESCRIPTION =
+  'Search the web and return the top results (title, URL, snippet). Use it when the current site lacks the information, then verify on the source when possible.';
+
+/** What DeepSeek's search understands in a query, told to the model when that search is in use. */
+const DEEPSEEK_SEARCH_SYNTAX =
+  ' The query takes at most 128 characters and these operators: site:example.com (several joined with OR), -site:example.com, "exact phrase", -word, lang:en (or lang:zh,en), after:2025-01-01, before:2026. Add lang: when results should be in one language.';
+
+const searchTool = (description: string) => tool({ description, inputSchema: z.object({ query: z.string() }) });
+
 /**
  * The assistant's tools (§7.3, M1.5). They have no `execute`: the runtime runs
  * them itself so it can check risk, ask for approval, and observe the page.
@@ -29,11 +38,7 @@ export const assistantTools = {
       'Look at a screenshot of the viewport (elements are outlined with their numbers) and answer a question. Use it for icons, images, colors, calendars, charts, canvas content or anything the text does not show.',
     inputSchema: z.object({ question: z.string() }),
   }),
-  web_search: tool({
-    description:
-      'Search the web and return the top results (title, URL, snippet). Use it when the current site lacks the information, then verify on the source when possible.',
-    inputSchema: z.object({ query: z.string() }),
-  }),
+  web_search: searchTool(SEARCH_DESCRIPTION),
   navigate: tool({ description: 'Open a URL in the current tab.', inputSchema: z.object({ url }) }),
   click: tool({ description: 'Click an element.', inputSchema: z.object({ index }) }),
   click_at: tool({
@@ -97,11 +102,25 @@ export const assistantTools = {
 
 export type AssistantToolName = keyof typeof assistantTools;
 
+/** Offered only when pages can be read through DeepSeek's Fetch API. */
+const readUrlTool = tool({
+  description:
+    'Read a public web page by its address without opening it, and get its text. Use it for search results, articles and documentation you only need to read. It does not see pages behind the user\'s login and cannot interact: open those in the tab instead.',
+  inputSchema: z.object({ url }),
+});
+
+/** The tools for a task: the search tool described for the provider that will run it, and `read_url` when DeepSeek reads pages. */
+export function toolsFor(search: { provider: string; deepseekFetch?: boolean }) {
+  if (search.provider !== 'deepseek') return assistantTools;
+  const tools = { ...assistantTools, web_search: searchTool(SEARCH_DESCRIPTION + DEEPSEEK_SEARCH_SYNTAX) };
+  return search.deepseekFetch ? { ...tools, read_url: readUrlTool } : tools;
+}
+
 /** Tools that act on an element of the current page. */
 export const ELEMENT_TOOLS = new Set<string>(['click', 'type', 'hover', 'select_option']);
 
 /** Tools that only read; they never take over the tab. */
-export const READING_TOOLS = new Set<string>(['read_page', 'view_page', 'extract', 'look', 'web_search', 'ask_user']);
+export const READING_TOOLS = new Set<string>(['read_page', 'view_page', 'extract', 'look', 'web_search', 'read_url', 'ask_user']);
 
 /** Tools after which the model gets a fresh page view. */
 export const VIEW_AFTER = new Set<string>([

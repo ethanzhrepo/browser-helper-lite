@@ -15,7 +15,7 @@ An AI assistant in Chrome's side panel that works with the model and API key of 
 - **You stay in control**: three modes, Query (read only), Auto (asks before payments, deletions and other high-risk steps) and Manual approval (asks before every change), plus per-site rules. Pause, stop or take over at any time.
 - **Quick to reach**: open the panel with <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>H</kbd>, or right-click a page to summarize it or ask about the selected text.
 - **Defends against prompt injection**: hidden page text never reaches the model, page content cannot pass as instructions, and links that would carry your data out need your approval. See [docs/security](docs/security/README.md).
-- **No server of its own**: conversations stay in your browser, and requests go straight to the provider you configure. Export, import or erase everything under Settings › Data.
+- **No server of its own**: conversations stay in your browser, and requests go straight to the provider you configure. Export (encrypted with a password), import or erase everything under Settings › Data.
 
 The interface is available in English, 简体中文, Français and Español.
 
@@ -86,6 +86,8 @@ The design notes ([docs/product-design.md](docs/product-design.md)) and security
 ## Privacy
 
 Conversations are stored locally in the browser. Requests go directly from the extension to your model provider. API keys stay in the extension's storage and are never exposed to web pages. Requests to OpenAI set `store: false`. Screenshots the assistant looks at go to the model that reads them, and are not taken by themselves on sign-in, account or payment pages. Deleting a conversation erases its messages and the pages attached to them.
+
+A web search sends the query to the search provider you choose. With DeepSeek search, public pages the assistant only needs to read are fetched by DeepSeek instead of opened in a tab, so their addresses go to DeepSeek (turn it off under Settings › Search). You can also send the first 128 characters of your message with each search for better results; that is off unless you turn it on. An export is encrypted with a password of your choice (AES-256-GCM, key from PBKDF2-SHA-256); API keys are exported only in an encrypted file.
 
 Once a day the extension asks GitHub for this project's latest release number, to tell you about updates. The request carries nothing about you; turn it off under Settings › About.
 

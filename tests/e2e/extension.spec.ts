@@ -223,17 +223,73 @@ test('web search through the DeepSeek search API', async () => {
   const options = await context.newPage();
   await options.goto(`chrome-extension://${extensionId}/options.html#search`);
   await expect(options.getByTestId('search-provider-deepseek').locator('input')).toBeChecked();
+  // The key comes from the connection, or is entered here.
+  const keySource = options.locator('#deepseek-connection');
+  await expect(keySource).toHaveValue('ds');
+  await expect(options.locator('#search-key')).toHaveCount(0);
+  await keySource.selectOption('search-key');
+  await expect(options.locator('#search-key')).toBeVisible();
+  await keySource.selectOption('ds');
+  await expect(options.locator('#search-key')).toHaveCount(0);
   await options.getByTestId('search-test').click();
   await expect(options.getByTestId('search-test-results')).toContainText('Braided cables last longer – Lab test');
+  // The French copy of the first page is not listed again.
+  await expect(options.getByTestId('search-test-results').locator('li')).toHaveCount(3);
   await screenshot(options, 'options-search-deepseek');
-  await options.close();
 
   await ask(panel, 'TEST-SEARCH: are braided cables better?');
   const run = panel.getByTestId('agent-run');
   await expect(run).toHaveAttribute('data-status', 'done', { timeout: 20_000 });
   await expect(run.locator('[data-tool="web_search"]')).toContainText('DeepSeek');
   await expect(panel.getByTestId('assistant-message').last()).toContainText('The top result is Braided cables last longer – Lab test');
-  expect(server.searchRequests.at(-1)).toEqual({ query: 'braided cable durability', count: 8 });
+  // The question stays here unless the user turned that on.
+  expect(server.searchRequests.at(-1)).toEqual({ query: 'braided cable durability', count: 16 });
+
+  await options.locator('#deepseek-question').click();
+  await expect.poll(() => options.evaluate(async () => (await chrome.storage.local.get('settings:v1'))['settings:v1'].search.deepseekQuestion)).toBe(true);
+  await options.close();
+  const searches = server.searchRequests.length;
+  await ask(panel, 'TEST-SEARCH: are braided cables better?');
+  await expect.poll(() => server.searchRequests.length, { timeout: 20_000 }).toBe(searches + 1);
+  expect(server.searchRequests.at(-1)).toEqual({ query: 'braided cable durability', count: 16, ori_question: 'TEST-SEARCH: are braided cables better?' });
+
+  // A search result is read through DeepSeek's Fetch API: no tab is opened for it.
+  const tabs = context.pages().length;
+  await ask(panel, 'TEST-READURL: how long do braided cables last?');
+  await expect(panel.getByTestId('assistant-message').last()).toContainText('The guide says: Fetched guide: braided cables last 10 years.', { timeout: 20_000 });
+  await expect(panel.getByTestId('agent-run').last().locator('[data-tool="read_url"][data-status="done"]')).toContainText('Read https://cables.example/guide');
+  expect(server.fetchRequests).toEqual([{ url: 'https://cables.example/guide' }]);
+  expect(context.pages()).toHaveLength(tabs);
+  // The model is offered the tool only while reading through DeepSeek is on.
+  const toolNames = () => (server.chatRequests.at(-1)!.tools ?? []).map((tool: { function: { name: string } }) => tool.function.name);
+  expect(toolNames()).toContain('read_url');
+  await patchSettings(panel, (s) => ({ ...s, search: { ...s.search, deepseekFetch: false } }));
+  await ask(panel, 'TEST-SEARCH: and plain ones?');
+  await expect(panel.getByTestId('assistant-message').last()).toContainText('The top result is', { timeout: 20_000 });
+  expect(toolNames()).not.toContain('read_url');
+  expect(toolNames()).toContain('web_search');
+
+  // DeepSeek's own web search, as "the model's own search": a DeepSeek model does the searching.
+  const settingsBefore = await panel.evaluate(async () => (await chrome.storage.local.get('settings:v1'))['settings:v1']);
+  await patchSettings(panel, (s) => ({
+    ...s,
+    connections: s.connections.map((c: { id: string }) => (c.id === 'ds' ? { ...c, baseURL: `${server.origin}/v1`, models: ['deepseek-v4-pro'] } : c)),
+    slots: { ...s.slots, chat: { connectionId: 'ds', modelId: 'deepseek-v4-pro' } },
+    search: { ...s.search, provider: 'native' },
+  }));
+  const nativeOptions = await context.newPage();
+  await nativeOptions.goto(`chrome-extension://${extensionId}/options.html#search`);
+  await nativeOptions.getByTestId('search-test').click();
+  const answer = nativeOptions.getByTestId('search-test-results');
+  await expect(answer).toContainText('braided cables survived ten times more bends');
+  // The page the answer cites comes first; its French copy is not listed again.
+  await expect(answer).toContainText('[1] Cable lab test — https://lab.example/test#1');
+  await expect(answer).toContainText('[2] Cable shop — https://shop.example/cables');
+  await expect(answer).not.toContainText('hl=fr');
+  const sent = server.webSearchRequests.at(-1)! as unknown as { model: string; tools: unknown; thinking: unknown };
+  expect(sent).toMatchObject({ model: 'deepseek-flash', tools: [{ type: 'deepseek_web_search' }], thinking: { type: 'disabled' } });
+  await nativeOptions.close();
+  await patchSettings(panel, () => settingsBefore);
   await panel.close();
 });
 

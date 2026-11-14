@@ -4,13 +4,14 @@ import { browser } from 'wxt/browser';
 import { capturePage, truncate } from '../browser/page-context';
 import { buildHistory, renderContext } from '../chat/prompt';
 import { hasHostAccess, isRestrictedUrl, originPattern } from '../permissions/hosts';
+import { isLoopbackHost } from '../providers/vendors';
 import { toErrorInfo } from '../providers/errors';
 import { rejectsImages, seesImages } from '../providers/vision';
 import { pickSlot, resolveModelRef, type ResolvedModel } from '../providers/resolve';
 import { nativeSearch } from '../search/native';
-import { apiSearch, buildSearchUrl, deepseekConnection, formatSearchResults, searchEndpoint } from '../search/search';
+import { searchApiKey } from '../search/keys';
+import { apiSearch, buildSearchUrl, deepseekFetch, fetchEndpoint, formatSearchResults, readsThroughDeepSeek, searchEndpoint } from '../search/search';
 import type { Locale, MessageRecord, SearchProviderId, Settings, SitePolicy } from '../shared/types';
-import { getApiKey, getSearchKey } from '../storage/settings';
 import { ActionError, AgentBrowser, sleep, unwrap, type GroupStatus, type Screen } from './browser-controller';
 import { containsCardNumber, containsSecret, findInjection, newBoundary, siteOf, urlDataLeak, wrapUntrusted } from './injection';
 import { decide, modeDecision, policyFor, type ActionKind } from './policy';
@@ -20,7 +21,7 @@ import { actionKind, classifyAction, downloadRisk, formSubmission } from './risk
 import { cropPreview } from './screenshot';
 import { isSensitivePage } from './sensitive';
 import { SCREENSHOT_WHY, screenshotReason } from './vision';
-import { assistantTools, ELEMENT_TOOLS, READING_TOOLS, VIEW_AFTER } from './tools';
+import { ELEMENT_TOOLS, READING_TOOLS, toolsFor, VIEW_AFTER } from './tools';
 
 /** Tools that go through the risk check and may need approval. */
 const GUARDED_TOOLS = new Set([...ELEMENT_TOOLS, 'press', 'click_at']);
@@ -637,7 +638,8 @@ export class AgentRunner {
    */
   private async allowNavigation(action: AgentAction, url: string): Promise<boolean> {
     const host = hostOf(url);
-    const download = downloadRisk(url);
+    // Reading a page's text through a service downloads nothing to this computer.
+    const download = action.tool === 'read_url' ? undefined : downloadRisk(url);
     if (download) action.risk = download.risk;
     const reason: RiskReason | undefined = urlDataLeak(url)
       ? 'exfiltration'
@@ -737,9 +739,15 @@ export class AgentRunner {
     }
     const result = streamText({
       model: this.main.model,
-      instructions: buildAssistantSystemPrompt({ locale: this.locale, now: new Date(), mode: this.settings.agent.mode, chatOnly }),
+      instructions: buildAssistantSystemPrompt({
+        locale: this.locale,
+        now: new Date(),
+        mode: this.settings.agent.mode,
+        chatOnly,
+        readUrl: readsThroughDeepSeek(this.settings.search),
+      }),
       messages,
-      ...(chatOnly ? {} : { tools: assistantTools, toolChoice: atLimit ? ('none' as const) : ('auto' as const) }),
+      ...(chatOnly ? {} : { tools: toolsFor(this.settings.search), toolChoice: atLimit ? ('none' as const) : ('auto' as const) }),
       temperature: this.settings.slots.chat?.temperature,
       providerOptions: this.main.providerOptions,
       abortSignal: this.abort.signal,
@@ -961,6 +969,21 @@ export class AgentRunner {
       case 'web_search':
         action.result = await this.webSearch(str('query'), action);
         return 'continue';
+      case 'read_url': {
+        const url = normalizeUrl(str('url'));
+        const host = hostOf(url);
+        if (!host || !/^https?:$/.test(new URL(url).protocol)) throw new ActionError(`Only http(s) pages can be read: ${str('url')}`);
+        if (policyFor(host, this.settings.sitePolicies) === 'blocked') {
+          action.status = 'rejected';
+          action.result = `The user blocked ${host} for the assistant.`;
+          return 'continue';
+        }
+        action.target = SEARCH_LABELS.deepseek;
+        // The address goes to DeepSeek and from there to the site: the same checks as for opening it.
+        if (!(await this.allowNavigation(action, url))) return 'continue';
+        action.result = await this.readUrl(url);
+        return 'continue';
+      }
       case 'wait':
         await sleep(Math.min(Math.max(num('seconds') || 1, 0.5), 10) * 1000);
         action.result = 'ok';
@@ -1296,9 +1319,14 @@ export class AgentRunner {
         const response = await this.waitFor({ kind: 'permission', origin: originPattern(endpoint), url: endpoint });
         if (response.kind !== 'permission' || !response.granted) throw new Error(`access to ${hostOf(endpoint)} was not allowed`);
       }
-      const connection = provider === 'deepseek' ? deepseekConnection(search, this.settings.connections) : undefined;
-      const apiKey = connection ? await getApiKey(connection.id) : await getSearchKey(provider);
-      const results = await apiSearch(provider, query, { settings: search, connections: this.settings.connections, apiKey, signal: this.abort.signal });
+      const apiKey = await searchApiKey(provider, this.settings);
+      const results = await apiSearch(provider, query, {
+        settings: search,
+        connections: this.settings.connections,
+        apiKey,
+        question: provider === 'deepseek' && search.deepseekQuestion ? this.searchQuestion() : undefined,
+        signal: this.abort.signal,
+      });
       for (const result of results) this.rememberHost(result.url);
       return this.untrusted('search_results', { source: SEARCH_LABELS[provider] }, formatSearchResults(query, results, SEARCH_LABELS[provider]), 'search');
     } catch (error) {
@@ -1308,6 +1336,49 @@ export class AgentRunner {
       action.target = SEARCH_LABELS.browser;
       return `${SEARCH_LABELS[provider]} search failed (${detail}); searched in the browser instead.\n${await this.browserSearch(query)}`;
     }
+  }
+
+  /**
+   * Reads a public page through DeepSeek's Fetch API, without a tab. DeepSeek
+   * fetches it from its own servers, so it sees what anyone sees: nothing that
+   * needs the user's login.
+   */
+  private async readUrl(url: string): Promise<string> {
+    const search = this.settings.search;
+    if (!readsThroughDeepSeek(search)) throw new ActionError('Reading pages by address is turned off. Open the page in the tab instead.');
+    const parsed = new URL(url);
+    if (parsed.username || parsed.password || containsSecret(url)) throw new ActionError('Addresses with a password, key or token in them are not sent to DeepSeek.');
+    if (isLoopbackHost(parsed.hostname)) throw new ActionError('Only public pages can be read this way. Open this one in the tab instead.');
+    const endpoint = fetchEndpoint(search, this.settings.connections);
+    if (!(await hasHostAccess(endpoint))) {
+      const response = await this.waitFor({ kind: 'permission', origin: originPattern(endpoint), url: endpoint });
+      if (response.kind !== 'permission' || !response.granted) throw new ActionError(`Access to ${hostOf(endpoint)} was not allowed. Open the page in the tab instead.`);
+    }
+    let page;
+    try {
+      page = await deepseekFetch(url, {
+        settings: search,
+        connections: this.settings.connections,
+        apiKey: await searchApiKey('deepseek', this.settings),
+        signal: this.abort.signal,
+      });
+    } catch (error) {
+      if (error instanceof StopError || this.stopped) throw new StopError();
+      const info = toErrorInfo(error);
+      const why = info.status === 404 ? 'the page could not be fetched' : info.status === 403 ? 'DeepSeek refused this address' : clip(info.message, 200);
+      throw new ActionError(`read_url failed: ${why}. Open the page in the tab (navigate) if you still need it.`);
+    }
+    if (!page.content.trim()) throw new ActionError('read_url found no text on the page. Open it in the tab (navigate) if you still need it.');
+    this.rememberHost(url);
+    const { text, truncated } = truncate(page.content, READ_PAGE_CHARS);
+    const attributes = { title: clip(page.title, 200), url, via: 'DeepSeek', ...(truncated ? { truncated: 'true' } : {}) };
+    return this.untrusted('page', attributes, text, 'page', url);
+  }
+
+  /** The user's message for this turn, for a search provider that asks for it. Left out when it holds a key, a token or a card number. */
+  private searchQuestion(): string | undefined {
+    const text = this.history.findLast((m) => m.role === 'user')?.content.trim();
+    return text && !containsSecret(text) && !containsCardNumber(text) ? text : undefined;
   }
 
   private async browserSearch(query: string): Promise<string> {

@@ -25,6 +25,8 @@ export class ConfigError extends Error {
 
 function codeForStatus(status: number): ErrorCode {
   if (status === 401) return 'auth';
+  // Payment required: the account has run out of balance.
+  if (status === 402) return 'rateLimit';
   if (status === 403) return 'forbidden';
   if (status === 404) return 'notFound';
   if (status === 429) return 'rateLimit';

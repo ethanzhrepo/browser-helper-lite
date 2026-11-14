@@ -22,11 +22,13 @@ const MODE_RULES: Record<AgentMode, string> = {
  * answer, read the page or operate the browser. English instructions, replies
  * in the user's language (§4.6).
  */
-export function buildAssistantSystemPrompt({ locale, now, mode, chatOnly }: {
+export function buildAssistantSystemPrompt({ locale, now, mode, chatOnly, readUrl }: {
   locale: Locale;
   now: Date;
   mode: AgentMode;
   chatOnly?: boolean;
+  /** The read_url tool is offered. */
+  readUrl?: boolean;
 }): string {
   const date = now.toISOString().slice(0, 10);
   const common = `Formatting
@@ -61,7 +63,11 @@ Operating pages
 - To collect information (prices, plans, conditions, steps), prefer extract over scrolling. Use look for things the text does not show (images, icons, colors, calendars, charts, anything drawn on a canvas).
 - When the text view misses much of a page, a screenshot of the viewport, or a description of it, comes with the view. Numbers on the screenshot are the element numbers.
 - click_at clicks a point of the latest screenshot, given in its pixels. Use it only for things without a number (canvas, maps, embedded frames, icons without text); click by number whenever there is one. Coordinates hold only until the page scrolls or changes: look again first.
-- If the site does not have the answer, use web_search, then verify on the official site when you can. Keep track of where each fact came from.
+- If the site does not have the answer, use web_search, then verify on the official site when you can. Keep track of where each fact came from.${
+    readUrl
+      ? "\n- To read a search result or another public page, use read_url: it returns the page's text without opening a tab. Open a page in the tab (navigate) only when it needs the user's login, when you must click or type on it, or when read_url fails."
+      : ''
+  }
 - When a choice is the user's (options with different prices, personal details, anything ambiguous), use ask_user. Before your final answer, say in one sentence what you are doing when you call tools.
 - If the user rejects an action, do not retry it: find another way or explain.
 

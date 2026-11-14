@@ -4,7 +4,8 @@ import { fetchModelList } from '../providers/model-list';
 import { pickSlot, resolveModelRef } from '../providers/resolve';
 import { transcribeAudio } from '../providers/speech';
 import { nativeSearch } from '../search/native';
-import { apiSearch, deepseekConnection } from '../search/search';
+import { searchApiKey } from '../search/keys';
+import { apiSearch } from '../search/search';
 import type {
   ConnectionTestRequest,
   ConnectionTestResult,
@@ -17,7 +18,7 @@ import type {
   TranscribeResult,
 } from '../shared/protocol';
 import { clearConversations } from '../storage/db';
-import { getApiKey, getSearchKey, loadSettings } from '../storage/settings';
+import { getApiKey, loadSettings } from '../storage/settings';
 import { stopAllTasks } from './agent-service';
 import { isExtensionPage } from './trust';
 
@@ -39,8 +40,7 @@ async function testSearch(request: SearchTestRequest): Promise<SearchTestResult>
       if (!ref) throw new Error('Choose a model first.');
       return { ok: true, results: [], text: await nativeSearch(await resolveModelRef(settings, ref), request.query) };
     }
-    const connection = request.provider === 'deepseek' ? deepseekConnection(settings.search, settings.connections) : undefined;
-    const apiKey = connection ? await getApiKey(connection.id) : await getSearchKey(request.provider);
+    const apiKey = await searchApiKey(request.provider, settings);
     const results = await apiSearch(request.provider, request.query, { settings: settings.search, connections: settings.connections, apiKey });
     return { ok: true, results };
   } catch (error) {

@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { ACTIVE_STATUSES, type AgentTask } from '../agent/types';
 import { normalizeBaseURL } from '../providers/vendors';
 import type { ConversationRecord, MessageRecord, Settings } from '../shared/types';
+import { MAX_KDF_ITERATIONS, MIN_KDF_ITERATIONS, seal, unseal, type Sealed } from './backup-crypto';
 import { db } from './db';
 import { loadSecrets, loadSettings, replaceSettings, withDefaults } from './settings';
 
@@ -10,8 +11,9 @@ import { loadSecrets, loadSettings, replaceSettings, withDefaults } from './sett
 z.config({ jitless: true });
 
 /**
- * A backup file: settings, conversations and, only when asked for, API keys.
- * It is plain JSON, so anyone who gets the file can read what is in it.
+ * A backup file: settings and, when asked for, conversations and API keys.
+ * With a password it is encrypted (see backup-crypto.ts); without one it is
+ * plain JSON that anyone who gets the file can read, so it never holds keys.
  */
 export const BACKUP_APP = 'browser-helper-lite';
 export const BACKUP_VERSION = 1;
@@ -124,6 +126,28 @@ const backupSchema = z.object({
   tasks: z.array(taskSchema).optional(),
 });
 
+const encryptedSchema = z.object({
+  app: z.literal(BACKUP_APP),
+  version: z.literal(BACKUP_VERSION),
+  exportedAt: z.number(),
+  encrypted: z.object({
+    cipher: z.literal('AES-256-GCM'),
+    kdf: z.literal('PBKDF2-SHA256'),
+    iterations: z.number().int().min(MIN_KDF_ITERATIONS).max(MAX_KDF_ITERATIONS),
+    salt: z.string().min(1),
+    iv: z.string().min(1),
+    data: z.string().min(1),
+  }),
+});
+
+/** A backup locked with a password: only where it comes from and when is readable. */
+export interface EncryptedBackup {
+  app: typeof BACKUP_APP;
+  version: typeof BACKUP_VERSION;
+  exportedAt: number;
+  encrypted: Sealed;
+}
+
 export interface Backup {
   app: typeof BACKUP_APP;
   version: typeof BACKUP_VERSION;
@@ -136,21 +160,38 @@ export interface Backup {
   tasks?: AgentTask[];
 }
 
-export async function buildBackup({ includeKeys }: { includeKeys: boolean }): Promise<Backup> {
-  const conversations = (await db.conversations.toArray()).filter((c) => !c.deletedAt);
-  const kept = new Set(conversations.map((c) => c.id));
-  const messages = (await db.messages.toArray()).filter((m) => !m.deletedAt && kept.has(m.conversationId));
-  const tasks = (await db.tasks.toArray()).filter((task) => !task.discardedAt && kept.has(task.conversationId));
-  return {
+export async function buildBackup({ includeKeys, includeConversations = true }: { includeKeys: boolean; includeConversations?: boolean }): Promise<Backup> {
+  const backup: Backup = {
     app: BACKUP_APP,
     version: BACKUP_VERSION,
     exportedAt: Date.now(),
     settings: await loadSettings(),
     ...(includeKeys ? { secrets: await loadSecrets() } : {}),
-    conversations,
-    messages,
-    tasks,
   };
+  if (!includeConversations) return backup;
+  const conversations = (await db.conversations.toArray()).filter((c) => !c.deletedAt);
+  const kept = new Set(conversations.map((c) => c.id));
+  const messages = (await db.messages.toArray()).filter((m) => !m.deletedAt && kept.has(m.conversationId));
+  const tasks = (await db.tasks.toArray()).filter((task) => !task.discardedAt && kept.has(task.conversationId));
+  return { ...backup, conversations, messages, tasks };
+}
+
+/**
+ * The text of a backup file. With a password the backup is encrypted; API keys
+ * are written only then.
+ */
+export async function serializeBackup(backup: Backup, password?: string): Promise<string> {
+  if (!password) {
+    if (backup.secrets) throw new Error('API keys are exported only in an encrypted backup.');
+    return JSON.stringify(backup, null, 2);
+  }
+  const file: EncryptedBackup = {
+    app: BACKUP_APP,
+    version: BACKUP_VERSION,
+    exportedAt: backup.exportedAt,
+    encrypted: await seal(JSON.stringify(backup), password),
+  };
+  return JSON.stringify(file, null, 2);
 }
 
 /** Reads a backup file. Throws when it is not one. */
@@ -162,6 +203,23 @@ export function parseBackup(text: string): Backup {
     throw new Error('Not a JSON file.');
   }
   return backupSchema.parse(data) as unknown as Backup;
+}
+
+/** Reads a backup file that may be encrypted. Throws when it is neither kind. */
+export function readBackupFile(text: string): { backup: Backup } | { encrypted: EncryptedBackup } {
+  let data: unknown;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    throw new Error('Not a JSON file.');
+  }
+  if (typeof data === 'object' && data !== null && 'encrypted' in data) return { encrypted: encryptedSchema.parse(data) };
+  return { backup: backupSchema.parse(data) as unknown as Backup };
+}
+
+/** Opens an encrypted backup. Throws WrongPasswordError when the password does not fit. */
+export async function decryptBackup(file: EncryptedBackup, password: string): Promise<Backup> {
+  return parseBackup(await unseal(file.encrypted, password));
 }
 
 export interface RestoreSummary {
@@ -221,12 +279,12 @@ export async function restoreBackup(backup: Backup): Promise<RestoreSummary> {
   return summary;
 }
 
-/** Hands the backup to the browser as a file download. */
-export function downloadBackup(backup: Backup): void {
-  const url = URL.createObjectURL(new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' }));
+/** Hands the text of a backup file to the browser as a download. */
+export function downloadBackup(text: string, exportedAt: number): void {
+  const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
   const link = document.createElement('a');
   link.href = url;
-  link.download = `browser-helper-lite-${new Date(backup.exportedAt).toISOString().slice(0, 10)}.json`;
+  link.download = `browser-helper-lite-${new Date(exportedAt).toISOString().slice(0, 10)}.json`;
   link.click();
   setTimeout(() => URL.revokeObjectURL(url), 10_000);
 }

@@ -89,6 +89,10 @@ export interface SearchResult {
   title: string;
   url: string;
   snippet: string;
+  /** Name of the site, when the search provider gives one. */
+  site?: string;
+  /** Day the page was published (YYYY-MM-DD), when known. */
+  date?: string;
 }
 
 export type SearchEngine = 'google' | 'bing' | 'duckduckgo' | 'custom';

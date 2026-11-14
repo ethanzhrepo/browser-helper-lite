@@ -1,7 +1,7 @@
 import { expect, test, type BrowserContext, type Page } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
-import { ask, chooseMode, EXTENSION_PATH, groupOf, launch, openPanel, openSiteAndPanel, seed, tabIdOf } from './helpers';
+import { ask, chooseMode, EXTENSION_PATH, groupOf, launch, openPanel, openSiteAndPanel, screenshot, seed, tabIdOf } from './helpers';
 import { indexOf, MOCK_KEY, MOCK_MODEL, readTurn, say, startMockServer, type ChatMessage, type Reply } from './mock-llm-server';
 
 /** A form that deletes the account, with a field a page could name anything: here "q", like a search box. */
@@ -275,19 +275,45 @@ test.describe.serial('review fixes: conversations and data', () => {
     expect(await worker.evaluate(async (id) => Object.keys(await chrome.storage.session.get(`panelRequest:${id}`)).length, tabId)).toBe(0);
   });
 
-  test('data: export without keys, delete everything, import it back', async () => {
+  test('data: export plain or encrypted, delete everything, import it back', async () => {
     await ask(panel, 'A conversation worth keeping');
     await expect(assistantMessages().last()).toContainText('Reply number', { timeout: 20_000 });
 
     const options = await context.newPage();
     await options.goto(`chrome-extension://${extensionId}/options.html#data`);
-    const download = options.waitForEvent('download');
+    const note = options.getByTestId('data-note');
+    const exportFile = async () => {
+      const download = options.waitForEvent('download');
+      await options.getByTestId('export-data').click();
+      return (await download).path();
+    };
+
+    // Encryption is on to begin with, and asks for a password twice.
     await options.getByTestId('export-data').click();
-    const file = await (await download).path();
+    await expect(note).toContainText('Use at least 8 characters.');
+    await options.getByTestId('export-password').fill('correct horse');
+    await options.getByTestId('export-password-again').fill('correct house');
+    await options.getByTestId('export-data').click();
+    await expect(note).toContainText("The passwords don't match.");
+    await options.getByTestId('export-password-again').fill('correct horse');
+    await screenshot(options, 'options-data-export');
+    const locked = await exportFile();
+    const sealed = readFileSync(locked, 'utf8');
+    expect(JSON.parse(sealed).encrypted).toMatchObject({ cipher: 'AES-256-GCM', kdf: 'PBKDF2-SHA256' });
+    expect(sealed).not.toContain('A conversation worth keeping');
+    expect(sealed).not.toContain(MOCK_KEY);
+    // The password is not kept in the form.
+    await expect(options.getByTestId('export-password')).toHaveValue('');
+
+    // Without encryption the file is readable, and never holds keys.
+    await options.locator('#encrypt-backup').click();
+    await expect(options.locator('#include-keys')).toBeDisabled();
+    const file = await exportFile();
     const backup = JSON.parse(readFileSync(file, 'utf8'));
     expect(backup.conversations).toHaveLength(1);
     expect(JSON.stringify(backup)).toContain('A conversation worth keeping');
     expect(JSON.stringify(backup)).not.toContain(MOCK_KEY);
+    expect(backup.secrets).toBeUndefined();
 
     options.on('dialog', (dialog) => void dialog.accept());
     await options.getByTestId('clear-conversations').click();
@@ -299,7 +325,27 @@ test.describe.serial('review fixes: conversations and data', () => {
     await expect(options.getByTestId('data-note')).toContainText('Imported. 1 conversation added.');
     expect(await countRows(options, 'messages')).toBe(2);
     // The connection kept its address, so it kept its key.
-    expect(await options.evaluate(async () => ((await chrome.storage.local.get('secrets:v1'))['secrets:v1'] as Record<string, string>).mock)).toBe(MOCK_KEY);
+    const storedKey = () => options.evaluate(async () => ((await chrome.storage.local.get('secrets:v1'))['secrets:v1'] as Record<string, string> | undefined)?.mock);
+    expect(await storedKey()).toBe(MOCK_KEY);
+
+    // The encrypted file asks for its password, and brings the keys back with it.
+    await options.getByTestId('clear-conversations').click();
+    await expect(note).toContainText('All conversations deleted.');
+    await options.evaluate(() => chrome.storage.local.remove('secrets:v1'));
+    await options.getByTestId('import-file').setInputFiles(locked);
+    await expect(options.getByTestId('import-locked')).toContainText('is encrypted. Enter its password.');
+    expect(await countRows(options, 'conversations')).toBe(0);
+    await options.getByTestId('import-password').fill('wrong horse');
+    await options.getByTestId('import-unlock').click();
+    await expect(note).toContainText('Wrong password, or the file is damaged.');
+    await screenshot(options, 'options-data-import-password');
+    expect(await countRows(options, 'conversations')).toBe(0);
+    await options.getByTestId('import-password').fill('correct horse');
+    await options.getByTestId('import-password').press('Enter');
+    await expect(note).toContainText('Imported. 1 conversation added.');
+    await expect(options.getByTestId('import-locked')).toHaveCount(0);
+    expect(await countRows(options, 'messages')).toBe(2);
+    expect(await storedKey()).toBe(MOCK_KEY);
 
     await options.getByTestId('reset-everything').click();
     await expect(options.getByTestId('data-note')).toContainText('Everything erased.');
