@@ -1,4 +1,4 @@
-import { Bot, Info, Languages, Mic, Plug, Search, ShieldCheck, SlidersHorizontal } from 'lucide-react';
+import { Bot, Database, Info, Languages, Mic, PartyPopper, Plug, Search, ShieldCheck, SlidersHorizontal, X } from 'lucide-react';
 import { useEffect, useState, type ComponentType, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { Settings } from '../../src/shared/types';
@@ -7,13 +7,14 @@ import { useSettings } from '../../src/ui/useSettings';
 import { AboutSection } from './AboutSection';
 import { AgentSection } from './AgentSection';
 import { ConnectionsSection } from './ConnectionsSection';
+import { DataSection } from './DataSection';
 import { LanguageSection } from './LanguageSection';
 import { SearchSection } from './SearchSection';
 import { SitesSection } from './SitesSection';
 import { SlotsSection } from './SlotsSection';
 import { VoiceSection } from './VoiceSection';
 
-type SectionId = 'providers' | 'models' | 'agent' | 'search' | 'voice' | 'sites' | 'language' | 'about';
+type SectionId = 'providers' | 'models' | 'agent' | 'search' | 'voice' | 'sites' | 'language' | 'data' | 'about';
 
 const SECTIONS: { id: SectionId; icon: ComponentType<{ className?: string }>; render: (s: Settings) => ReactNode }[] = [
   { id: 'providers', icon: Plug, render: (s) => <ConnectionsSection settings={s} /> },
@@ -23,7 +24,8 @@ const SECTIONS: { id: SectionId; icon: ComponentType<{ className?: string }>; re
   { id: 'voice', icon: Mic, render: (s) => <VoiceSection settings={s} /> },
   { id: 'sites', icon: ShieldCheck, render: (s) => <SitesSection settings={s} /> },
   { id: 'language', icon: Languages, render: (s) => <LanguageSection settings={s} /> },
-  { id: 'about', icon: Info, render: () => <AboutSection /> },
+  { id: 'data', icon: Database, render: () => <DataSection /> },
+  { id: 'about', icon: Info, render: (s) => <AboutSection settings={s} /> },
 ];
 
 function currentSection(): SectionId {
@@ -35,6 +37,8 @@ export function App() {
   const { t } = useTranslation();
   const settings = useSettings();
   const [section, setSection] = useState<SectionId>(currentSection);
+  // Opened by the extension right after it was installed.
+  const [welcome, setWelcome] = useState(() => new URLSearchParams(location.search).has('welcome'));
 
   useEffect(() => {
     const onHashChange = () => setSection(currentSection());
@@ -77,6 +81,23 @@ export function App() {
           ))}
         </nav>
         <main className="min-w-0 flex-1 animate-fade-in" key={section}>
+          {welcome && (
+            <div className="mb-6 flex items-start gap-3 rounded-xl border border-accent/25 bg-accent-soft/60 p-4" data-testid="welcome" role="status">
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-accent text-on-accent">
+                <PartyPopper className="h-4 w-4" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="text-[15px] font-semibold tracking-tight">{t('welcome.title')}</p>
+                <ol className="mt-1 list-decimal space-y-0.5 pl-4 text-sm leading-relaxed text-muted">
+                  <li>{t('welcome.stepModel')}</li>
+                  <li>{t('welcome.stepOpen')}</li>
+                </ol>
+              </div>
+              <button type="button" aria-label={t('common.dismiss')} onClick={() => setWelcome(false)} className="text-muted hover:text-fg">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          )}
           {settings && active.render(settings)}
         </main>
       </div>

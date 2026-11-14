@@ -1,5 +1,5 @@
 {
   "extName": { "message": "Browser Helper Lite" },
-  "extDescription": { "message": "可自选模型的 AI 侧边栏助手：围绕网页对话，并可在你授权后替你操作网站。" },
+  "extDescription": { "message": "侧边栏 AI 助手，使用你自己的模型和 API Key：围绕网页提问，并在你允许的网站上替你操作。" },
   "actionTitle": { "message": "打开 Browser Helper" }
 }

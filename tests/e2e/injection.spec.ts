@@ -55,7 +55,7 @@ test.describe.serial('prompt injection from a page', () => {
     await approval.getByRole('button', { name: 'Deny' }).click();
 
     // After the injection attempt, an ordinary click also waits for approval.
-    await expect(approval).toContainText('This page tried to give the assistant instructions', { timeout: 20_000 });
+    await expect(approval).toContainText('This page tried to instruct the assistant', { timeout: 20_000 });
     await expect(approval).toContainText('Get coupon');
     await screenshot(panel, 'injection-cautious');
     await approval.getByRole('button', { name: 'Deny' }).click();

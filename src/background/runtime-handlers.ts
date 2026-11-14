@@ -8,13 +8,17 @@ import { apiSearch, deepseekConnection } from '../search/search';
 import type {
   ConnectionTestRequest,
   ConnectionTestResult,
+  DataClearRequest,
+  DataClearResult,
   RuntimeRequest,
   SearchTestRequest,
   SearchTestResult,
   TranscribeRequest,
   TranscribeResult,
 } from '../shared/protocol';
+import { clearConversations } from '../storage/db';
 import { getApiKey, getSearchKey, loadSettings } from '../storage/settings';
+import { stopAllTasks } from './agent-service';
 import { isExtensionPage } from './trust';
 
 export async function testConnection(request: ConnectionTestRequest): Promise<ConnectionTestResult> {
@@ -60,6 +64,24 @@ async function transcribe(request: TranscribeRequest): Promise<TranscribeResult>
   }
 }
 
+async function clearData(request: DataClearRequest): Promise<DataClearResult> {
+  try {
+    await stopAllTasks();
+    await clearConversations();
+    if (request.scope === 'everything') {
+      await browser.storage.local.clear();
+      await browser.storage.session.clear();
+      // Site access granted at runtime goes too; access a build declares itself cannot be removed.
+      const { origins = [] } = await browser.permissions.getAll();
+      await Promise.all(origins.map((origin) => browser.permissions.remove({ origins: [origin] }).catch(() => false)));
+    }
+    return { ok: true };
+  } catch (error) {
+    console.error('Could not erase the data', error);
+    return { ok: false };
+  }
+}
+
 export function registerRuntimeHandlers(): void {
   browser.runtime.onMessage.addListener((message: RuntimeRequest, sender, sendResponse) => {
     // These use stored API keys: only our own pages may ask.
@@ -74,6 +96,10 @@ export function registerRuntimeHandlers(): void {
     }
     if (message?.type === 'stt.transcribe') {
       void transcribe(message).then(sendResponse);
+      return true;
+    }
+    if (message?.type === 'data.clear') {
+      void clearData(message).then(sendResponse);
       return true;
     }
     return undefined;

@@ -54,7 +54,7 @@ test.describe.serial('assistant operating pages', () => {
     const approval = panel.getByTestId('approval-card');
     await expect(approval).toBeVisible({ timeout: 30_000 });
     await expect(approval).toContainText('Add Cable B to cart');
-    await expect(approval).toContainText('This submits, sends or saves something.');
+    await expect(approval).toContainText('Submits, sends or saves something.');
     await expect(approval.getByRole('button', { name: 'Always allow on this site' })).toBeVisible();
     await screenshot(panel, 'agent-approval');
     await panel.emulateMedia({ colorScheme: 'dark' });
@@ -107,7 +107,7 @@ test.describe.serial('assistant operating pages', () => {
     await site.click('#robot');
 
     await expect(panel.getByTestId('question-card')).toContainText('Which date would you like', { timeout: 20_000 });
-    await expect(panel.getByTestId('composer-input')).toHaveAttribute('placeholder', "Answer the assistant's question…");
+    await expect(panel.getByTestId('composer-input')).toHaveAttribute('placeholder', "Type your answer…");
     await panel.getByTestId('composer-input').fill('Nov 3');
     await panel.getByTestId('composer-input').press('Enter');
 

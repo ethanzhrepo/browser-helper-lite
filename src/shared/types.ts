@@ -95,6 +95,8 @@ export interface Settings {
   search: SearchSettings;
   voice: VoiceSettings;
   sitePolicies: Record<string, SitePolicy>;
+  /** Ask GitHub once a day whether a newer release exists (an unpacked extension is not updated by Chrome). */
+  checkUpdates: boolean;
   updatedAt: number;
 }
 
@@ -140,8 +142,9 @@ export type MessageRole = 'user' | 'assistant';
 export type MessageStatus = 'done' | 'error' | 'aborted';
 
 /**
- * Messages are append-only: once written they are never edited, only
- * tombstoned via `deletedAt`. This keeps Drive sync a simple union (§9.4).
+ * Messages are append-only: once written they are never edited, only removed.
+ * A removed message is emptied and keeps its id and `deletedAt`, which keeps
+ * Drive sync a simple union (§9.4).
  */
 export interface MessageRecord {
   id: string;
@@ -166,5 +169,8 @@ export interface ConversationRecord {
   title: string;
   createdAt: number;
   updatedAt: number;
+  /** Deleted by the user; hidden at once. */
   deletedAt?: number;
+  /** Its messages and task records were erased; only this marker is left. */
+  purgedAt?: number;
 }

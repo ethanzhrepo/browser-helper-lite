@@ -1,8 +1,8 @@
-import { AlertTriangle, Brain, Check, ChevronRight, Copy, FileText, RotateCcw, Settings2, Square, TextQuote } from 'lucide-react';
-import { Fragment, useEffect, useRef, useState } from 'react';
+import { AlertTriangle, ArrowDown, ArrowUp, Brain, Check, ChevronRight, Copy, FileText, Pencil, RotateCcw, Settings2, Square, TextQuote } from 'lucide-react';
+import { Fragment, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ACTIVE_STATUSES, type AgentClientMessage, type AgentTask } from '../../src/agent/types';
-import type { ContextSnapshot, ErrorInfo, MessageRecord } from '../../src/shared/types';
+import type { ContextSnapshot, ErrorInfo, MessageRecord, Usage } from '../../src/shared/types';
 import { Button, IconButton } from '../../src/ui/Button';
 import { errorSummary, isSettingsError } from '../../src/ui/errors';
 import { Markdown } from '../../src/ui/Markdown';
@@ -23,16 +23,25 @@ function turnPositions(messages: MessageRecord[], tasks: AgentTask[]): Map<strin
   return positions;
 }
 
-export function MessageList({ messages, tasks, pendingTaskId, onRetry, onAgentSend }: {
+export function MessageList({ messages, tasks, pendingTaskId, canChange, onRetry, onRegenerate, onEdit, onAgentSend }: {
   messages: MessageRecord[];
   tasks: Record<string, AgentTask>;
   /** A request was sent and its turn has not reported back yet. */
   pendingTaskId?: string;
+  /** A model is set and nothing is running: replies can be redone and requests edited. */
+  canChange: boolean;
+  /** Another reply after one that failed or was stopped. */
   onRetry: () => void;
+  /** Replaces the last reply with a new one. */
+  onRegenerate: () => void;
+  /** Sends a request again with new text; it and everything after it is replaced. */
+  onEdit: (message: MessageRecord, text: string) => void;
   onAgentSend: (message: AgentClientMessage) => void;
 }) {
+  const { t } = useTranslation();
   const scrollRef = useRef<HTMLDivElement>(null);
   const stickToBottom = useRef(true);
+  const [away, setAway] = useState(false);
 
   // Follow new content unless the user has scrolled up to read.
   useEffect(() => {
@@ -42,41 +51,66 @@ export function MessageList({ messages, tasks, pendingTaskId, onRetry, onAgentSe
 
   const onScroll = () => {
     const el = scrollRef.current;
-    if (el) stickToBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 48;
+    if (!el) return;
+    stickToBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 48;
+    setAway(el.scrollHeight - el.scrollTop - el.clientHeight > 240);
+  };
+
+  const toLatest = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+    stickToBottom.current = true;
+    el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
   };
 
   const conversationId = messages[0]?.conversationId;
   const conversationTasks = Object.values(tasks).filter((task) => task.conversationId === conversationId);
   const active = conversationTasks.some((task) => ACTIVE_STATUSES.includes(task.status));
   const last = messages.at(-1);
-  const canRetry = !active && !pendingTaskId && last?.role === 'assistant' && last.status !== 'done';
+  const idle = canChange && !active && !pendingTaskId;
   const positions = turnPositions(messages, conversationTasks);
   const replied = new Set(messages.filter((m) => m.role === 'assistant' && m.taskId).map((m) => m.taskId));
 
   return (
-    <div ref={scrollRef} onScroll={onScroll} className="flex-1 overflow-y-auto px-3.5 pb-2 pt-5" data-testid="message-list">
-      <div className="mx-auto flex max-w-3xl flex-col gap-6">
-        {messages.map((message) => (
-          <Fragment key={message.id}>
-            {message.role === 'user' ? (
-              <UserMessage message={message} />
-            ) : (
-              <AssistantMessage
-                content={message.content}
-                reasoning={message.reasoning}
-                modelId={message.model?.modelId}
-                aborted={message.status === 'aborted'}
-                error={message.status === 'error' ? message.error : undefined}
-                onRetry={canRetry && message.id === last?.id ? onRetry : undefined}
-              />
-            )}
-            {positions.get(message.id)?.map((task) => (
-              <TurnView key={task.id} task={task} replied={replied.has(task.id)} onSend={onAgentSend} />
-            ))}
-          </Fragment>
-        ))}
-        {pendingTaskId && !tasks[pendingTaskId] && <AssistantMessage content="" streaming />}
+    <div className="relative flex min-h-0 flex-1 flex-col">
+      <div ref={scrollRef} onScroll={onScroll} className="flex-1 overflow-y-auto px-3.5 pb-2 pt-5" data-testid="message-list">
+        <div className="mx-auto flex max-w-3xl flex-col gap-6">
+          {messages.map((message) => (
+            <Fragment key={message.id}>
+              {message.role === 'user' ? (
+                <UserMessage message={message} onEdit={idle ? (text) => onEdit(message, text) : undefined} />
+              ) : (
+                <AssistantMessage
+                  content={message.content}
+                  reasoning={message.reasoning}
+                  modelId={message.model?.modelId}
+                  usage={message.usage}
+                  aborted={message.status === 'aborted'}
+                  error={message.status === 'error' ? message.error : undefined}
+                  // A reply that failed or was stopped stays and gets another try; a finished one is replaced.
+                  redo={idle && message.id === last?.id ? (message.status === 'done' ? { kind: 'regenerate', run: onRegenerate } : { kind: 'retry', run: onRetry }) : undefined}
+                />
+              )}
+              {positions.get(message.id)?.map((task) => (
+                <TurnView key={task.id} task={task} replied={replied.has(task.id)} onSend={onAgentSend} />
+              ))}
+            </Fragment>
+          ))}
+          {pendingTaskId && !tasks[pendingTaskId] && <AssistantMessage content="" streaming />}
+        </div>
       </div>
+      {away && (
+        <button
+          type="button"
+          onClick={toLatest}
+          aria-label={t('message.toLatest')}
+          title={t('message.toLatest')}
+          data-testid="to-latest"
+          className="absolute bottom-2 left-1/2 flex h-8 w-8 -translate-x-1/2 animate-fade-in items-center justify-center rounded-full border border-line bg-surface text-muted shadow-card transition-colors hover:text-fg"
+        >
+          <ArrowDown className="h-4 w-4" />
+        </button>
+      )}
     </div>
   );
 }
@@ -115,25 +149,97 @@ function ContextChip({ context }: { context: ContextSnapshot }) {
   );
 }
 
-function UserMessage({ message }: { message: MessageRecord }) {
+function UserMessage({ message, onEdit }: { message: MessageRecord; onEdit?: (text: string) => void }) {
+  const { t } = useTranslation();
+  const [draft, setDraft] = useState<string>();
+  const editorRef = useRef<HTMLTextAreaElement>(null);
+
+  useLayoutEffect(() => {
+    const el = editorRef.current;
+    if (!el || draft === undefined) return;
+    el.style.height = 'auto';
+    el.style.height = `${Math.min(el.scrollHeight, 240)}px`;
+  }, [draft]);
+
+  const submit = () => {
+    const text = (draft ?? '').trim();
+    if (!text || !onEdit) return;
+    setDraft(undefined);
+    onEdit(text);
+  };
+
+  const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.nativeEvent.isComposing) return;
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      setDraft(undefined);
+    } else if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault();
+      submit();
+    }
+  };
+
   return (
-    <div className="flex animate-fade-in flex-col items-end gap-1.5" data-testid="user-message">
+    <div className="group flex animate-fade-in flex-col items-end gap-1.5" data-testid="user-message">
       {message.contexts?.map((context) => <ContextChip key={`${context.kind}-${context.capturedAt}`} context={context} />)}
-      <div className="max-w-[88%] whitespace-pre-wrap rounded-2xl rounded-br-md bg-accent-soft px-3.5 py-2 text-sm leading-relaxed text-fg">
-        {message.content}
-      </div>
+      {draft === undefined ? (
+        <>
+          <div className="max-w-[88%] whitespace-pre-wrap rounded-2xl rounded-br-md bg-accent-soft px-3.5 py-2 text-sm leading-relaxed text-fg">
+            {message.content}
+          </div>
+          {onEdit && (
+            <IconButton
+              label={t('common.edit')}
+              onClick={() => setDraft(message.content)}
+              data-testid="edit-message"
+              className="-mt-1 h-7 w-7 opacity-0 transition-opacity focus:opacity-100 group-hover:opacity-100"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+            </IconButton>
+          )}
+        </>
+      ) : (
+        <div className="w-full rounded-2xl border border-accent/40 bg-surface p-2 shadow-soft">
+          <textarea
+            ref={editorRef}
+            autoFocus
+            rows={1}
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={onKeyDown}
+            data-testid="edit-input"
+            className="block w-full resize-none bg-transparent px-1.5 py-1 text-sm leading-relaxed text-fg outline-none"
+          />
+          <div className="mt-1 flex items-center gap-1.5">
+            <span className="mr-auto pl-1.5 text-xs text-faint">{t('message.editHint')}</span>
+            <Button size="sm" variant="ghost" onClick={() => setDraft(undefined)}>
+              {t('common.cancel')}
+            </Button>
+            <Button size="sm" variant="primary" onClick={submit} disabled={!draft.trim()} data-testid="edit-send">
+              <ArrowUp className="h-3.5 w-3.5" strokeWidth={2.5} />
+              {t('composer.send')}
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-function AssistantMessage({ content, reasoning, modelId, streaming, aborted, error, onRetry }: {
+/** 1234 → "1.2k": enough to see what a reply cost. */
+function compact(count: number): string {
+  return count >= 1000 ? `${(count / 1000).toFixed(count >= 10_000 ? 0 : 1)}k` : String(count);
+}
+
+function AssistantMessage({ content, reasoning, modelId, usage, streaming, aborted, error, redo }: {
   content: string;
   reasoning?: string;
   modelId?: string;
+  usage?: Usage;
   streaming?: boolean;
   aborted?: boolean;
   error?: ErrorInfo;
-  onRetry?: () => void;
+  redo?: { kind: 'retry' | 'regenerate'; run: () => void };
 }) {
   const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
@@ -143,6 +249,8 @@ function AssistantMessage({ content, reasoning, modelId, streaming, aborted, err
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
   };
+  const used = (usage?.inputTokens ?? 0) + (usage?.outputTokens ?? 0);
+  const tokens = used > 0 ? t('message.tokens', { input: compact(usage?.inputTokens ?? 0), output: compact(usage?.outputTokens ?? 0) }) : '';
 
   return (
     <div className="group flex animate-fade-in flex-col gap-2 text-sm text-fg" data-testid="assistant-message">
@@ -178,12 +286,19 @@ function AssistantMessage({ content, reasoning, modelId, streaming, aborted, err
               {copied ? <Check className="h-3.5 w-3.5 text-success" /> : <Copy className="h-3.5 w-3.5" />}
             </IconButton>
           )}
-          {onRetry && (
-            <IconButton label={t('message.retry')} onClick={onRetry} className="h-7 w-7">
+          {redo && (
+            <IconButton label={t(`message.${redo.kind}`)} onClick={redo.run} className="h-7 w-7" data-testid={redo.kind}>
               <RotateCcw className="h-3.5 w-3.5" />
             </IconButton>
           )}
-          {modelId && <span className="ml-1 truncate opacity-0 transition-opacity group-hover:opacity-100">{modelId}</span>}
+          <span className="ml-1 flex min-w-0 gap-1.5 opacity-0 transition-opacity group-hover:opacity-100">
+            {modelId && <span className="truncate">{modelId}</span>}
+            {tokens && (
+              <span className="shrink-0 tabular-nums" title={t('message.tokensHint')} data-testid="usage">
+                {tokens}
+              </span>
+            )}
+          </span>
         </div>
       )}
     </div>

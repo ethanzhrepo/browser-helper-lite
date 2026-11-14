@@ -17,10 +17,36 @@ const enableCdpDriver = process.env.ENABLE_CDP_DRIVER !== 'false';
  */
 const e2eGrantAllHosts = process.env.E2E_GRANT_ALL_HOSTS === 'true';
 
+/**
+ * Our pages load scripts, styles, images, fonts and media only from the
+ * extension itself, and embed no frames or plugins. Model output can therefore
+ * never make the side panel contact a server, e.g. through an image or a
+ * stylesheet URL carrying your data (§8.2). `default-src` covers whatever is
+ * not listed. Requests made by our own code go to the provider you configure:
+ * any https address, or http for a model on your own machine or network.
+ */
+function extensionPagesCsp(dev: boolean): string {
+  return [
+    "default-src 'self'",
+    "script-src 'self'",
+    // Mermaid and KaTeX style their output inline; stylesheets from elsewhere stay blocked.
+    "style-src 'self' 'unsafe-inline'",
+    `connect-src 'self' https: http:${dev ? ' ws://localhost:*' : ''}`,
+    "img-src 'self' data: blob:",
+    "font-src 'self' data:",
+    "media-src 'self' blob:",
+    "worker-src 'self'",
+    "object-src 'none'",
+    "frame-src 'none'",
+    "base-uri 'none'",
+    "form-action 'none'",
+  ].join('; ');
+}
+
 export default defineConfig({
   modules: ['@wxt-dev/module-react'],
   outDir: e2eGrantAllHosts ? '.output-e2e' : '.output',
-  manifest: {
+  manifest: ({ command }) => ({
     name: '__MSG_extName__',
     description: '__MSG_extDescription__',
     default_locale: 'en',
@@ -28,6 +54,13 @@ export default defineConfig({
     minimum_chrome_version: '116',
     action: {
       default_title: '__MSG_actionTitle__',
+    },
+    // Opens the side panel on the current tab, like a click on the toolbar button.
+    // Change it under chrome://extensions/shortcuts.
+    commands: {
+      _execute_action: {
+        suggested_key: { default: 'Alt+Shift+H' },
+      },
     },
     permissions: [
       'sidePanel',
@@ -37,22 +70,19 @@ export default defineConfig({
       'tabs',
       'tabGroups',
       'notifications',
+      // "Ask about the selection" and "Summarize this page" in the page's right-click menu.
+      'contextMenus',
       // Favicons through Chrome's local service, so our pages never load remote images.
       'favicon',
       ...(enableCdpDriver ? ['debugger'] : []),
     ],
-    // Our pages load scripts, images, fonts and media only from the extension
-    // itself, and embed no frames. Model output can therefore never make the
-    // side panel contact a server, e.g. through an image URL carrying your
-    // data (§8.2).
     content_security_policy: {
-      extension_pages:
-        "script-src 'self'; object-src 'self'; img-src 'self' data: blob:; font-src 'self' data:; media-src 'self' blob:; frame-src 'none'; base-uri 'none'; form-action 'none'",
+      extension_pages: extensionPagesCsp(command === 'serve'),
     },
     // Site access is requested at runtime, per site or for all sites (§6).
     optional_host_permissions: ['<all_urls>'],
     ...(e2eGrantAllHosts ? { host_permissions: ['<all_urls>'] } : {}),
-  },
+  }),
   hooks: {
     // No global side panel, which would show on every tab: it opens per tab,
     // from the toolbar button (background.ts, §4.7).
@@ -72,6 +102,8 @@ export default defineConfig({
     plugins: [tailwindcss()],
     define: {
       __ENABLE_CDP_DRIVER__: JSON.stringify(enableCdpDriver),
+      // Test builds never look for updates: tests must not depend on the network.
+      __AUTO_UPDATE_CHECK__: JSON.stringify(!e2eGrantAllHosts),
     },
   }),
 });

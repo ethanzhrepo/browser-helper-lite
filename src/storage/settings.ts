@@ -43,6 +43,7 @@ export function defaultSettings(): Settings {
     search: DEFAULT_SEARCH_SETTINGS,
     voice: DEFAULT_VOICE_SETTINGS,
     sitePolicies: {},
+    checkUpdates: true,
     updatedAt: 0,
   };
 }
@@ -89,6 +90,13 @@ async function saveSettings(settings: Settings): Promise<Settings> {
   return next;
 }
 
+/** Replaces the settings and all API keys at once (restoring a backup). */
+export async function replaceSettings(settings: Settings, secrets: Secrets): Promise<Settings> {
+  const next = { ...settings, updatedAt: Date.now() };
+  await browser.storage.local.set({ [SETTINGS_KEY]: next, [SECRETS_KEY]: secrets });
+  return next;
+}
+
 export async function updateSettings(mutate: (draft: Settings) => Settings): Promise<Settings> {
   return saveSettings(mutate(await loadSettings()));
 }
@@ -103,7 +111,7 @@ export function watchSettings(listener: (settings: Settings) => void): () => voi
   return () => browser.storage.onChanged.removeListener(onChanged);
 }
 
-async function loadSecrets(): Promise<Secrets> {
+export async function loadSecrets(): Promise<Secrets> {
   return ((await browser.storage.local.get(SECRETS_KEY))[SECRETS_KEY] as Secrets | undefined) ?? {};
 }
 

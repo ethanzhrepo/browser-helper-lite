@@ -47,4 +47,19 @@ export interface TranscribeResult {
   error?: ErrorInfo;
 }
 
-export type RuntimeRequest = ConnectionTestRequest | SearchTestRequest | TranscribeRequest;
+/**
+ * Erases stored data (the settings page's Data section). Done in the
+ * background, which first stops the turns that would write more.
+ * - conversations: every conversation, message and task record
+ * - everything: also settings, API keys, site rules and granted site access
+ */
+export interface DataClearRequest {
+  type: 'data.clear';
+  scope: 'conversations' | 'everything';
+}
+
+export interface DataClearResult {
+  ok: boolean;
+}
+
+export type RuntimeRequest = ConnectionTestRequest | SearchTestRequest | TranscribeRequest | DataClearRequest;

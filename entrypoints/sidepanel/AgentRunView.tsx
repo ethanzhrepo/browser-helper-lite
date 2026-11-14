@@ -15,7 +15,7 @@ import {
   X,
   XCircle,
 } from 'lucide-react';
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import { ALL_SITES_PATTERN, requestHostAccess } from '../../src/permissions/hosts';
@@ -39,7 +39,8 @@ export function actionLabel(t: TFunction, action: AgentAction): string {
     seconds: String(a.seconds ?? ''),
     direction: a.direction === 'up' ? t('agent.directions.up') : t('agent.directions.down'),
   };
-  const key = `agent.actions.${action.tool}`;
+  // A key press says what it lands on, when something has the focus.
+  const key = action.tool === 'press' && action.target ? 'agent.actions.pressOn' : `agent.actions.${action.tool}`;
   return t(key, { ...values, defaultValue: action.tool });
 }
 
@@ -226,6 +227,46 @@ function CardShell({ tone, icon, title, children, testId }: {
 /** Approvals are ignored this long after a card appears. */
 const APPROVAL_ARM_MS = 500;
 
+const IS_MAC = /mac/i.test(navigator.platform);
+
+/** A key hint on a button. */
+function Key({ children }: { children: ReactNode }) {
+  return <kbd className="ml-1.5 rounded border border-current/25 px-1 font-sans text-[10px] font-medium leading-4 opacity-70">{children}</kbd>;
+}
+
+/**
+ * Enter and Escape answer the card that is showing. Not while you are writing
+ * something, and not while a button or a link has the focus: there the key
+ * already means something else.
+ */
+function useCardKeys(keys: { enter?: (event: KeyboardEvent) => boolean; escape?: () => void }) {
+  const latest = useRef(keys);
+  latest.current = keys;
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || event.isComposing || event.repeat) return;
+      const focused = document.activeElement;
+      const writing = (focused instanceof HTMLTextAreaElement || focused instanceof HTMLInputElement) && focused.value !== '';
+      const onControl = focused instanceof HTMLButtonElement || focused instanceof HTMLAnchorElement || focused instanceof HTMLSelectElement;
+      if (writing || (focused as HTMLElement | null)?.isContentEditable) return;
+      let handled = false;
+      if (event.key === 'Escape' && latest.current.escape) {
+        latest.current.escape();
+        handled = true;
+      } else if (event.key === 'Enter' && !event.shiftKey && !event.altKey && !onControl && latest.current.enter) {
+        handled = latest.current.enter(event);
+      }
+      if (handled) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+    };
+    // Capture: before the message box sees the key.
+    document.addEventListener('keydown', onKey, true);
+    return () => document.removeEventListener('keydown', onKey, true);
+  }, []);
+}
+
 function WaitingCard({ task, waiting, onSend }: {
   task: AgentTask;
   waiting: WaitReason;
@@ -240,6 +281,32 @@ function WaitingCard({ task, waiting, onSend }: {
   }, []);
   const respond = (response: Extract<AgentClientMessage, { type: 'respond' }>['response']) =>
     onSend({ type: 'respond', taskId: task.id, response });
+
+  const approval = waiting.kind === 'approval' ? waiting : undefined;
+  const highRisk = Boolean(approval) && (approval!.risk >= 3 || ['injection', 'exfiltration', 'secret'].includes(approval!.reason));
+  const grantSite = () => {
+    if (waiting.kind !== 'permission') return;
+    // requestHostAccess must run inside the click or key handler to keep the user gesture.
+    void requestHostAccess(waiting.url).then((granted) => respond({ kind: 'permission', granted }));
+  };
+  useCardKeys({
+    enter: (event) => {
+      if (approval) {
+        // A high-risk step takes a deliberate key combination, never a stray Enter.
+        if (!armed || (highRisk && !(event.metaKey || event.ctrlKey))) return false;
+        respond({ kind: 'approval', actionId: approval.actionId, decision: 'allowOnce' });
+      } else if (waiting.kind === 'permission') grantSite();
+      else if (waiting.kind === 'handoff') respond({ kind: 'continue' });
+      else return false;
+      return true;
+    },
+    escape:
+      approval
+        ? () => respond({ kind: 'approval', actionId: approval.actionId, decision: 'deny' })
+        : waiting.kind === 'permission'
+          ? () => respond({ kind: 'permission', granted: false })
+          : undefined,
+  });
 
   if (waiting.kind === 'approval') {
     const decide = (decision: ApprovalDecision) => respond({ kind: 'approval', actionId: waiting.actionId, decision });
@@ -271,14 +338,22 @@ function WaitingCard({ task, waiting, onSend }: {
               {clip(typed || fullUrl, 1000)}
             </p>
           )}
+          {/* "Press Enter" alone does not say what happens: name the form it sends. */}
+          {waiting.submits !== undefined && (
+            <p className="rounded-lg bg-subtle px-3 py-2 text-xs leading-relaxed text-fg" data-testid="approval-submits">
+              {waiting.submits ? t('agent.approval.submits', { button: clip(waiting.submits, 80) }) : t('agent.approval.submitsForm')}
+            </p>
+          )}
           <p className="text-xs text-muted">{t(`agent.approval.reason.${waiting.reason}`)}</p>
         </div>
         <div className="grid grid-cols-2 gap-1.5">
           <Button variant="primary" disabled={!armed} onClick={() => decide('allowOnce')}>
             {t('agent.approval.allowOnce')}
+            <Key>{high ? `${IS_MAC ? '⌘' : 'Ctrl'} ↵` : '↵'}</Key>
           </Button>
           <Button variant="danger" onClick={() => decide('deny')}>
             {t('agent.approval.deny')}
+            <Key>Esc</Key>
           </Button>
           {canAllowTask && (
             <Button disabled={!armed} onClick={() => decide('allowTask')} className={canAllowSite ? '' : 'col-span-2'}>
@@ -296,22 +371,24 @@ function WaitingCard({ task, waiting, onSend }: {
   }
 
   if (waiting.kind === 'permission') {
-    // requestHostAccess must run inside the click handler to keep the user gesture.
-    const grant = (pattern: string) =>
-      void requestHostAccess(pattern).then((granted) => respond({ kind: 'permission', granted }));
     return (
       <CardShell tone="accent" icon={KeyRound} title={t('agent.permission.title')} testId="permission-card">
         <p className="break-all text-[13px] leading-relaxed">{t('agent.permission.body', { origin: waiting.origin })}</p>
         <div className="grid grid-cols-2 gap-1.5">
-          <Button variant="primary" onClick={() => grant(waiting.url)}>
+          <Button variant="primary" onClick={grantSite}>
             {t('agent.permission.allowSite')}
+            <Key>↵</Key>
           </Button>
           <Button variant="danger" onClick={() => respond({ kind: 'permission', granted: false })}>
             {t('agent.permission.deny')}
+            <Key>Esc</Key>
           </Button>
           {/* After an injection attempt, access is granted one site at a time. */}
           {!task.injection && (
-            <Button onClick={() => grant(ALL_SITES_PATTERN)} className="col-span-2">
+            <Button
+              onClick={() => void requestHostAccess(ALL_SITES_PATTERN).then((granted) => respond({ kind: 'permission', granted }))}
+              className="col-span-2"
+            >
               {t('agent.permission.allowAll')}
             </Button>
           )}
@@ -333,6 +410,7 @@ function WaitingCard({ task, waiting, onSend }: {
         <div className="grid grid-cols-2 gap-1.5">
           <Button variant="primary" onClick={() => respond({ kind: 'continue' })}>
             {t('agent.handoff.done')}
+            <Key>↵</Key>
           </Button>
           <Button variant="danger" onClick={() => onSend({ type: 'stop', taskId: task.id })}>
             {t('agent.controls.stop')}

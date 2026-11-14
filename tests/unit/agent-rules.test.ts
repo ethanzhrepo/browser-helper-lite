@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { parseKeyCombo } from '../../src/agent/keys';
 import type { TargetInfo } from '../../src/agent/page/types';
 import { decide, modeDecision, policyFor, siteDecision } from '../../src/agent/policy';
-import { actionKind, classifyAction } from '../../src/agent/risk';
+import { actionKind, classifyAction, formSubmission } from '../../src/agent/risk';
 import { buildSearchUrl } from '../../src/search/search';
 import { DEFAULT_SEARCH_SETTINGS } from '../../src/storage/settings';
 
@@ -59,7 +59,34 @@ describe('classifyAction', () => {
     const coupon = target({ tag: 'input', inForm: true, editable: true, formSubmitText: 'Place order' });
     expect(classifyAction('type', { index: 1, text: 'SAVE10', submit: true }, coupon)).toMatchObject({ risk: 3, reason: 'payment' });
     expect(classifyAction('type', { index: 1, text: 'SAVE10', submit: true }, target({ tag: 'input', inForm: true, editable: true, formSubmitText: 'Apply' })).risk).toBe(2);
-    expect(classifyAction('type', { index: 1, text: 'cables', submit: true }, target({ tag: 'input', inForm: true, editable: true, isSearchField: true, formSubmitText: 'Pay' })).risk).toBe(1);
+  });
+
+  it('trusts a search box only when its form looks like a search', () => {
+    const search = (overrides: Partial<TargetInfo>) => target({ tag: 'input', inForm: true, editable: true, isSearchField: true, ...overrides });
+    const submit = (field: TargetInfo) => classifyAction('type', { index: 1, text: 'cables', submit: true }, field);
+    const enter = (field: TargetInfo) => classifyAction('press', { keys: 'Enter' }, field);
+    expect(submit(search({ formMethod: 'get', formSubmitText: 'Search' })).risk).toBe(1);
+    expect(submit(search({})).risk).toBe(1);
+    // A field named "q" does not make "Delete account" a search, in any mode.
+    for (const classify of [submit, enter]) {
+      expect(classify(search({ formSubmitText: 'Delete account' }))).toMatchObject({ risk: 3, reason: 'destructive' });
+      expect(classify(search({ formSubmitText: 'Pay' }))).toMatchObject({ risk: 3, reason: 'payment' });
+      expect(classify(search({ formMethod: 'post', formSubmitText: 'Search' }))).toMatchObject({ risk: 2, reason: 'submit' });
+    }
+    const posted = search({ formMethod: 'post' });
+    expect(actionKind('type', { index: 1, text: 'x' }, posted, classifyAction('type', { index: 1, text: 'x' }, posted))).toBe('change');
+    expect(decide('query', undefined, submit(search({ formSubmitText: 'Delete account' })).risk, 'change')).toBe('deny');
+  });
+
+  it('says which form a step sends with Enter', () => {
+    const coupon = target({ tag: 'input', inForm: true, editable: true, formSubmitText: 'Delete account' });
+    expect(formSubmission('press', { keys: 'Enter' }, coupon)).toBe('Delete account');
+    expect(formSubmission('type', { index: 1, text: 'x', submit: true }, coupon)).toBe('Delete account');
+    expect(formSubmission('press', { keys: 'Enter' }, target({ tag: 'input', inForm: true, editable: true }))).toBe('');
+    expect(formSubmission('press', { keys: 'Tab' }, coupon)).toBeUndefined();
+    expect(formSubmission('type', { index: 1, text: 'x' }, coupon)).toBeUndefined();
+    expect(formSubmission('press', { keys: 'Enter' }, target({ tag: 'input', editable: true }))).toBeUndefined();
+    expect(formSubmission('press', { keys: 'Enter' }, undefined)).toBeUndefined();
   });
 
   it('judges key presses by what they act on', () => {

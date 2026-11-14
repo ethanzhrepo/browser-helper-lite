@@ -1,5 +1,5 @@
 {
   "extName": { "message": "Browser Helper Lite" },
-  "extDescription": { "message": "Un panneau latéral d'IA compatible avec le modèle de votre choix : discutez des pages et, avec votre autorisation, laissez-le agir sur les sites à votre place." },
+  "extDescription": { "message": "Assistant IA latéral pour votre modèle et votre clé API : interrogez les pages et laissez-le agir sur les sites autorisés." },
   "actionTitle": { "message": "Ouvrir Browser Helper" }
 }

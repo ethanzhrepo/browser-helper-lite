@@ -55,6 +55,8 @@ export function Composer(props: {
   onModeChange: (mode: AgentMode) => void;
   /** Replaces the default placeholder, e.g. while the agent asks a question. */
   placeholder?: string;
+  /** The message box takes the cursor when the panel opens and whenever this changes. */
+  focusKey?: number;
   text: string;
   onTextChange: (text: string) => void;
   tab?: ActiveTab;
@@ -84,6 +86,10 @@ export function Composer(props: {
   const [caret, setCaret] = useState(0);
   const [activeIndex, setActiveIndex] = useState(0);
   const [dismissedFor, setDismissedFor] = useState<string>();
+
+  useEffect(() => {
+    textareaRef.current?.focus();
+  }, [props.focusKey, disabled]);
 
   // Grow with the content up to a limit.
   useLayoutEffect(() => {

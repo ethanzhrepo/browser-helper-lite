@@ -14,10 +14,23 @@
     "history": "Historial",
     "settings": "Ajustes"
   },
+  "menu": {
+    "askSelection": "Preguntar sobre «%s»",
+    "summarize": "Resumir esta página"
+  },
+  "welcome": {
+    "title": "Dos pasos para empezar",
+    "stepModel": "Añade abajo una conexión a un modelo.",
+    "stepOpen": "Abre cualquier página y pulsa el icono de la extensión en la barra de herramientas."
+  },
+  "update": {
+    "available": "La versión {{version}} está disponible",
+    "how": "Actualizar"
+  },
   "model": {
     "choose": "Elegir un modelo",
     "search": "Buscar modelos",
-    "none": "No hay modelos. Añade una conexión o escribe un ID de modelo en los ajustes.",
+    "none": "Aún no hay modelos. Añade una conexión en los ajustes.",
     "manage": "Gestionar modelos",
     "favorite": "Añadir a favoritos",
     "unfavorite": "Quitar de favoritos",
@@ -29,7 +42,7 @@
   },
   "empty": {
     "setupTitle": "Conecta un modelo para empezar",
-    "setupBody": "Añade una clave de API de OpenAI, Anthropic, Gemini, DeepSeek o de cualquier servicio compatible con OpenAI. Las claves se quedan en este dispositivo.",
+    "setupBody": "Usa tu propia clave de API. Se queda en este dispositivo.",
     "setupAction": "Añadir un modelo",
     "title": "¿En qué te ayudo?",
     "actions": {
@@ -37,42 +50,42 @@
       "translate": "Traducir la selección o la página",
       "explain": "Explicar el texto seleccionado"
     },
-    "tip": "Escribe / para ver comandos y @ para adjuntar la página, tu selección u otra pestaña.",
-    "body": "Pregunta lo que quieras. También puedo leer esta página, buscar en la web y trabajar en tus pestañas.",
-    "tasksTitle": "O encárgame una tarea",
+    "tip": "/ para comandos · @ para adjuntar una página, selección o pestaña",
+    "body": "Pregunta sobre esta página o encárgame una tarea en tus pestañas.",
+    "tasksTitle": "Prueba una tarea",
     "examples": {
-      "plans": "Busca los planes móviles de Rogers por menos de 60 $ al mes y compáralos en una tabla",
-      "compare": "Busca un cargador USB-C de 65 W en Amazon y AliExpress y compara precio y plazo de entrega",
-      "process": "Averigua paso a paso cómo transferir mi número a Rogers"
+      "plans": "Busca los planes móviles de Rogers por menos de 60 $/mes y compáralos en una tabla",
+      "compare": "Compara cargadores USB-C de 65 W en Amazon y AliExpress: precio y entrega",
+      "process": "¿Cómo paso mi número a Rogers? Enumera los pasos"
     },
-    "tabsTip": "Este panel pertenece a esta pestaña; otras pestañas tienen su propio chat al abrirlo allí."
+    "tabsTip": "Cada pestaña tiene su propia conversación."
   },
   "composer": {
     "placeholder": "Pregunta lo que quieras…",
-    "placeholderNoModel": "Añade un modelo en los ajustes para empezar",
+    "placeholderNoModel": "Añade primero un modelo en los ajustes",
     "send": "Enviar",
     "stop": "Detener",
     "removeSelection": "Quitar la selección",
-    "defaultPrompt": "Por favor, revisa el contenido adjunto.",
-    "placeholderAnswer": "Responde a la pregunta del asistente…",
+    "defaultPrompt": "Mira el contenido adjunto.",
+    "placeholderAnswer": "Escribe tu respuesta…",
     "mode": "Modo",
     "modes": {
       "query": "Consulta",
       "auto": "Automático",
       "manual": "Aprobación manual",
-      "queryHint": "Lee páginas, busca y sigue enlaces. Nunca pulsa botones, rellena formularios ni envía nada.",
-      "autoHint": "Lee y opera las páginas por su cuenta. Solo los pasos de alto riesgo (pagos, eliminaciones, cambios de cuenta) esperan tu aprobación.",
-      "manualHint": "Lee, se desplaza y busca por su cuenta. Cada acción que cambia una página espera tu aprobación."
+      "queryHint": "Lee, busca y sigue enlaces. No cambia nada.",
+      "autoHint": "Trabaja solo. Pregunta antes de pagos, eliminaciones y otros pasos de alto riesgo.",
+      "manualHint": "Lee y busca solo. Pregunta antes de cada cambio."
     },
     "removeAttachment": "Quitar el adjunto"
   },
   "context": {
-    "unavailable": "No se puede leer esta página",
-    "needsAccess": "Haz clic para permitir la lectura de este sitio",
-    "includeHint": "Adjuntar esta página a tu próximo mensaje",
-    "accessDenied": "No se concedió acceso a este sitio, así que no se puede adjuntar la página.",
-    "noSelection": "No hay texto seleccionado en la página.",
-    "captureFailed": "No se pudo leer esta página. Recárgala e inténtalo de nuevo."
+    "unavailable": "Esta página no se puede leer",
+    "needsAccess": "Pulsa para permitir este sitio",
+    "includeHint": "Adjuntar esta página",
+    "accessDenied": "Sin acceso a este sitio: la página no se adjuntó.",
+    "noSelection": "No hay nada seleccionado en la página.",
+    "captureFailed": "No se pudo leer la página. Recárgala e inténtalo de nuevo."
   },
   "mentions": {
     "page": "Página actual",
@@ -87,18 +100,18 @@
     },
     "translate": {
       "label": "Traducir",
-      "description": "La selección o toda la página",
+      "description": "La selección, o la página",
       "prompt": "Traduce el contenido adjunto al {{language}}. Si ya está en {{language}}, tradúcelo al inglés."
     },
     "explain": {
       "label": "Explicar",
-      "description": "El texto seleccionado, con palabras sencillas",
+      "description": "La selección, con palabras sencillas",
       "prompt": "Explica el texto seleccionado con palabras sencillas."
     },
     "extractTables": {
       "label": "Extraer tablas",
-      "description": "Datos estructurados como tablas Markdown",
-      "prompt": "Extrae los datos estructurados de esta página (precios, planes, especificaciones, listas) en tablas Markdown."
+      "description": "Los datos de la página en tablas Markdown",
+      "prompt": "Extrae los datos estructurados de esta página (precios, planes, especificaciones, listas) como tablas Markdown."
     }
   },
   "message": {
@@ -108,29 +121,37 @@
     "copy": "Copiar",
     "copied": "Copiado",
     "retry": "Reintentar",
+    "regenerate": "Regenerar",
+    "editHint": "Sustituye este mensaje y las respuestas posteriores",
+    "tokens": "↑{{input}} ↓{{output}}",
+    "tokensHint": "Tokens enviados y recibidos",
+    "toLatest": "Ir a lo último",
     "truncated": "parcial",
-    "diagramError": "No se pudo dibujar este diagrama. Aquí está su código.",
+    "diagramError": "No se pudo dibujar este diagrama. Su código:",
     "copySvg": "Copiar SVG",
     "image": "Imagen",
-    "linkData": "Este enlace lleva datos en su dirección (como un correo electrónico o un código largo). Compruébala y vuelve a hacer clic en el enlace para abrirlo:"
+    "linkData": "La dirección de este enlace lleva datos (un correo, un código largo). Revísala y pulsa otra vez para abrirlo:"
   },
   "history": {
     "title": "Historial",
     "search": "Buscar conversaciones",
-    "empty": "Todavía no hay conversaciones",
-    "untitled": "Sin título"
+    "empty": "Aún no hay conversaciones",
+    "noMatches": "Sin resultados",
+    "untitled": "Sin título",
+    "deleted": "Conversación eliminada",
+    "undo": "Deshacer"
   },
   "errors": {
     "auth": "La clave de API fue rechazada. Revísala en los ajustes.",
-    "forbidden": "El proveedor denegó el acceso (403). Revisa los permisos o la región de la clave.",
+    "forbidden": "Acceso denegado (403). Revisa los permisos o la región de la clave.",
     "notFound": "No encontrado (404). Revisa la URL base y el ID del modelo.",
-    "rateLimit": "Se alcanzó el límite de solicitudes o la cuota. Espera un momento o revisa tu saldo.",
+    "rateLimit": "Límite o cuota alcanzados. Espera, o revisa tu saldo.",
     "badRequest": "El proveedor rechazó la solicitud ({{status}}).",
-    "server": "El proveedor tuvo un error de servidor ({{status}}). Inténtalo más tarde.",
-    "network": "No se pudo contactar con el proveedor. Revisa tu red, la URL base y el acceso al sitio.",
-    "noModel": "No hay ningún modelo seleccionado. Elige uno en los ajustes.",
-    "noKey": "Esta conexión no tiene clave de API. Añade una en los ajustes.",
-    "insecure": "Tu clave de API se enviaría por HTTP sin cifrar. Usa una dirección https:// (http solo se permite para este equipo, como localhost).",
+    "server": "Error del proveedor ({{status}}). Inténtalo más tarde.",
+    "network": "No se pudo contactar con el proveedor. Revisa tu red y la URL base.",
+    "noModel": "No hay modelo seleccionado. Elige uno en los ajustes.",
+    "noKey": "Esta conexión no tiene clave de API.",
+    "insecure": "Tu clave de API viajaría sin cifrar. Usa una dirección https://; http solo vale para este equipo.",
     "unknown": "Algo salió mal."
   },
   "options": {
@@ -141,6 +162,7 @@
       "models": "Funciones de los modelos",
       "sites": "Acceso a sitios",
       "language": "Idioma",
+      "data": "Datos",
       "about": "Acerca de",
       "agent": "Agente",
       "search": "Búsqueda",
@@ -149,16 +171,16 @@
   },
   "connections": {
     "title": "Proveedores de modelos",
-    "description": "Añade una conexión por proveedor. Las claves se guardan solo en este dispositivo y solo se envían al proveedor que configures.",
+    "description": "Una conexión por proveedor. Las claves se quedan en este dispositivo y solo van a ese proveedor.",
     "add": "Añadir conexión",
-    "empty": "Todavía no hay conexiones.",
-    "confirmDelete": "¿Eliminar la conexión «{{name}}»? Su clave de API se borrará de este dispositivo.",
+    "empty": "Aún no hay conexiones.",
+    "confirmDelete": "¿Eliminar «{{name}}» y su clave de API?",
     "modelCount_one": "{{count}} modelo",
-    "modelCount_many": "{{count}} de modelos",
+    "modelCount_many": "{{count}} modelos",
     "modelCount_other": "{{count}} modelos",
-    "noModelList": "Sin lista de modelos. Escribe los IDs en Funciones de los modelos.",
+    "noModelList": "Sin lista de modelos. Escribe los ID en Funciones de los modelos.",
     "compatible": "Compatible con OpenAI",
-    "customPreset": "Endpoint personalizado",
+    "customPreset": "Dirección personalizada",
     "fields": {
       "vendor": "Proveedor",
       "preset": "Servicio",
@@ -167,81 +189,114 @@
       "apiKey": "Clave de API",
       "apiKeyOptional": "Clave de API (opcional)"
     },
-    "keyHint": "Consejo: crea una clave aparte con un límite de gasto para esta extensión.",
+    "keyHint": "Consejo: usa una clave aparte con límite de gasto.",
     "getKey": "Obtener una clave",
-    "keyKeep": "Guardada. Déjala vacía para conservarla",
-    "showKey": "Mostrar clave",
-    "hideKey": "Ocultar clave",
+    "keyKeep": "Guardada. Déjalo vacío para conservarla",
+    "showKey": "Mostrar la clave",
+    "hideKey": "Ocultar la clave",
     "test": "Probar conexión",
     "testOk_one": "Conectado. Se encontró {{count}} modelo.",
-    "testOk_many": "Conectado. Se encontraron {{count}} de modelos.",
+    "testOk_many": "Conectado. Se encontraron {{count}} modelos.",
     "testOk_other": "Conectado. Se encontraron {{count}} modelos.",
-    "noModelsEndpoint": "Puede que este servicio no ofrezca una lista de modelos. Aun así puedes guardarlo y escribir un ID de modelo en Funciones de los modelos.",
+    "noModelsEndpoint": "Este servicio no ofrece lista de modelos. Guárdalo y escribe un ID en Funciones de los modelos.",
     "validation": {
-      "baseURL": "Escribe una URL base http(s) válida.",
-      "apiKey": "Escribe una clave de API.",
-      "permission": "Se necesita acceso a este host de API para conectar. Permítelo cuando Chrome lo pida."
+      "baseURL": "Introduce una URL base http(s) válida.",
+      "apiKey": "Introduce una clave de API.",
+      "permission": "Permite el acceso a este host cuando Chrome lo pida."
     },
     "hints": {
-      "region": "Las cuentas de China continental y las internacionales usan direcciones distintas. Cambia la URL base si tu clave es de la otra región.",
-      "ollama": "Ollama bloquea las extensiones de forma predeterminada. Reinícialo con la variable de entorno OLLAMA_ORIGINS=chrome-extension://* y vuelve a intentarlo."
+      "region": "Las cuentas de China continental y las internacionales usan direcciones distintas. Cambia la URL base si hace falta.",
+      "ollama": "Ollama bloquea las extensiones por defecto. Inícialo con OLLAMA_ORIGINS=chrome-extension://* e inténtalo de nuevo."
     },
-    "noModels": "Sin lista de modelos"
+    "noModels": "Sin lista"
   },
   "slots": {
     "title": "Funciones de los modelos",
-    "description": "Elige qué modelo se encarga de cada tipo de trabajo. Puedes combinar proveedores libremente.",
-    "noConnections": "Primero añade una conexión con un proveedor.",
-    "addConnection": "Añadir una conexión",
+    "description": "Qué modelo hace cada trabajo. Mezcla proveedores libremente.",
+    "noConnections": "Añade primero una conexión.",
+    "addConnection": "Añadir conexión",
     "connection": "Conexión",
     "model": "Modelo",
     "notSet": "Sin definir",
-    "typeModelId": "Esta conexión no tiene lista de modelos. Escribe el ID del modelo.",
+    "typeModelId": "Aquí no hay lista. Escribe el ID del modelo.",
     "modelPlaceholder": "ID del modelo",
     "chat": {
       "title": "Modelo actual",
-      "description": "Responde y trabaja en el panel lateral, también operando páginas (necesita llamadas a herramientas). Cámbialo desde la cabecera del panel."
+      "description": "Responde y opera páginas (necesita llamadas a herramientas). Cámbialo en la cabecera del panel."
     },
     "fast": {
       "title": "Modelo rápido",
-      "description": "Trabajo sencillo y barato: extraer información de páginas largas."
+      "description": "Extrae información de páginas largas. Elige uno barato."
     },
     "vision": {
       "title": "Modelo de visión",
-      "description": "Mira capturas de pantalla por los modelos que no ven imágenes (p. ej., DeepSeek). Elige un modelo multimodal rápido y barato."
+      "description": "Lee capturas de pantalla para modelos que no ven imágenes."
     },
     "stt": {
       "title": "Modelo de voz a texto",
-      "description": "Transcribe la entrada de voz cuando esta usa un modelo de voz a texto.",
-      "modelHint": "Por ejemplo gpt-4o-transcribe o whisper-1 (OpenAI), whisper-large-v3 (Groq), gemini-2.5-flash (Gemini)."
+      "description": "Transcribe la entrada de voz.",
+      "modelHint": "P. ej. gpt-4o-transcribe, whisper-1 (OpenAI), whisper-large-v3 (Groq), gemini-2.5-flash (Gemini)."
     }
   },
   "sites": {
     "title": "Acceso a sitios",
-    "description": "Sitios y hosts de API a los que puede acceder esta extensión. No se concede nada al instalarla: el acceso se pide la primera vez que usas un sitio.",
+    "description": "Sitios y hosts de API que la extensión puede usar. Cada uno se pide al usarlo por primera vez.",
     "allowAll": "Permitir todos los sitios",
     "allSites": "Todos los sitios",
-    "none": "Todavía no hay sitios permitidos.",
-    "usedByConnection": "Lo usa la conexión «{{name}}»",
+    "none": "Aún no hay sitios permitidos.",
+    "usedByConnection": "Lo usa «{{name}}»",
     "revoke": "Revocar",
-    "policiesTitle": "Reglas del agente por sitio",
-    "policiesDescription": "Decide qué puede hacer el agente en cada sitio. Una regla para example.com también cubre sus subdominios.",
-    "noPolicies": "Todavía no hay reglas.",
+    "policiesTitle": "Reglas por sitio",
+    "policiesDescription": "Qué puede hacer el agente en un sitio. Una regla para example.com cubre sus subdominios.",
+    "noPolicies": "Aún no hay reglas.",
     "hostLabel": "Sitio",
     "addPolicy": "Añadir",
-    "defaultPolicy": "Los sitios sin regla siguen el modo elegido en el panel. Si una regla de sitio y el modo no coinciden, gana la más estricta; los sitios «Automático» tampoco piden aprobación manual. Las acciones de alto riesgo siempre necesitan tu aprobación.",
+    "defaultPolicy": "Los demás sitios siguen el modo del panel lateral. Gana lo más estricto entre regla y modo, salvo que los sitios en Automático se saltan la aprobación manual. Los pasos de alto riesgo siempre preguntan.",
     "policies": {
       "blocked": "Bloqueado",
       "readOnly": "Solo lectura",
-      "confirmEach": "Confirmar cada acción",
-      "confirmRisky": "Confirmar acciones con riesgo",
+      "confirmEach": "Preguntar siempre",
+      "confirmRisky": "Preguntar si hay riesgo",
       "auto": "Automático (salvo alto riesgo)"
     }
   },
   "language": {
     "title": "Idioma",
     "description": "Idioma de la interfaz. Las respuestas siguen el idioma en que escribes.",
-    "auto": "Igual que el navegador ({{language}})"
+    "auto": "Como el navegador ({{language}})"
+  },
+  "data": {
+    "title": "Datos",
+    "description": "Todo se guarda en este navegador. Haz copia, muévelo o bórralo.",
+    "exportTitle": "Exportar",
+    "exportHint": "Ajustes y conversaciones en un archivo JSON.",
+    "export": "Exportar",
+    "includeKeys": "Incluir claves de API",
+    "includeKeysHint": "Quien tenga el archivo podrá usar tus claves.",
+    "importTitle": "Importar",
+    "importHint": "Sustituye tus ajustes y añade las conversaciones del archivo.",
+    "import": "Elegir archivo",
+    "importInvalid": "No es una exportación de Browser Helper Lite.",
+    "importConfirm_one": "¿Sustituir tus ajustes y añadir {{count}} conversación?",
+    "importConfirm_many": "¿Sustituir tus ajustes y añadir {{count}} conversaciones?",
+    "importConfirm_other": "¿Sustituir tus ajustes y añadir {{count}} conversaciones?",
+    "importConfirmChats_one": "¿Añadir {{count}} conversación?",
+    "importConfirmChats_many": "¿Añadir {{count}} conversaciones?",
+    "importConfirmChats_other": "¿Añadir {{count}} conversaciones?",
+    "importDone_one": "Importado. Se añadió {{count}} conversación.",
+    "importDone_many": "Importado. Se añadieron {{count}} conversaciones.",
+    "importDone_other": "Importado. Se añadieron {{count}} conversaciones.",
+    "clearTitle": "Eliminar todas las conversaciones",
+    "clearHint": "Mensajes, páginas adjuntas y registros de tareas. Los ajustes se quedan.",
+    "clear": "Eliminar todo",
+    "clearConfirm": "¿Eliminar todas las conversaciones? No se puede deshacer.",
+    "clearDone": "Se eliminaron todas las conversaciones.",
+    "resetTitle": "Borrar todo",
+    "resetHint": "Conversaciones, ajustes, claves de API, reglas y acceso a sitios.",
+    "reset": "Borrar",
+    "resetConfirm": "¿Borrar todas las conversaciones, los ajustes y las claves de API? No se puede deshacer.",
+    "resetDone": "Todo borrado.",
+    "failed": "No funcionó. Inténtalo de nuevo."
   },
   "about": {
     "title": "Acerca de",
@@ -249,13 +304,26 @@
     "cdpDriver": "Controlador CDP (permiso debugger)",
     "enabled": "Activado",
     "disabled": "Desactivado",
-    "privacy": "Browser Helper no tiene servidor propio. Las conversaciones se guardan en este navegador y las solicitudes van directamente a los proveedores que configures.",
-    "keys": "Las claves de API se guardan en el almacenamiento de la extensión y nunca se envían a páginas web.",
+    "shortcut": "Abrir el panel lateral",
+    "shortcutNone": "Sin atajo",
+    "shortcutChange": "Cambiar",
+    "checkNow": "Comprobar",
+    "checking": "Comprobando…",
+    "neverChecked": "Aún sin comprobar",
+    "upToDate": "Al día · comprobado el {{time}}",
+    "checkFailed": "No se pudo comprobar. Inténtalo más tarde.",
+    "updateAvailable": "La versión {{version}} está disponible",
+    "updateSteps": "Ejecuta esto de nuevo y pulsa recargar en la tarjeta de la extensión en chrome://extensions. Tus datos se conservan.",
+    "releaseNotes": "Notas de la versión",
+    "autoCheck": "Buscar actualizaciones a diario",
+    "autoCheckHint": "Pregunta a GitHub por la última versión. No se envía nada sobre ti.",
+    "privacy": "No hay servidor de Browser Helper. Las conversaciones se quedan en este navegador; las solicitudes van directas a tus proveedores.",
+    "keys": "Las claves de API se quedan en el almacenamiento de la extensión. Las páginas web no pueden leerlas.",
     "designDoc": "Documento de diseño del producto"
   },
   "agent": {
     "groupTitle": "Browser Helper",
-    "busy": "Ya hay una tarea en curso en esta conversación. Detenla o espera a que termine.",
+    "busy": "Ya hay una tarea en curso aquí. Detenla o espera.",
     "status": {
       "running": "Trabajando",
       "paused": "En pausa",
@@ -265,17 +333,18 @@
       "stopped": "Detenido"
     },
     "actionCount_one": "{{count}} acción",
-    "actionCount_many": "{{count}} de acciones",
+    "actionCount_many": "{{count}} acciones",
     "actionCount_other": "{{count}} acciones",
     "driverHint": "cdp: ratón y teclado reales · dom: eventos simulados",
     "actions": {
       "navigate": "Abrir {{url}}",
       "open_tab": "Abrir {{url}} en una pestaña nueva",
-      "click": "Hacer clic en {{target}}",
+      "click": "Pulsar {{target}}",
       "type": "Escribir «{{text}}» en {{target}}",
       "press": "Pulsar {{keys}}",
-      "hover": "Pasar el ratón por {{target}}",
-      "scroll": "Desplazar hacia {{direction}}",
+      "pressOn": "Pulsar {{keys}} en {{target}}",
+      "hover": "Apuntar a {{target}}",
+      "scroll": "Desplazarse hacia {{direction}}",
       "select_option": "Elegir «{{option}}» en {{target}}",
       "go_back": "Volver atrás",
       "switch_tab": "Cambiar a la pestaña {{tab}}",
@@ -296,54 +365,56 @@
     "approval": {
       "title": "¿Permitir esta acción?",
       "titleHigh": "Acción de alto riesgo: ¿permitirla?",
-      "body": "En {{site}}, el agente quiere:",
+      "titleSuspicious": "Revisa antes de permitir",
+      "body": "En {{site}}:",
+      "submits": "Esto envía el formulario «{{button}}».",
+      "submitsForm": "Esto envía el formulario donde está el campo.",
       "reason": {
         "payment": "Parece un pago o una compra.",
-        "destructive": "Parece difícil de deshacer (eliminar, cancelar, cambios en la cuenta o la seguridad).",
-        "submit": "Esto envía o guarda algo.",
-        "confirmEach": "Tu regla para este sitio pide confirmar cada paso.",
-        "sensitiveField": "Esto implica información sensible.",
-        "manualMode": "El modo de aprobación manual está activado.",
-        "injection": "Esta página intentó dar instrucciones al asistente, así que hasta el final de esta tarea pide permiso antes de cambiar páginas o abrir sitios nuevos.",
-        "exfiltration": "La dirección contiene datos (como un correo, un número de tarjeta o un código largo). Asegúrate de que quieres enviarlos a este sitio.",
-        "newSite": "Este sitio no ha aparecido en esta tarea: no está en tu petición, en tu pestaña ni en los resultados de búsqueda.",
-        "secret": "El texto parece una clave o un token. Asegúrate de que quieres introducirlo en este sitio.",
-        "clipboard": "Esto pega en la página lo que tengas en el portapapeles. El asistente no puede ver qué es.",
-        "frame": "Esto actúa dentro de un marco de otro sitio, que el asistente no puede leer. Comprueba dónde va a hacer clic o escribir.",
-        "download": "Esto descarga un archivo. Los programas y los archivos comprimidos pueden dañar tu equipo; permite solo los que esperas.",
-        "sensitivePage": "Esta página gestiona la seguridad de tu cuenta, claves, pagos o una consola en la nube, así que cada cambio se te consulta."
+        "destructive": "Parece difícil de deshacer: eliminación, cancelación o cambio de cuenta.",
+        "submit": "Envía, publica o guarda algo.",
+        "confirmEach": "Tu regla para este sitio pregunta siempre.",
+        "sensitiveField": "Implica información sensible.",
+        "manualMode": "La aprobación manual está activada.",
+        "injection": "Esta página intentó dar instrucciones al asistente, así que ahora pregunta antes de cambios y sitios nuevos.",
+        "exfiltration": "La dirección contiene datos (un correo, un número de tarjeta, un código largo). ¿Enviarlos a este sitio?",
+        "newSite": "Este sitio no ha aparecido en esta tarea.",
+        "secret": "El texto parece una clave o un token. ¿Introducirlo en este sitio?",
+        "clipboard": "Pega tu portapapeles en la página. El asistente no ve lo que contiene.",
+        "frame": "Actúa dentro del marco de otro sitio, que el asistente no puede leer.",
+        "download": "Descarga un archivo. Permite solo los archivos que esperas.",
+        "sensitivePage": "Esta página gestiona la seguridad de la cuenta, claves o pagos, así que cada cambio pregunta."
       },
       "allowOnce": "Permitir una vez",
       "allowTask": "Permitir en esta tarea",
       "allowSite": "Permitir siempre en este sitio",
-      "deny": "Denegar",
-      "titleSuspicious": "Revisa antes de permitir"
+      "deny": "Denegar"
     },
     "permission": {
-      "title": "¿Permitir el acceso a este sitio?",
-      "body": "El agente necesita leer y usar {{origin}} para continuar.",
+      "title": "¿Permitir este sitio?",
+      "body": "El agente necesita leer y usar {{origin}}.",
       "allowSite": "Permitir este sitio",
       "allowAll": "Permitir todos los sitios",
       "deny": "No permitir"
     },
     "handoff": {
       "title": {
-        "captcha": "Completa la verificación",
+        "captcha": "Resuelve la verificación",
         "login": "Inicia sesión",
         "verification": "Introduce el código",
-        "other": "Te toca a ti"
+        "other": "Tu turno"
       },
-      "captcha": "{{site}} pide una verificación humana. Complétala en la pestaña y luego continúa.",
-      "login": "Inicia sesión tú mismo en {{site}} y luego continúa.",
-      "verification": "Introduce el código de verificación en {{site}} y luego continúa.",
-      "other": "Termina este paso en {{site}} y luego continúa.",
-      "autoResume": "La tarea sigue sola cuando desaparece la verificación.",
+      "captcha": "{{site}} pide una comprobación humana. Resuélvela en la pestaña.",
+      "login": "Inicia sesión en {{site}}.",
+      "verification": "Introduce el código de verificación en {{site}}.",
+      "other": "Termina este paso en {{site}}.",
+      "autoResume": "Continúa solo cuando desaparezca la comprobación.",
       "done": "Listo, continuar"
     },
     "question": {
       "title": "El asistente pregunta:",
       "hint": "Responde en el cuadro de abajo.",
-      "noSecrets": "Nunca compartas aquí contraseñas, números de tarjeta ni códigos de verificación."
+      "noSecrets": "Nunca compartas aquí contraseñas, números de tarjeta ni códigos."
     },
     "controls": {
       "pause": "Pausar",
@@ -353,35 +424,35 @@
       "progress": "Paso {{step}}/{{max}}"
     },
     "overlay": {
-      "running": "Browser Helper está trabajando en esta pestaña",
+      "running": "Browser Helper está trabajando aquí",
       "stop": "Detener",
       "resume": "Reanudar",
       "continue": "Continuar",
-      "openPanel": "Abrir panel",
+      "openPanel": "Abrir el panel",
       "paused": {
-        "user": "En pausa. Reanuda cuando quieras.",
-        "interference": "En pausa porque usaste la página. Reanuda cuando termines.",
-        "debuggerDetached": "En pausa: se cerró la barra de depuración. Reanuda para seguir con eventos simulados."
+        "user": "En pausa.",
+        "interference": "En pausa porque usaste la página.",
+        "debuggerDetached": "En pausa: se cerró la barra de depuración. Al reanudar se usarán eventos simulados."
       },
       "waiting": {
         "approval": "Esperando tu aprobación en el panel lateral",
-        "question": "El agente tiene una pregunta en el panel lateral",
-        "handoff": "Te toca: termina este paso y pulsa Continuar",
-        "permission": "Esperando acceso al sitio en el panel lateral"
+        "question": "Hay una pregunta en el panel lateral",
+        "handoff": "Tu turno. Pulsa Continuar al terminar",
+        "permission": "Esperando el acceso al sitio en el panel lateral"
       }
     },
     "notification": {
       "title": {
-        "approval": "Se necesita tu aprobación",
+        "approval": "Se necesita aprobación",
         "question": "El agente tiene una pregunta",
-        "handoff": "Te toca a ti",
+        "handoff": "Tu turno",
         "permission": "Se necesita acceso al sitio"
       },
       "approval": "{{site}}: {{target}}",
       "permission": "¿Permitir el acceso a {{origin}}?",
       "question": "Abre el panel lateral para responder."
     },
-    "maxStepsSummary": "Me detuve tras {{count}} pasos sin terminar. Revisa los pasos de arriba y dame una tarea más concreta o sube el límite de pasos en los ajustes.",
+    "maxStepsSummary": "Me detuve tras {{count}} pasos sin terminar. Prueba una tarea más concreta, o sube el límite de pasos en los ajustes.",
     "stoppedSummary": "La tarea se detuvo.",
     "failedSummary": "La tarea falló: {{message}}",
     "thinking": "Pensando…",
@@ -391,22 +462,22 @@
     "closeTabs_other": "Cerrar las {{count}} pestañas que abrí",
     "injection": {
       "title": "Esta página intentó dar instrucciones al asistente",
-      "titleHidden": "Esta página oculta instrucciones para asistentes de IA",
-      "body": "Se le indicó al asistente que las ignore. Hasta que termine esta tarea, cambiar páginas y abrir sitios nuevos necesita tu aprobación."
+      "titleHidden": "Esta página esconde instrucciones para asistentes de IA",
+      "body": "Se ignoraron. Hasta que termine la tarea, los cambios y los sitios nuevos necesitan tu aprobación."
     }
   },
   "agentSettings": {
     "title": "Agente",
-    "description": "Cómo usa el asistente las páginas web por ti.",
-    "useCdp": "Usar ratón y teclado reales (CDP)",
-    "useCdpHint": "Más fiable en sitios modernos. Chrome muestra la barra «ha empezado a depurar este navegador» mientras se ejecuta una tarea.",
-    "cdpUnavailable": "No disponible: esta versión no incluye el permiso debugger.",
+    "description": "Cómo trabaja el asistente en las páginas web.",
+    "useCdp": "Ratón y teclado reales (CDP)",
+    "useCdpHint": "Más fiable. Chrome muestra una barra de depuración durante la tarea.",
+    "cdpUnavailable": "No está en esta versión (sin permiso debugger).",
     "notifications": "Avisarme cuando una tarea me necesite",
-    "notificationsHint": "Notificaciones de Chrome para CAPTCHA, inicios de sesión y aprobaciones.",
+    "notificationsHint": "Para CAPTCHA, inicios de sesión y aprobaciones.",
     "maxSteps": "Límite de pasos por tarea",
-    "maxStepsHint": "Entre 5 y 100.",
+    "maxStepsHint": "De 5 a 100.",
     "mode": "Modo predeterminado",
-    "modeHint": "También puedes cambiar de modo en cualquier momento bajo el cuadro de mensaje; se aplica al instante a una tarea en curso."
+    "modeHint": "También se cambia bajo el cuadro de mensaje, incluso en plena tarea."
   },
   "voice": {
     "start": "Entrada de voz",
@@ -414,65 +485,65 @@
     "transcribing": "Transcribiendo…",
     "listening": "Escuchando…",
     "problems": {
-      "permission": "Permite el micrófono en la pestaña que se acaba de abrir y vuelve a pulsar el micrófono.",
-      "unsupported": "Este navegador no admite reconocimiento de voz. Elige un modelo de voz a texto en Entrada de voz.",
-      "network": "El reconocimiento de voz de Chrome no pudo conectar con el servicio de Google. Revisa la red o usa un modelo de voz a texto.",
+      "permission": "Permite el micrófono en la pestaña que se abrió y pulsa otra vez el micrófono.",
+      "unsupported": "Este navegador no tiene reconocimiento de voz. Usa un modelo de voz a texto.",
+      "network": "Chrome no pudo contactar con el servicio de voz de Google. Revisa tu red, o usa un modelo de voz a texto.",
       "transcribe": "No se pudo transcribir la grabación."
     },
     "permission": {
       "title": "Acceso al micrófono",
       "askingTitle": "Permite el micrófono",
-      "askingBody": "Chrome pregunta si Browser Helper puede usar tu micrófono. Solo se usa mientras dictas.",
+      "askingBody": "Chrome lo pide para Browser Helper. Solo se usa mientras la entrada de voz está activa.",
       "grantedTitle": "Micrófono permitido",
-      "grantedBody": "Ya puedes dictar en el panel lateral. Esta pestaña se cierra sola.",
+      "grantedBody": "La entrada de voz está lista. Esta pestaña se cierra sola.",
       "deniedTitle": "Micrófono bloqueado",
-      "deniedBody": "Permítelo con el icono a la derecha de la barra de direcciones, o en la configuración de Chrome › Privacidad y seguridad › Configuración de sitios › Micrófono, y vuelve a intentarlo.",
+      "deniedBody": "Permítelo desde el icono a la derecha de la barra de direcciones e inténtalo de nuevo.",
       "retry": "Reintentar"
     },
     "title": "Entrada de voz",
-    "description": "Habla en lugar de escribir: pulsa el micrófono en el cuadro de mensaje y vuelve a pulsarlo (o haz una pausa de dos segundos) para terminar.",
+    "description": "Pulsa el micrófono para hablar. Pulsa otra vez, o haz una pausa de dos segundos, para terminar.",
     "engine": "Reconocimiento",
     "engines": {
       "browser": {
         "title": "Reconocimiento de voz de Chrome",
-        "description": "Gratis y en tiempo real. El audio se envía al servicio de voz de Google."
+        "description": "Gratis y en tiempo real. El audio va al servicio de voz de Google."
       },
       "stt": {
         "title": "Modelo de voz a texto",
-        "description": "Graba y luego envía el audio al modelo de voz a texto de Funciones de los modelos. Más preciso y mejor con idiomas mezclados."
+        "description": "Graba y envía el audio a tu modelo. Más preciso con idiomas mezclados."
       }
     },
     "setSttModel": "Elegir un modelo de voz a texto",
     "language": "Idioma hablado",
     "languageAuto": "El de la interfaz",
     "autoSend": "Enviar cuando deje de hablar",
-    "autoSendHint": "Si no, el texto se queda en el cuadro para que lo edites.",
+    "autoSendHint": "Desactivado: el texto espera en el cuadro para que lo edites.",
     "microphone": "Micrófono",
-    "micHint": "Un panel lateral no puede pedir el micrófono, así que se abre una pestaña una vez para pedirlo.",
+    "micHint": "Se abre una pestaña una vez para pedirlo: los paneles laterales no pueden.",
     "micGranted": "Browser Helper puede usar el micrófono.",
     "micAllowed": "Permitido",
     "allowMic": "Permitir el micrófono"
   },
   "search": {
     "title": "Búsqueda",
-    "description": "Cómo busca el asistente en la web cuando una página no tiene la respuesta.",
-    "provider": "Servicio de búsqueda",
+    "description": "Cómo busca el asistente en la web.",
+    "provider": "Proveedor de búsqueda",
     "providers": {
       "browser": {
         "title": "Búsqueda en el navegador",
-        "description": "Google, Bing o DuckDuckGo en una pestaña en segundo plano. Gratis, puede encontrar CAPTCHA."
+        "description": "Google, Bing o DuckDuckGo en una pestaña en segundo plano. Gratis; puede haber CAPTCHA."
       },
       "deepseek": {
         "title": "API de búsqueda de DeepSeek",
-        "description": "Usa la clave de tu conexión de DeepSeek. Los resultados traen resúmenes escritos para modelos."
+        "description": "Usa la clave de tu conexión de DeepSeek."
       },
       "cloudflare": {
         "title": "Cloudflare Web Search",
-        "description": "A través de tu AI Gateway, con cargo a tu cuenta de Cloudflare. Fuentes: Ceramic, Exa, Linkup."
+        "description": "A través de tu AI Gateway, con cargo a tu cuenta de Cloudflare."
       },
       "tavily": {
         "title": "Tavily",
-        "description": "API de búsqueda pensada para agentes de IA."
+        "description": "API de búsqueda hecha para agentes de IA."
       },
       "brave": {
         "title": "Brave Search",
@@ -480,15 +551,15 @@
       },
       "exa": {
         "title": "Exa",
-        "description": "Búsqueda semántica con fragmentos destacados de cada página."
+        "description": "Búsqueda semántica con fragmentos de las páginas."
       },
       "native": {
-        "title": "Búsqueda propia del modelo",
-        "description": "OpenAI, Anthropic y Gemini buscan en la web por su lado, con el modelo actual."
+        "title": "La búsqueda del propio modelo",
+        "description": "OpenAI, Anthropic y Gemini buscan por su lado."
       }
     },
-    "engine": "Motor de búsqueda del navegador",
-    "engineFallbackHint": "Se usa cuando la API falla, si lo permites abajo.",
+    "engine": "Buscador del navegador",
+    "engineFallbackHint": "Se usa si la API falla, si lo permites abajo.",
     "engines": {
       "google": "Google",
       "bing": "Bing",
@@ -496,30 +567,30 @@
       "custom": "Personalizado"
     },
     "customUrl": "URL de búsqueda personalizada",
-    "customUrlHint": "Usa %s donde va la búsqueda.",
-    "deepseekNoConnection": "La búsqueda de DeepSeek usa la clave de una conexión de DeepSeek, y todavía no tienes ninguna.",
+    "customUrlHint": "Pon %s donde va la consulta.",
+    "deepseekNoConnection": "Añade primero una conexión de DeepSeek: se usa su clave.",
     "deepseekConnection": "Conexión de DeepSeek",
-    "deepseekHint": "Su clave de API y su URL base se usan para /v1/tools/search.",
-    "cloudflareAccount": "ID de cuenta",
-    "cloudflareGateway": "ID de AI Gateway",
+    "deepseekHint": "Su clave y su URL base se usan para /v1/tools/search.",
+    "cloudflareAccount": "Account ID",
+    "cloudflareGateway": "AI Gateway ID",
     "cloudflareSource": "Fuente de búsqueda",
     "cloudflareToken": "Token de API",
-    "cloudflareTokenHint": "Necesita los permisos Workers AI Read y AI Gateway Read.",
+    "cloudflareTokenHint": "Necesita Workers AI Read y AI Gateway Read.",
     "keyHint": "Se guarda solo en este dispositivo.",
-    "nativeHint": "Usa la conexión del modelo actual, que debe ser OpenAI, Anthropic o Gemini. Cada búsqueda es una petición de modelo más.",
-    "fallback": "Buscar en el navegador si la API falla",
-    "fallbackHint": "Por ejemplo, si la clave es incorrecta o se agotó la cuota.",
+    "nativeHint": "Necesita un modelo de OpenAI, Anthropic o Gemini. Cada búsqueda es una solicitud más.",
+    "fallback": "Recurrir a la búsqueda del navegador",
+    "fallbackHint": "Cuando la API falla, p. ej. clave incorrecta o cuota agotada.",
     "test": "Probar la búsqueda",
-    "testQuery": "Búsqueda de prueba",
+    "testQuery": "Consulta de prueba",
     "testOk_one": "Funciona. {{count}} resultado:",
     "testOk_many": "Funciona. {{count}} resultados:",
     "testOk_other": "Funciona. {{count}} resultados:",
     "testOkText": "Funciona. El modelo respondió:",
-    "verifyNote": "Sea cual sea el servicio, se pide al asistente que verifique los datos en las páginas de origen y las cite."
+    "verifyNote": "Al asistente siempre se le pide comprobar los datos en las páginas de origen y citarlas."
   },
   "tasks": {
     "running": "Trabajando en otra pestaña: {{title}}",
-    "waiting": "Otra pestaña te necesita: {{title}}",
+    "waiting": "Te necesita en otra pestaña: {{title}}",
     "show": "Ver"
   }
 }

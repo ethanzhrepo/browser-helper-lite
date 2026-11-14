@@ -14,10 +14,23 @@
     "history": "历史记录",
     "settings": "设置"
   },
+  "menu": {
+    "askSelection": "询问「%s」",
+    "summarize": "总结此页"
+  },
+  "welcome": {
+    "title": "两步开始使用",
+    "stepModel": "在下面添加一个模型连接。",
+    "stepOpen": "打开任意网页，点工具栏上的扩展图标。"
+  },
+  "update": {
+    "available": "有新版本 {{version}}",
+    "how": "更新"
+  },
   "model": {
     "choose": "选择模型",
     "search": "搜索模型",
-    "none": "没有可选的模型。请添加连接，或在设置里手动填写模型 ID。",
+    "none": "还没有模型，请在设置里添加连接。",
     "manage": "管理模型",
     "favorite": "设为常用",
     "unfavorite": "取消常用",
@@ -27,7 +40,7 @@
   },
   "empty": {
     "setupTitle": "先连接一个模型",
-    "setupBody": "添加 OpenAI、Anthropic、Gemini、DeepSeek 或任意 OpenAI 兼容服务的 API Key。Key 只保存在这台设备上。",
+    "setupBody": "使用你自己的 API Key，它只保存在这台设备上。",
     "setupAction": "添加模型",
     "title": "有什么可以帮你？",
     "actions": {
@@ -35,42 +48,42 @@
       "translate": "翻译选中内容或整页",
       "explain": "解释选中的文字"
     },
-    "tip": "输入 / 使用指令，输入 @ 附带页面、选中内容或其他标签页。",
-    "body": "直接提问就行。我也可以读取这个页面、上网搜索，或在标签页里替你操作。",
-    "tasksTitle": "或者交给我一个任务",
+    "tip": "/ 调用指令 · @ 附带页面、选中内容或标签页",
+    "body": "可以问这个页面，也可以让我在标签页里办事。",
+    "tasksTitle": "试试交给我一个任务",
     "examples": {
-      "plans": "在 Rogers 官网找出月费 60 加元以内的手机套餐，并用表格对比",
-      "compare": "在 Amazon 和 AliExpress 上搜索 65W USB-C 充电器，对比价格和配送时间",
-      "process": "查一下把手机号转入 Rogers 的办理流程，按步骤列出来"
+      "plans": "在 Rogers 官网找出月费 60 加元以内的手机套餐，用表格对比",
+      "compare": "对比 Amazon 和 AliExpress 上 65W USB-C 充电器的价格和配送",
+      "process": "怎么把手机号转入 Rogers？按步骤列出来"
     },
-    "tabsTip": "侧边栏只属于这个标签页；在别的标签页打开时，那里是它自己的对话。"
+    "tabsTip": "每个标签页有自己的对话。"
   },
   "composer": {
     "placeholder": "有什么想问的…",
-    "placeholderNoModel": "请先在设置中添加模型",
+    "placeholderNoModel": "请先在设置里添加模型",
     "send": "发送",
     "stop": "停止",
     "removeSelection": "移除选中内容",
     "defaultPrompt": "请看附带的内容。",
-    "placeholderAnswer": "回答助手的问题…",
+    "placeholderAnswer": "输入你的回答…",
     "mode": "模式",
     "modes": {
       "query": "查询模式",
       "auto": "自动模式",
       "manual": "手动批准",
-      "queryHint": "读页面、搜索、打开链接。不会点击按钮、填写表单或提交任何东西。",
-      "autoHint": "自动读取和操作页面。只有付款、删除、改账户设置等高风险操作会等你确认。",
-      "manualHint": "读取、滚动、搜索自动进行；每一个会改动页面的操作都要你批准。"
+      "queryHint": "只读页面、搜索、打开链接，不改动任何东西。",
+      "autoHint": "自动操作。付款、删除等高风险步骤会先问你。",
+      "manualHint": "自动读取和搜索。每次改动都先问你。"
     },
     "removeAttachment": "移除附件"
   },
   "context": {
     "unavailable": "无法读取此页面",
-    "needsAccess": "点击后授权读取此网站",
-    "includeHint": "在下一条消息中附带此页面",
-    "accessDenied": "没有获得此网站的访问授权，无法附带页面。",
-    "noSelection": "页面上没有选中的文字。",
-    "captureFailed": "无法读取此页面，请刷新页面后重试。"
+    "needsAccess": "点击授权此网站",
+    "includeHint": "附带此页面",
+    "accessDenied": "没有此网站的访问权限，页面未附带。",
+    "noSelection": "页面上没有选中文字。",
+    "captureFailed": "读取页面失败，请刷新后重试。"
   },
   "mentions": {
     "page": "当前页面",
@@ -85,7 +98,7 @@
     },
     "translate": {
       "label": "翻译",
-      "description": "选中内容，或整个页面",
+      "description": "选中内容，或整页",
       "prompt": "请把附带的内容翻译成{{language}}。如果它本来就是{{language}}，请翻译成英文。"
     },
     "explain": {
@@ -95,7 +108,7 @@
     },
     "extractTables": {
       "label": "提取表格",
-      "description": "把结构化数据整理成表格",
+      "description": "把页面数据整理成表格",
       "prompt": "请把这个页面上的结构化数据（价格、套餐、规格、列表等）整理成 Markdown 表格。"
     }
   },
@@ -106,29 +119,37 @@
     "copy": "复制",
     "copied": "已复制",
     "retry": "重试",
+    "regenerate": "重新生成",
+    "editHint": "会替换这条消息和它之后的回复",
+    "tokens": "↑{{input}} ↓{{output}}",
+    "tokensHint": "发送和接收的 token 数",
+    "toLatest": "回到最新",
     "truncated": "部分内容",
-    "diagramError": "这个图表画不出来，下面是它的源码。",
+    "diagramError": "图表画不出来，源码如下：",
     "copySvg": "复制 SVG",
     "image": "图片",
-    "linkData": "这个链接的网址里带着数据（比如邮箱地址或一长串编码）。请先核对，确认后再点一次链接打开："
+    "linkData": "这个链接的网址里带着数据（邮箱、长编码等）。核对后再点一次打开："
   },
   "history": {
     "title": "历史记录",
     "search": "搜索对话",
     "empty": "还没有对话",
-    "untitled": "未命名"
+    "noMatches": "没有匹配的对话",
+    "untitled": "未命名",
+    "deleted": "对话已删除",
+    "undo": "撤销"
   },
   "errors": {
-    "auth": "API Key 无效，请在设置中检查。",
-    "forbidden": "服务商拒绝访问（403），请检查 Key 的权限或所属区域。",
-    "notFound": "找不到资源（404），请检查 Base URL 和模型 ID。",
-    "rateLimit": "已触发频率限制或额度不足，请稍后再试或检查账户余额。",
+    "auth": "API Key 无效，请在设置里检查。",
+    "forbidden": "访问被拒绝（403），请检查 Key 的权限或区域。",
+    "notFound": "找不到（404），请检查 Base URL 和模型 ID。",
+    "rateLimit": "触发限流或额度不足，请稍后再试或检查余额。",
     "badRequest": "服务商拒绝了请求（{{status}}）。",
-    "server": "服务商出现服务器错误（{{status}}），请稍后重试。",
-    "network": "无法连接到服务商，请检查网络、Base URL 和网站访问授权。",
-    "noModel": "还没有选择模型，请在设置中选择。",
-    "noKey": "这个连接没有 API Key，请在设置中添加。",
-    "insecure": "这样会通过未加密的 HTTP 发送你的 API Key。请改用 https:// 地址（只有本机地址，例如 localhost，才允许用 http）。",
+    "server": "服务商出错（{{status}}），请稍后重试。",
+    "network": "连不上服务商，请检查网络和 Base URL。",
+    "noModel": "还没选模型，请在设置里选择。",
+    "noKey": "这个连接没有 API Key。",
+    "insecure": "这样会明文发送你的 API Key。请改用 https:// 地址，http 只能用于本机。",
     "unknown": "出了点问题。"
   },
   "options": {
@@ -139,6 +160,7 @@
       "models": "能力分配",
       "sites": "网站权限",
       "language": "语言",
+      "data": "数据",
       "about": "关于",
       "agent": "Agent",
       "search": "搜索",
@@ -147,12 +169,12 @@
   },
   "connections": {
     "title": "模型供应商",
-    "description": "每个供应商只需添加一次连接。Key 只保存在这台设备上，也只会发送给你配置的供应商。",
+    "description": "每个供应商添加一个连接。Key 只存在这台设备上，只发给对应的供应商。",
     "add": "添加连接",
     "empty": "还没有连接。",
-    "confirmDelete": "确定删除连接「{{name}}」吗？它的 API Key 也会从这台设备上移除。",
+    "confirmDelete": "删除「{{name}}」和它的 API Key？",
     "modelCount_other": "{{count}} 个模型",
-    "noModelList": "没有模型列表，请在「能力分配」中手动填写模型 ID。",
+    "noModelList": "没有模型列表，请在「能力分配」里填写模型 ID。",
     "compatible": "OpenAI 兼容接口",
     "customPreset": "自定义地址",
     "fields": {
@@ -163,79 +185,106 @@
       "apiKey": "API Key",
       "apiKeyOptional": "API Key（可选）"
     },
-    "keyHint": "建议为本插件单独创建一个设置了额度上限的 Key。",
+    "keyHint": "建议单独建一个有额度上限的 Key。",
     "getKey": "获取 Key",
-    "keyKeep": "已保存，留空则保持不变",
+    "keyKeep": "已保存，留空则不变",
     "showKey": "显示 Key",
     "hideKey": "隐藏 Key",
     "test": "测试连接",
     "testOk_other": "连接成功，找到 {{count}} 个模型。",
-    "noModelsEndpoint": "这个服务可能不提供模型列表。你仍然可以保存，然后在「能力分配」中手动填写模型 ID。",
+    "noModelsEndpoint": "这个服务不提供模型列表。保存后在「能力分配」里填写模型 ID。",
     "validation": {
       "baseURL": "请输入有效的 http(s) Base URL。",
       "apiKey": "请输入 API Key。",
-      "permission": "需要允许访问这个 API 地址才能连接，请在 Chrome 弹出提示时选择允许。"
+      "permission": "Chrome 询问时，请允许访问这个 API 地址。"
     },
     "hints": {
-      "region": "中国大陆版和国际版使用不同的接口地址。如果你的 Key 属于另一个区域，请修改 Base URL。",
-      "ollama": "Ollama 默认拒绝来自浏览器扩展的请求。请设置环境变量 OLLAMA_ORIGINS=chrome-extension://* 后重新启动 Ollama 再试。"
+      "region": "中国大陆版和国际版的接口地址不同，需要时请修改 Base URL。",
+      "ollama": "Ollama 默认拒绝扩展的请求。用 OLLAMA_ORIGINS=chrome-extension://* 启动后再试。"
     },
     "noModels": "无模型列表"
   },
   "slots": {
     "title": "能力分配",
-    "description": "为每类工作选择由哪个模型来完成，不同供应商可以自由搭配。",
-    "noConnections": "请先添加一个供应商连接。",
+    "description": "哪类工作用哪个模型，不同供应商可以混用。",
+    "noConnections": "请先添加连接。",
     "addConnection": "添加连接",
     "connection": "连接",
     "model": "模型",
     "notSet": "未设置",
-    "typeModelId": "这个连接没有模型列表，请手动填写模型 ID。",
+    "typeModelId": "这里没有模型列表，请填写模型 ID。",
     "modelPlaceholder": "模型 ID",
     "chat": {
       "title": "当前模型",
-      "description": "在侧边栏里回答和干活，包括操作网页（需要支持工具调用）。可以在侧边栏顶部随时切换。"
+      "description": "回答问题和操作网页（需要支持工具调用）。可在侧边栏顶部切换。"
     },
     "fast": {
       "title": "快速模型",
-      "description": "处理便宜、快速的杂活：从长页面里抽取信息。"
+      "description": "从长页面里抽取信息，选便宜的就行。"
     },
     "vision": {
       "title": "视觉模型",
-      "description": "替不能看图的模型（比如 DeepSeek）查看截图。建议选一个便宜、快速的多模态模型。"
+      "description": "替不能看图的模型查看截图。"
     },
     "stt": {
       "title": "语音识别模型",
-      "description": "当语音输入选择「语音识别模型」时，用它把录音转成文字。",
+      "description": "把语音输入转成文字。",
       "modelHint": "例如 gpt-4o-transcribe、whisper-1（OpenAI），whisper-large-v3（Groq），gemini-2.5-flash（Gemini）。"
     }
   },
   "sites": {
     "title": "网站权限",
-    "description": "这个插件可以访问的网站和 API 地址。安装时不申请任何网站，第一次在某个网站使用时才会请求授权。",
+    "description": "扩展可以访问的网站和 API 地址，第一次用到时才会请求授权。",
     "allowAll": "允许所有网站",
     "allSites": "所有网站",
     "none": "还没有授权任何网站。",
-    "usedByConnection": "连接「{{name}}」正在使用",
+    "usedByConnection": "「{{name}}」在使用",
     "revoke": "撤销",
-    "policiesTitle": "按网站设置 Agent 策略",
-    "policiesDescription": "决定 Agent 在每个网站上能做什么。为 example.com 设置的策略也适用于它的子域名。",
-    "noPolicies": "还没有设置任何网站策略。",
+    "policiesTitle": "网站规则",
+    "policiesDescription": "Agent 在各个网站上能做什么。example.com 的规则也适用于它的子域名。",
+    "noPolicies": "还没有规则。",
     "hostLabel": "网站",
     "addPolicy": "添加",
-    "defaultPolicy": "没有设置策略的网站，按侧边栏里选择的模式处理。网站策略和模式冲突时取更严格的；设为「自动」的网站在「手动批准」模式下也不再逐一确认。高风险操作始终需要你确认。",
+    "defaultPolicy": "其他网站按侧边栏里的模式处理。规则和模式取更严格的，但「全自动」的网站不受「手动批准」限制。高风险步骤始终会问你。",
     "policies": {
       "blocked": "禁止",
       "readOnly": "只读",
-      "confirmEach": "每步确认",
-      "confirmRisky": "有风险的操作需确认",
+      "confirmEach": "每次都问",
+      "confirmRisky": "有风险时问",
       "auto": "全自动（高风险除外）"
     }
   },
   "language": {
     "title": "语言",
-    "description": "界面语言。模型的回复会跟随你提问时使用的语言。",
+    "description": "界面语言。回复会跟随你提问的语言。",
     "auto": "跟随浏览器（{{language}}）"
+  },
+  "data": {
+    "title": "数据",
+    "description": "所有数据都存在这个浏览器里，可以备份、迁移或清除。",
+    "exportTitle": "导出",
+    "exportHint": "设置和对话导出为一个 JSON 文件。",
+    "export": "导出",
+    "includeKeys": "包含 API Key",
+    "includeKeysHint": "拿到文件的人就能使用你的 Key。",
+    "importTitle": "导入",
+    "importHint": "替换当前设置，并加入文件里的对话。",
+    "import": "选择文件",
+    "importInvalid": "这不是 Browser Helper Lite 的导出文件。",
+    "importConfirm_other": "替换当前设置，并加入 {{count}} 个对话？",
+    "importConfirmChats_other": "加入 {{count}} 个对话？",
+    "importDone_other": "导入完成，加入了 {{count}} 个对话。",
+    "clearTitle": "删除全部对话",
+    "clearHint": "包括消息、附带的页面和任务记录，设置保留。",
+    "clear": "全部删除",
+    "clearConfirm": "删除所有对话？此操作无法撤销。",
+    "clearDone": "已删除全部对话。",
+    "resetTitle": "清除全部数据",
+    "resetHint": "对话、设置、API Key、网站规则和网站授权。",
+    "reset": "清除",
+    "resetConfirm": "清除所有对话、设置和 API Key？此操作无法撤销。",
+    "resetDone": "已全部清除。",
+    "failed": "没有成功，请重试。"
   },
   "about": {
     "title": "关于",
@@ -243,13 +292,26 @@
     "cdpDriver": "CDP 驱动（debugger 权限）",
     "enabled": "已开启",
     "disabled": "已关闭",
-    "privacy": "Browser Helper 没有自己的服务器。对话保存在这个浏览器里，请求直接发给你配置的模型供应商。",
-    "keys": "API Key 保存在这个浏览器的扩展存储中，不会发送给任何网页。",
+    "shortcut": "打开侧边栏",
+    "shortcutNone": "未设置快捷键",
+    "shortcutChange": "修改",
+    "checkNow": "立即检查",
+    "checking": "正在检查…",
+    "neverChecked": "还没检查过",
+    "upToDate": "已是最新 · {{time}} 检查",
+    "checkFailed": "检查失败，请稍后再试。",
+    "updateAvailable": "有新版本 {{version}}",
+    "updateSteps": "再运行一次下面的命令，然后在 chrome://extensions 里点扩展卡片上的刷新。数据会保留。",
+    "releaseNotes": "更新说明",
+    "autoCheck": "每天检查更新",
+    "autoCheckHint": "向 GitHub 查询最新版本号，不发送任何个人信息。",
+    "privacy": "Browser Helper 没有服务器。对话存在这个浏览器里，请求直接发给你的模型供应商。",
+    "keys": "API Key 存在扩展自己的存储里，网页读不到。",
     "designDoc": "产品设计文档"
   },
   "agent": {
     "groupTitle": "Browser Helper",
-    "busy": "这个对话里已经有一个任务在进行。请先停止它，或等它完成。",
+    "busy": "这里已有任务在进行，请先停止或等它完成。",
     "status": {
       "running": "正在操作",
       "paused": "已暂停",
@@ -259,13 +321,14 @@
       "stopped": "已停止"
     },
     "actionCount_other": "{{count}} 个操作",
-    "driverHint": "cdp：真实的鼠标键盘输入 · dom：模拟页面事件",
+    "driverHint": "cdp：真实鼠标键盘 · dom：模拟事件",
     "actions": {
       "navigate": "打开 {{url}}",
       "open_tab": "在新标签页打开 {{url}}",
       "click": "点击 {{target}}",
       "type": "在 {{target}} 中输入「{{text}}」",
       "press": "按下 {{keys}}",
+      "pressOn": "在 {{target}} 上按下 {{keys}}",
       "hover": "把鼠标移到 {{target}}",
       "scroll": "向{{direction}}滚动",
       "select_option": "在 {{target}} 中选择「{{option}}」",
@@ -286,34 +349,36 @@
       "down": "下"
     },
     "approval": {
-      "title": "允许执行这个操作吗？",
-      "titleHigh": "高风险操作，确定允许吗？",
-      "body": "Agent 想在 {{site}} 上：",
+      "title": "允许这一步吗？",
+      "titleHigh": "高风险操作，允许吗？",
+      "titleSuspicious": "请先核实再允许",
+      "body": "在 {{site}} 上：",
+      "submits": "这会提交表单「{{button}}」。",
+      "submitsForm": "这会提交输入框所在的表单。",
       "reason": {
-        "payment": "这看起来是付款或购买。",
-        "destructive": "这看起来难以撤销（删除、取消、修改账户或安全设置）。",
-        "submit": "这会提交、发送或保存内容。",
-        "confirmEach": "你为这个网站设置了每步都要确认。",
-        "sensitiveField": "这涉及敏感信息。",
-        "manualMode": "当前是「手动批准」模式。",
-        "injection": "这个页面试图给助手下指令，所以在本次任务剩下的步骤里，改动页面或打开新网站前都会先问你。",
-        "exfiltration": "这个网址里带着数据（比如邮箱、银行卡号或一长串编码）。确认你愿意把它发给这个网站。",
-        "newSite": "这个网站在本次任务里没出现过：不在你的请求、当前标签页或搜索结果里。",
-        "secret": "要输入的内容像是密钥或令牌。请确认你要把它填到这个网站上。",
-        "clipboard": "这会把你剪贴板里的内容粘贴到页面上。助手看不到剪贴板里是什么。",
-        "frame": "这一步作用在另一个网站嵌入的框架里，助手读不到里面的内容。请确认它会点到或输入到哪里。",
-        "download": "这会下载一个文件。程序和压缩包可能危害你的电脑，只允许你预期中的文件。",
-        "sensitivePage": "这个页面涉及账户安全、密钥、支付或云控制台，所以每一次改动都要你确认。"
+        "payment": "看起来是付款或购买。",
+        "destructive": "看起来难以撤销：删除、取消或修改账户。",
+        "submit": "会提交、发送或保存内容。",
+        "confirmEach": "你为这个网站设了每次都问。",
+        "sensitiveField": "涉及敏感信息。",
+        "manualMode": "当前是手动批准模式。",
+        "injection": "这个页面试图给助手下指令，之后改动页面和打开新网站都会先问你。",
+        "exfiltration": "网址里带着数据（邮箱、卡号、长编码）。要发给这个网站吗？",
+        "newSite": "这个网站在本次任务里没出现过。",
+        "secret": "要输入的内容像密钥或令牌。要填到这个网站上吗？",
+        "clipboard": "会把剪贴板里的内容粘贴到页面上，助手看不到里面是什么。",
+        "frame": "作用在另一个网站的嵌入框架里，助手读不到里面的内容。",
+        "download": "会下载文件。只允许你预期中的文件。",
+        "sensitivePage": "这个页面涉及账户安全、密钥或支付，每次改动都会问你。"
       },
       "allowOnce": "允许一次",
       "allowTask": "本任务内都允许",
       "allowSite": "总是允许此网站",
-      "deny": "拒绝",
-      "titleSuspicious": "请先核实再允许"
+      "deny": "拒绝"
     },
     "permission": {
       "title": "允许访问这个网站吗？",
-      "body": "Agent 需要读取和操作 {{origin}} 才能继续。",
+      "body": "Agent 需要读取和操作 {{origin}}。",
       "allowSite": "允许此网站",
       "allowAll": "允许所有网站",
       "deny": "不允许"
@@ -325,17 +390,17 @@
         "verification": "请输入验证码",
         "other": "轮到你了"
       },
-      "captcha": "{{site}} 要求进行人机验证。请在标签页里完成验证，然后继续。",
-      "login": "请自己在 {{site}} 上登录，然后继续。",
-      "verification": "请在 {{site}} 上输入验证码，然后继续。",
-      "other": "请在 {{site}} 上完成这一步，然后继续。",
-      "autoResume": "验证完成后，任务会自动继续。",
+      "captcha": "{{site}} 需要人机验证，请在标签页里完成。",
+      "login": "请在 {{site}} 上登录。",
+      "verification": "请在 {{site}} 上输入验证码。",
+      "other": "请在 {{site}} 上完成这一步。",
+      "autoResume": "验证通过后会自动继续。",
       "done": "已完成，继续"
     },
     "question": {
       "title": "助手想问你：",
       "hint": "请在下方输入框里回答。",
-      "noSecrets": "不要在这里提供密码、银行卡号或验证码。"
+      "noSecrets": "不要在这里提供密码、卡号或验证码。"
     },
     "controls": {
       "pause": "暂停",
@@ -345,21 +410,21 @@
       "progress": "第 {{step}}/{{max}} 步"
     },
     "overlay": {
-      "running": "Browser Helper 正在操作这个标签页",
+      "running": "Browser Helper 正在操作此页",
       "stop": "停止",
       "resume": "继续",
       "continue": "继续",
       "openPanel": "打开侧边栏",
       "paused": {
-        "user": "已暂停。准备好后点继续。",
-        "interference": "你操作了页面，任务已暂停。完成后点继续。",
-        "debuggerDetached": "调试提示条被关闭，任务已暂停。继续后将改用模拟事件操作。"
+        "user": "已暂停。",
+        "interference": "你操作了页面，已暂停。",
+        "debuggerDetached": "调试提示条被关闭，已暂停。继续后改用模拟事件。"
       },
       "waiting": {
-        "approval": "正在等你在侧边栏里确认",
-        "question": "Agent 在侧边栏里有问题问你",
-        "handoff": "轮到你了：完成这一步后点继续",
-        "permission": "正在等你在侧边栏里授权访问网站"
+        "approval": "等你在侧边栏里确认",
+        "question": "侧边栏里有问题等你回答",
+        "handoff": "轮到你了，完成后点继续",
+        "permission": "等你在侧边栏里授权网站"
       }
     },
     "notification": {
@@ -367,13 +432,13 @@
         "approval": "需要你确认",
         "question": "Agent 有问题问你",
         "handoff": "轮到你了",
-        "permission": "需要网站访问授权"
+        "permission": "需要网站授权"
       },
       "approval": "{{site}}：{{target}}",
       "permission": "允许访问 {{origin}} 吗？",
       "question": "打开侧边栏回答。"
     },
-    "maxStepsSummary": "已经执行了 {{count}} 步，任务仍未完成，我先停下了。可以看看上面的步骤，然后给我一个更具体的任务，或者在设置里调高步数上限。",
+    "maxStepsSummary": "执行了 {{count}} 步仍未完成，先停下了。可以把任务说得更具体，或在设置里调高步数上限。",
     "stoppedSummary": "任务已停止。",
     "failedSummary": "任务失败：{{message}}",
     "thinking": "思考中…",
@@ -382,21 +447,21 @@
     "injection": {
       "title": "这个页面试图给助手下指令",
       "titleHidden": "这个页面藏着给 AI 助手的指令",
-      "body": "已经要求助手忽略这些内容。在这个任务结束前，改动页面和打开新网站都需要你批准。"
+      "body": "已忽略。任务结束前，改动页面和打开新网站都需要你批准。"
     }
   },
   "agentSettings": {
     "title": "Agent",
-    "description": "设置助手如何替你操作网页。",
-    "useCdp": "使用真实的鼠标和键盘输入（CDP）",
-    "useCdpHint": "在现代网站上更可靠。任务运行期间，Chrome 顶部会显示「正在调试此浏览器」提示条。",
-    "cdpUnavailable": "不可用：这个版本没有包含 debugger 权限。",
-    "notifications": "任务需要我时发送通知",
-    "notificationsHint": "遇到验证码、登录或需要确认时，发送 Chrome 通知。",
+    "description": "助手如何操作网页。",
+    "useCdp": "真实鼠标键盘输入（CDP）",
+    "useCdpHint": "更可靠。任务运行时 Chrome 会显示调试提示条。",
+    "cdpUnavailable": "此版本不支持（没有 debugger 权限）。",
+    "notifications": "任务需要我时通知我",
+    "notificationsHint": "遇到验证码、登录或需要确认时。",
     "maxSteps": "每个任务的步数上限",
-    "maxStepsHint": "5 到 100 之间。",
+    "maxStepsHint": "5 到 100。",
     "mode": "默认模式",
-    "modeHint": "也可以随时在输入框下方切换模式，对正在进行的任务立即生效。"
+    "modeHint": "也可以在输入框下方随时切换，任务进行中也生效。"
   },
   "voice": {
     "start": "语音输入",
@@ -404,65 +469,65 @@
     "transcribing": "正在识别…",
     "listening": "正在聆听…",
     "problems": {
-      "permission": "请在刚打开的标签页里允许使用麦克风，然后再点一次麦克风。",
-      "unsupported": "这个浏览器不支持语音识别。请在「语音输入」设置里改用语音识别模型。",
-      "network": "Chrome 语音识别连不上 Google 的服务。请检查网络，或改用语音识别模型。",
+      "permission": "请在打开的标签页里允许麦克风，然后再点一次麦克风。",
+      "unsupported": "这个浏览器不支持语音识别，请改用语音识别模型。",
+      "network": "Chrome 连不上 Google 的语音服务。请检查网络，或改用语音识别模型。",
       "transcribe": "录音没能转成文字。"
     },
     "permission": {
       "title": "麦克风权限",
       "askingTitle": "请允许使用麦克风",
-      "askingBody": "Chrome 正在询问是否允许 Browser Helper 使用麦克风。只在你开启语音输入时使用。",
+      "askingBody": "Chrome 正在替 Browser Helper 询问。只在语音输入开启时使用。",
       "grantedTitle": "已允许使用麦克风",
-      "grantedBody": "现在可以在侧边栏里使用语音输入了。这个标签页会自动关闭。",
+      "grantedBody": "语音输入可以用了。这个标签页会自动关闭。",
       "deniedTitle": "麦克风被拦截了",
-      "deniedBody": "请点地址栏右侧的图标允许，或在 Chrome 设置 › 隐私和安全 › 网站设置 › 麦克风 中允许，然后重试。",
+      "deniedBody": "点地址栏右侧的图标允许，然后重试。",
       "retry": "重试"
     },
     "title": "语音输入",
-    "description": "用说话代替打字：点输入框里的麦克风开始，再点一次（或停顿两秒）结束。",
+    "description": "点麦克风开始说话；再点一次或停顿两秒结束。",
     "engine": "识别方式",
     "engines": {
       "browser": {
         "title": "Chrome 语音识别",
-        "description": "免费、实时。音频会发送到 Google 的语音服务。"
+        "description": "免费、实时。音频会发给 Google 的语音服务。"
       },
       "stt": {
         "title": "语音识别模型",
-        "description": "先录音，再发给「能力分配」里的语音识别模型。准确率更高，中英混说更好。"
+        "description": "先录音，再发给你的模型。多语言混说更准。"
       }
     },
     "setSttModel": "设置语音识别模型",
     "language": "说话的语言",
     "languageAuto": "跟随界面语言",
     "autoSend": "说完自动发送",
-    "autoSendHint": "关闭时，文字留在输入框里，方便你修改。",
+    "autoSendHint": "关闭时，文字留在输入框里等你修改。",
     "microphone": "麦克风",
-    "micHint": "侧边栏里弹不出麦克风授权，所以第一次使用时会打开一个标签页来询问。",
+    "micHint": "侧边栏无法请求麦克风，所以会打开一个标签页来询问一次。",
     "micGranted": "Browser Helper 可以使用麦克风。",
     "micAllowed": "已允许",
     "allowMic": "允许使用麦克风"
   },
   "search": {
     "title": "搜索",
-    "description": "页面里找不到答案时，助手用什么方式上网搜索。",
+    "description": "助手如何上网搜索。",
     "provider": "搜索方式",
     "providers": {
       "browser": {
         "title": "浏览器搜索",
-        "description": "在后台标签页里用 Google、Bing 或 DuckDuckGo 搜索。免费，偶尔会遇到验证码。"
+        "description": "在后台标签页里用 Google、Bing 或 DuckDuckGo。免费，可能遇到验证码。"
       },
       "deepseek": {
         "title": "DeepSeek 搜索 API",
-        "description": "使用你的 DeepSeek 连接的 Key。结果带有专为模型撰写的摘要。"
+        "description": "使用你的 DeepSeek 连接的 Key。"
       },
       "cloudflare": {
         "title": "Cloudflare Web Search",
-        "description": "通过你的 AI Gateway 调用，从 Cloudflare 账户扣费。搜索源：Ceramic、Exa、Linkup。"
+        "description": "通过你的 AI Gateway 调用，从 Cloudflare 账户扣费。"
       },
       "tavily": {
         "title": "Tavily",
-        "description": "专为 AI Agent 设计的搜索 API。"
+        "description": "为 AI Agent 设计的搜索 API。"
       },
       "brave": {
         "title": "Brave Search",
@@ -470,15 +535,15 @@
       },
       "exa": {
         "title": "Exa",
-        "description": "语义搜索，附带每个页面的重点摘录。"
+        "description": "语义搜索，附带页面摘录。"
       },
       "native": {
         "title": "模型自带搜索",
-        "description": "OpenAI、Anthropic、Gemini 在自己那边联网搜索，使用当前模型。"
+        "description": "OpenAI、Anthropic、Gemini 在自己那边联网搜索。"
       }
     },
     "engine": "浏览器搜索引擎",
-    "engineFallbackHint": "在下方允许时，API 出错会改用它。",
+    "engineFallbackHint": "下方允许时，API 出错会改用它。",
     "engines": {
       "google": "Google",
       "bing": "Bing",
@@ -487,23 +552,23 @@
     },
     "customUrl": "自定义搜索地址",
     "customUrlHint": "用 %s 表示搜索词的位置。",
-    "deepseekNoConnection": "DeepSeek 搜索使用 DeepSeek 连接的 API Key，你还没有添加。",
+    "deepseekNoConnection": "请先添加 DeepSeek 连接，搜索会用它的 Key。",
     "deepseekConnection": "DeepSeek 连接",
-    "deepseekHint": "用它的 API Key 和 Base URL 调用 /v1/tools/search。",
-    "cloudflareAccount": "账户 ID（Account ID）",
+    "deepseekHint": "用它的 Key 和 Base URL 调用 /v1/tools/search。",
+    "cloudflareAccount": "Account ID",
     "cloudflareGateway": "AI Gateway ID",
     "cloudflareSource": "搜索源",
     "cloudflareToken": "API Token",
     "cloudflareTokenHint": "需要 Workers AI Read 和 AI Gateway Read 权限。",
     "keyHint": "只保存在这台设备上。",
-    "nativeHint": "使用当前模型所在的连接，必须是 OpenAI、Anthropic 或 Gemini。每次搜索会多一次模型请求。",
-    "fallback": "API 出错时改用浏览器搜索",
-    "fallbackHint": "比如 Key 不对或额度用完的时候。",
+    "nativeHint": "需要 OpenAI、Anthropic 或 Gemini 的模型。每次搜索多一次请求。",
+    "fallback": "出错时改用浏览器搜索",
+    "fallbackHint": "API 失败时，比如 Key 不对或额度用完。",
     "test": "测试搜索",
     "testQuery": "测试搜索词",
     "testOk_other": "可以用。共 {{count}} 条结果：",
     "testOkText": "可以用。模型回答：",
-    "verifyNote": "无论用哪种方式，助手都会被要求回到原网页核实，并标明来源。"
+    "verifyNote": "无论哪种方式，助手都会被要求回原网页核实并标明来源。"
   },
   "tasks": {
     "running": "正在另一个标签页工作：{{title}}",

@@ -78,6 +78,11 @@ export class AgentBrowser {
       /** Whether the side panel is open on a tab; where it is not, the overlay offers to open it. */
       hasPanel?: (tabId: number) => boolean;
       panelLabel?: string;
+      /**
+       * Why the agent must not touch a page at this address (a browser page, a
+       * site the user blocked, or one without site access); undefined when it may.
+       */
+      pageProblem?: (url: string) => Promise<string | undefined>;
     },
   ) {
     this.currentTabId = startTabId;
@@ -108,8 +113,22 @@ export class AgentBrowser {
     this.cdp = undefined;
   }
 
+  /**
+   * Every way of reaching a page goes through here first. Input sent through
+   * the debugger is not held back by Chrome's site permissions, so the check
+   * cannot be left to Chrome.
+   */
+  private async assertAllowed(tabId: number): Promise<void> {
+    const check = this.options.pageProblem;
+    if (!check) return;
+    const tab = await browser.tabs.get(tabId).catch(() => undefined);
+    const problem = await check(tab?.url ?? '');
+    if (problem) throw new ActionError(problem);
+  }
+
   /** Runs input through CDP when available; if CDP fails, falls back to DOM events for good. */
   private async input(viaCdp: (cdp: CdpDriver) => Promise<void>, viaDom: () => Promise<void>): Promise<void> {
+    await this.assertAllowed(this.currentTabId);
     this.usedInput = true;
     const cdp = this.cdp;
     if (cdp) {
@@ -133,6 +152,12 @@ export class AgentBrowser {
   // ---- Page script ----
 
   async call<M extends ApiMethod>(tabId: number, method: M, ...args: ApiArgs<M>): Promise<ApiReturn<M>> {
+    await this.assertAllowed(tabId);
+    return this.callUnchecked(tabId, method, ...args);
+  }
+
+  /** Only for taking our own overlay off a page, which must work on a site the user has just blocked. */
+  private async callUnchecked<M extends ApiMethod>(tabId: number, method: M, ...args: ApiArgs<M>): Promise<ApiReturn<M>> {
     const invoke = async () => {
       const [injection] = await browser.scripting.executeScript({
         target: { tabId },
@@ -171,9 +196,14 @@ export class AgentBrowser {
   }
 
   private async showOverlay(): Promise<void> {
+    if (this.overlay.mode === 'hidden') return this.hideOverlay(this.currentTabId);
     const { hasPanel, panelLabel } = this.options;
-    const offerPanel = this.overlay.mode !== 'hidden' && hasPanel && !hasPanel(this.currentTabId);
+    const offerPanel = hasPanel && !hasPanel(this.currentTabId);
     await this.quiet('setOverlay', { ...this.overlay, panelLabel: offerPanel ? panelLabel : undefined });
+  }
+
+  private async hideOverlay(tabId: number): Promise<void> {
+    await this.callUnchecked(tabId, 'setOverlay', { mode: 'hidden', message: '', stopLabel: '' }).catch(() => undefined);
   }
 
   // ---- Tabs ----
@@ -267,8 +297,7 @@ export class AgentBrowser {
 
   async switchTo(tabId: number, activate = true): Promise<void> {
     if (!this.tabs.has(tabId)) throw new ActionError(`Tab ${tabId} is not one of your tabs.`);
-    const hidden: OverlayState = { mode: 'hidden', message: '', stopLabel: '' };
-    await this.call(this.currentTabId, 'setOverlay', hidden).catch(() => undefined);
+    await this.hideOverlay(this.currentTabId);
     this.currentTabId = tabId;
     if (activate) await browser.tabs.update(tabId, { active: true });
     await this.refreshOverlay();
@@ -423,6 +452,7 @@ export class AgentBrowser {
 
   /** Viewport screenshot (JPEG, base64) with numbered element boxes drawn on it. */
   async screenshot(tabId = this.currentTabId): Promise<string> {
+    await this.assertAllowed(tabId);
     // Hidden tabs may not render, so bring the agent's tab to the front first.
     const tab = await browser.tabs.update(tabId, { active: true });
     await this.call(tabId, 'highlight', true).catch(() => undefined);
@@ -451,6 +481,7 @@ export class AgentBrowser {
 
   /** The whole page as Markdown (same extractor as the chat's page attachment). */
   async pageMarkdown(tabId = this.currentTabId): Promise<PageExtraction> {
+    await this.assertAllowed(tabId);
     const [injection] = await browser.scripting.executeScript({ target: { tabId }, files: ['/extract-page.js'] });
     const page = injection?.result as PageExtraction | undefined;
     if (!page) throw new ActionError('Could not read the page.');

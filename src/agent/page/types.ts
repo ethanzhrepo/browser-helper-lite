@@ -44,6 +44,8 @@ export interface TargetInfo {
   disabled: boolean;
   /** For an element inside a form: the text of the button that submits it. */
   formSubmitText?: string;
+  /** For an element inside a form: how the form is sent ("get" or "post"). */
+  formMethod?: 'get' | 'post';
   /** A link with the `download` attribute. */
   download?: boolean;
   /** A native select's options, for checking the one select_option picks. */

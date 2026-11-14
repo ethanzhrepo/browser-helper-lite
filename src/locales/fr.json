@@ -14,10 +14,23 @@
     "history": "Historique",
     "settings": "Paramètres"
   },
+  "menu": {
+    "askSelection": "Interroger sur « %s »",
+    "summarize": "Résumer cette page"
+  },
+  "welcome": {
+    "title": "Deux étapes pour commencer",
+    "stepModel": "Ajoutez une connexion à un modèle ci-dessous.",
+    "stepOpen": "Ouvrez une page web et cliquez sur l'icône de l'extension dans la barre d'outils."
+  },
+  "update": {
+    "available": "La version {{version}} est disponible",
+    "how": "Mettre à jour"
+  },
   "model": {
     "choose": "Choisir un modèle",
     "search": "Rechercher un modèle",
-    "none": "Aucun modèle. Ajoutez une connexion ou saisissez un identifiant de modèle dans les paramètres.",
+    "none": "Aucun modèle. Ajoutez une connexion dans les paramètres.",
     "manage": "Gérer les modèles",
     "favorite": "Ajouter aux favoris",
     "unfavorite": "Retirer des favoris",
@@ -29,7 +42,7 @@
   },
   "empty": {
     "setupTitle": "Connectez un modèle pour commencer",
-    "setupBody": "Ajoutez une clé API OpenAI, Anthropic, Gemini, DeepSeek ou de tout service compatible OpenAI. Les clés restent sur cet appareil.",
+    "setupBody": "Utilisez votre propre clé API. Elle reste sur cet appareil.",
     "setupAction": "Ajouter un modèle",
     "title": "Comment puis-je vous aider ?",
     "actions": {
@@ -37,42 +50,42 @@
       "translate": "Traduire la sélection ou la page",
       "explain": "Expliquer le texte sélectionné"
     },
-    "tip": "Tapez / pour les commandes, @ pour joindre la page, votre sélection ou un autre onglet.",
-    "body": "Posez votre question. Je peux aussi lire cette page, chercher sur le web et agir dans vos onglets.",
-    "tasksTitle": "Ou confiez-moi une tâche",
+    "tip": "/ pour les commandes · @ pour joindre une page, une sélection ou un onglet",
+    "body": "Posez une question sur cette page, ou confiez-moi une tâche dans vos onglets.",
+    "tasksTitle": "Essayez une tâche",
     "examples": {
       "plans": "Trouve les forfaits mobiles Rogers à moins de 60 $/mois et compare-les dans un tableau",
-      "compare": "Cherche un chargeur USB-C 65 W sur Amazon et AliExpress et compare prix et délais de livraison",
-      "process": "Explique-moi étape par étape comment transférer mon numéro chez Rogers"
+      "compare": "Compare les chargeurs USB-C 65 W sur Amazon et AliExpress : prix et livraison",
+      "process": "Comment transférer mon numéro chez Rogers ? Liste les étapes"
     },
-    "tabsTip": "Ce panneau appartient à cet onglet ; ouvert dans un autre onglet, il y a sa propre conversation."
+    "tabsTip": "Chaque onglet a sa propre conversation."
   },
   "composer": {
     "placeholder": "Posez votre question…",
-    "placeholderNoModel": "Ajoutez un modèle dans les paramètres pour commencer",
+    "placeholderNoModel": "Ajoutez d'abord un modèle dans les paramètres",
     "send": "Envoyer",
     "stop": "Arrêter",
     "removeSelection": "Retirer la sélection",
-    "defaultPrompt": "Merci de regarder le contenu joint.",
-    "placeholderAnswer": "Répondez à la question de l'assistant…",
+    "defaultPrompt": "Regardez le contenu joint.",
+    "placeholderAnswer": "Votre réponse…",
     "mode": "Mode",
     "modes": {
       "query": "Consultation",
       "auto": "Automatique",
       "manual": "Validation manuelle",
-      "queryHint": "Lit les pages, cherche et suit les liens. Ne clique jamais sur un bouton, ne remplit ni n’envoie aucun formulaire.",
-      "autoHint": "Lit et utilise les pages tout seul. Seules les étapes à haut risque (paiements, suppressions, compte) attendent votre accord.",
-      "manualHint": "Lit, fait défiler et cherche tout seul. Chaque action qui modifie une page attend votre accord."
+      "queryHint": "Lit, cherche et suit les liens. Ne modifie rien.",
+      "autoHint": "Travaille seul. Demande avant les paiements, suppressions et autres étapes à haut risque.",
+      "manualHint": "Lit et cherche seul. Demande avant chaque modification."
     },
     "removeAttachment": "Retirer la pièce jointe"
   },
   "context": {
-    "unavailable": "Impossible de lire cette page",
-    "needsAccess": "Cliquez pour autoriser la lecture de ce site",
-    "includeHint": "Joindre cette page à votre prochain message",
-    "accessDenied": "L'accès à ce site n'a pas été accordé : impossible de joindre la page.",
-    "noSelection": "Aucun texte n'est sélectionné sur la page.",
-    "captureFailed": "Impossible de lire cette page. Rechargez-la et réessayez."
+    "unavailable": "Cette page ne peut pas être lue",
+    "needsAccess": "Cliquez pour autoriser ce site",
+    "includeHint": "Joindre cette page",
+    "accessDenied": "Pas d'accès à ce site : la page n'a pas été jointe.",
+    "noSelection": "Rien n'est sélectionné sur la page.",
+    "captureFailed": "Impossible de lire la page. Rechargez-la et réessayez."
   },
   "mentions": {
     "page": "Page actuelle",
@@ -87,50 +100,58 @@
     },
     "translate": {
       "label": "Traduire",
-      "description": "La sélection, ou toute la page",
+      "description": "La sélection, ou la page",
       "prompt": "Traduis le contenu joint en {{language}}. S'il est déjà en {{language}}, traduis-le en anglais."
     },
     "explain": {
       "label": "Expliquer",
-      "description": "Le texte sélectionné, en termes simples",
-      "prompt": "Explique le texte sélectionné en termes simples."
+      "description": "La sélection, en mots simples",
+      "prompt": "Explique le texte sélectionné en mots simples."
     },
     "extractTables": {
       "label": "Extraire les tableaux",
-      "description": "Les données structurées en tableaux Markdown",
+      "description": "Les données de la page en tableaux Markdown",
       "prompt": "Extrais les données structurées de cette page (prix, forfaits, caractéristiques, listes) sous forme de tableaux Markdown."
     }
   },
   "message": {
     "reasoning": "Raisonnement",
-    "thinking": "Réflexion en cours",
+    "thinking": "Réflexion",
     "stopped": "Arrêté",
     "copy": "Copier",
     "copied": "Copié",
     "retry": "Réessayer",
+    "regenerate": "Régénérer",
+    "editHint": "Remplace ce message et les réponses qui suivent",
+    "tokens": "↑{{input}} ↓{{output}}",
+    "tokensHint": "Jetons envoyés et reçus",
+    "toLatest": "Aller au plus récent",
     "truncated": "partiel",
-    "diagramError": "Ce diagramme n'a pas pu être dessiné. Voici sa source.",
+    "diagramError": "Impossible de dessiner ce diagramme. Sa source :",
     "copySvg": "Copier le SVG",
     "image": "Image",
-    "linkData": "Ce lien transporte des données dans son adresse (par exemple une adresse e-mail ou un long code). Vérifiez-la, puis cliquez à nouveau sur le lien pour l'ouvrir :"
+    "linkData": "L'adresse de ce lien contient des données (un e-mail, un long code). Vérifiez-la, puis cliquez à nouveau pour l'ouvrir :"
   },
   "history": {
     "title": "Historique",
-    "search": "Rechercher dans les conversations",
-    "empty": "Aucune conversation pour l'instant",
-    "untitled": "Sans titre"
+    "search": "Rechercher une conversation",
+    "empty": "Aucune conversation",
+    "noMatches": "Aucun résultat",
+    "untitled": "Sans titre",
+    "deleted": "Conversation supprimée",
+    "undo": "Annuler"
   },
   "errors": {
     "auth": "La clé API a été refusée. Vérifiez-la dans les paramètres.",
-    "forbidden": "Accès refusé par le fournisseur (403). Vérifiez les droits ou la région de la clé.",
+    "forbidden": "Accès refusé (403). Vérifiez les droits ou la région de la clé.",
     "notFound": "Introuvable (404). Vérifiez l'URL de base et l'identifiant du modèle.",
-    "rateLimit": "Limite de requêtes ou quota atteint. Patientez un peu ou vérifiez votre solde.",
-    "badRequest": "Le fournisseur a refusé la requête ({{status}}).",
-    "server": "Erreur serveur chez le fournisseur ({{status}}). Réessayez plus tard.",
-    "network": "Impossible de joindre le fournisseur. Vérifiez votre réseau, l'URL de base et l'accès au site.",
-    "noModel": "Aucun modèle n'est sélectionné. Choisissez-en un dans les paramètres.",
-    "noKey": "Cette connexion n'a pas de clé API. Ajoutez-en une dans les paramètres.",
-    "insecure": "Votre clé API serait envoyée en HTTP non chiffré. Utilisez une adresse https:// (http n'est autorisé que pour cet ordinateur, par exemple localhost).",
+    "rateLimit": "Limite ou quota atteint. Patientez, ou vérifiez votre solde.",
+    "badRequest": "Le fournisseur a rejeté la requête ({{status}}).",
+    "server": "Erreur du fournisseur ({{status}}). Réessayez plus tard.",
+    "network": "Fournisseur injoignable. Vérifiez votre réseau et l'URL de base.",
+    "noModel": "Aucun modèle sélectionné. Choisissez-en un dans les paramètres.",
+    "noKey": "Cette connexion n'a pas de clé API.",
+    "insecure": "Votre clé API partirait en clair. Utilisez une adresse https:// ; http ne fonctionne que pour cet ordinateur.",
     "unknown": "Une erreur s'est produite."
   },
   "options": {
@@ -141,6 +162,7 @@
       "models": "Rôles des modèles",
       "sites": "Accès aux sites",
       "language": "Langue",
+      "data": "Données",
       "about": "À propos",
       "agent": "Agent",
       "search": "Recherche",
@@ -149,16 +171,16 @@
   },
   "connections": {
     "title": "Fournisseurs de modèles",
-    "description": "Ajoutez une connexion par fournisseur. Les clés sont stockées uniquement sur cet appareil et envoyées seulement au fournisseur configuré.",
+    "description": "Une connexion par fournisseur. Les clés restent sur cet appareil et ne vont qu'à ce fournisseur.",
     "add": "Ajouter une connexion",
-    "empty": "Aucune connexion pour l'instant.",
-    "confirmDelete": "Supprimer la connexion « {{name}} » ? Sa clé API sera retirée de cet appareil.",
+    "empty": "Aucune connexion.",
+    "confirmDelete": "Supprimer « {{name}} » et sa clé API ?",
     "modelCount_one": "{{count}} modèle",
-    "modelCount_many": "{{count}} de modèles",
+    "modelCount_many": "{{count}} modèles",
     "modelCount_other": "{{count}} modèles",
     "noModelList": "Pas de liste de modèles. Saisissez les identifiants dans Rôles des modèles.",
     "compatible": "Compatible OpenAI",
-    "customPreset": "Point d'accès personnalisé",
+    "customPreset": "Adresse personnalisée",
     "fields": {
       "vendor": "Fournisseur",
       "preset": "Service",
@@ -167,74 +189,74 @@
       "apiKey": "Clé API",
       "apiKeyOptional": "Clé API (facultative)"
     },
-    "keyHint": "Conseil : créez une clé dédiée avec un plafond de dépenses pour cette extension.",
+    "keyHint": "Conseil : utilisez une clé dédiée avec un plafond de dépenses.",
     "getKey": "Obtenir une clé",
     "keyKeep": "Enregistrée. Laissez vide pour la conserver",
     "showKey": "Afficher la clé",
     "hideKey": "Masquer la clé",
     "test": "Tester la connexion",
-    "testOk_one": "Connexion réussie. {{count}} modèle trouvé.",
-    "testOk_many": "Connexion réussie. {{count}} de modèles trouvés.",
-    "testOk_other": "Connexion réussie. {{count}} modèles trouvés.",
-    "noModelsEndpoint": "Ce service ne fournit peut-être pas de liste de modèles. Vous pouvez tout de même l'enregistrer et saisir un identifiant dans Rôles des modèles.",
+    "testOk_one": "Connecté. {{count}} modèle trouvé.",
+    "testOk_many": "Connecté. {{count}} modèles trouvés.",
+    "testOk_other": "Connecté. {{count}} modèles trouvés.",
+    "noModelsEndpoint": "Ce service ne fournit pas de liste de modèles. Enregistrez, puis saisissez un identifiant dans Rôles des modèles.",
     "validation": {
       "baseURL": "Saisissez une URL de base http(s) valide.",
       "apiKey": "Saisissez une clé API.",
-      "permission": "L'accès à cet hôte d'API est nécessaire pour se connecter. Autorisez-le quand Chrome le demande."
+      "permission": "Autorisez l'accès à cet hôte quand Chrome le demande."
     },
     "hints": {
-      "region": "Les comptes de Chine continentale et internationaux utilisent des adresses différentes. Modifiez l'URL de base si votre clé dépend de l'autre région.",
-      "ollama": "Ollama bloque les extensions par défaut. Relancez-le avec la variable d'environnement OLLAMA_ORIGINS=chrome-extension://* puis réessayez."
+      "region": "Les comptes de Chine continentale et internationaux utilisent des adresses différentes. Modifiez l'URL de base si besoin.",
+      "ollama": "Ollama bloque les extensions par défaut. Lancez-le avec OLLAMA_ORIGINS=chrome-extension://* et réessayez."
     },
-    "noModels": "Pas de liste de modèles"
+    "noModels": "Pas de liste"
   },
   "slots": {
     "title": "Rôles des modèles",
-    "description": "Choisissez le modèle chargé de chaque type de tâche. Vous pouvez combiner librement les fournisseurs.",
-    "noConnections": "Ajoutez d'abord une connexion à un fournisseur.",
+    "description": "Quel modèle fait quel travail. Mélangez les fournisseurs librement.",
+    "noConnections": "Ajoutez d'abord une connexion.",
     "addConnection": "Ajouter une connexion",
     "connection": "Connexion",
     "model": "Modèle",
     "notSet": "Non défini",
-    "typeModelId": "Pas de liste de modèles pour cette connexion. Saisissez l'identifiant du modèle.",
+    "typeModelId": "Pas de liste ici. Saisissez l'identifiant du modèle.",
     "modelPlaceholder": "Identifiant du modèle",
     "chat": {
       "title": "Modèle actuel",
-      "description": "Répond et travaille dans le panneau latéral, y compris sur les pages (appel d'outils requis). Changez-le depuis l'en-tête du panneau."
+      "description": "Répond et utilise les pages (appel d'outils requis). Changez-le dans l'en-tête du panneau."
     },
     "fast": {
       "title": "Modèle rapide",
-      "description": "Tâches simples et peu coûteuses : extraire l'information des pages longues."
+      "description": "Extrait des informations des longues pages. Choisissez-en un bon marché."
     },
     "vision": {
       "title": "Modèle de vision",
-      "description": "Examine les captures d'écran pour les modèles qui ne voient pas les images (par ex. DeepSeek). Choisissez un modèle multimodal rapide et peu coûteux."
+      "description": "Lit les captures d'écran pour les modèles qui ne voient pas les images."
     },
     "stt": {
       "title": "Modèle de transcription",
-      "description": "Transcrit la saisie vocale quand celle-ci utilise un modèle de transcription.",
-      "modelHint": "Par exemple gpt-4o-transcribe ou whisper-1 (OpenAI), whisper-large-v3 (Groq), gemini-2.5-flash (Gemini)."
+      "description": "Transcrit la saisie vocale.",
+      "modelHint": "Par ex. gpt-4o-transcribe, whisper-1 (OpenAI), whisper-large-v3 (Groq), gemini-2.5-flash (Gemini)."
     }
   },
   "sites": {
     "title": "Accès aux sites",
-    "description": "Sites et hôtes d'API auxquels cette extension peut accéder. Rien n'est accordé à l'installation : l'accès est demandé la première fois que vous utilisez un site.",
+    "description": "Sites et hôtes d'API que l'extension peut utiliser. Chacun est demandé à la première utilisation.",
     "allowAll": "Autoriser tous les sites",
     "allSites": "Tous les sites",
-    "none": "Aucun site autorisé pour l'instant.",
-    "usedByConnection": "Utilisé par la connexion « {{name}} »",
+    "none": "Aucun site autorisé.",
+    "usedByConnection": "Utilisé par « {{name}} »",
     "revoke": "Révoquer",
-    "policiesTitle": "Règles de l'agent par site",
-    "policiesDescription": "Décidez ce que l'agent peut faire sur chaque site. Une règle pour example.com couvre aussi ses sous-domaines.",
-    "noPolicies": "Aucune règle pour l'instant.",
+    "policiesTitle": "Règles par site",
+    "policiesDescription": "Ce que l'agent peut faire sur un site. Une règle pour example.com couvre ses sous-domaines.",
+    "noPolicies": "Aucune règle.",
     "hostLabel": "Site",
     "addPolicy": "Ajouter",
-    "defaultPolicy": "Les sites sans règle suivent le mode choisi dans le panneau. Si une règle de site et le mode divergent, le plus strict l'emporte ; les sites « Automatique » ne demandent pas non plus de validation manuelle. Les actions à haut risque demandent toujours votre accord.",
+    "defaultPolicy": "Les autres sites suivent le mode du panneau latéral. La plus stricte de la règle et du mode l'emporte, sauf que les sites en Automatique ignorent la validation manuelle. Les étapes à haut risque demandent toujours.",
     "policies": {
       "blocked": "Bloqué",
       "readOnly": "Lecture seule",
-      "confirmEach": "Confirmer chaque action",
-      "confirmRisky": "Confirmer les actions risquées",
+      "confirmEach": "Demander à chaque fois",
+      "confirmRisky": "Demander si risqué",
       "auto": "Automatique (sauf haut risque)"
     }
   },
@@ -243,39 +265,86 @@
     "description": "Langue de l'interface. Les réponses suivent la langue dans laquelle vous écrivez.",
     "auto": "Comme le navigateur ({{language}})"
   },
+  "data": {
+    "title": "Données",
+    "description": "Tout est stocké dans ce navigateur. Sauvegardez, déplacez ou effacez.",
+    "exportTitle": "Exporter",
+    "exportHint": "Paramètres et conversations dans un fichier JSON.",
+    "export": "Exporter",
+    "includeKeys": "Inclure les clés API",
+    "includeKeysHint": "Quiconque a le fichier peut utiliser vos clés.",
+    "importTitle": "Importer",
+    "importHint": "Remplace vos paramètres et ajoute les conversations du fichier.",
+    "import": "Choisir un fichier",
+    "importInvalid": "Ce n'est pas un export de Browser Helper Lite.",
+    "importConfirm_one": "Remplacer vos paramètres et ajouter {{count}} conversation ?",
+    "importConfirm_many": "Remplacer vos paramètres et ajouter {{count}} conversations ?",
+    "importConfirm_other": "Remplacer vos paramètres et ajouter {{count}} conversations ?",
+    "importConfirmChats_one": "Ajouter {{count}} conversation ?",
+    "importConfirmChats_many": "Ajouter {{count}} conversations ?",
+    "importConfirmChats_other": "Ajouter {{count}} conversations ?",
+    "importDone_one": "Importé. {{count}} conversation ajoutée.",
+    "importDone_many": "Importé. {{count}} conversations ajoutées.",
+    "importDone_other": "Importé. {{count}} conversations ajoutées.",
+    "clearTitle": "Supprimer toutes les conversations",
+    "clearHint": "Messages, pages jointes et journaux de tâches. Les paramètres restent.",
+    "clear": "Tout supprimer",
+    "clearConfirm": "Supprimer toutes les conversations ? C'est irréversible.",
+    "clearDone": "Toutes les conversations ont été supprimées.",
+    "resetTitle": "Tout effacer",
+    "resetHint": "Conversations, paramètres, clés API, règles et accès aux sites.",
+    "reset": "Effacer",
+    "resetConfirm": "Effacer toutes les conversations, les paramètres et les clés API ? C'est irréversible.",
+    "resetDone": "Tout a été effacé.",
+    "failed": "Cela n'a pas fonctionné. Réessayez."
+  },
   "about": {
     "title": "À propos",
     "version": "Version",
     "cdpDriver": "Pilote CDP (autorisation debugger)",
     "enabled": "Activé",
     "disabled": "Désactivé",
-    "privacy": "Browser Helper n'a pas de serveur. Les conversations sont stockées dans ce navigateur et les requêtes vont directement aux fournisseurs que vous configurez.",
-    "keys": "Les clés API sont stockées dans l'espace de stockage de l'extension et ne sont jamais envoyées aux pages web.",
+    "shortcut": "Ouvrir le panneau latéral",
+    "shortcutNone": "Aucun raccourci",
+    "shortcutChange": "Modifier",
+    "checkNow": "Vérifier",
+    "checking": "Vérification…",
+    "neverChecked": "Pas encore vérifié",
+    "upToDate": "À jour · vérifié le {{time}}",
+    "checkFailed": "Vérification impossible. Réessayez plus tard.",
+    "updateAvailable": "La version {{version}} est disponible",
+    "updateSteps": "Relancez cette commande, puis cliquez sur recharger sur la carte de l'extension dans chrome://extensions. Vos données restent.",
+    "releaseNotes": "Notes de version",
+    "autoCheck": "Vérifier les mises à jour chaque jour",
+    "autoCheckHint": "Demande la dernière version à GitHub. Rien sur vous n'est envoyé.",
+    "privacy": "Pas de serveur Browser Helper. Les conversations restent dans ce navigateur ; les requêtes vont directement à vos fournisseurs.",
+    "keys": "Les clés API restent dans le stockage de l'extension. Les pages web ne peuvent pas les lire.",
     "designDoc": "Document de conception du produit"
   },
   "agent": {
     "groupTitle": "Browser Helper",
-    "busy": "Une tâche est déjà en cours dans cette conversation. Arrêtez-la ou attendez qu'elle se termine.",
+    "busy": "Une tâche est déjà en cours ici. Arrêtez-la ou attendez.",
     "status": {
       "running": "En cours",
       "paused": "En pause",
-      "waiting": "Votre intervention est requise",
+      "waiting": "À vous",
       "done": "Terminé",
       "failed": "Échec",
       "stopped": "Arrêté"
     },
     "actionCount_one": "{{count}} action",
-    "actionCount_many": "{{count}} d'actions",
+    "actionCount_many": "{{count}} actions",
     "actionCount_other": "{{count}} actions",
-    "driverHint": "cdp : vraies saisies souris et clavier · dom : événements simulés",
+    "driverHint": "cdp : vraie souris et vrai clavier · dom : événements simulés",
     "actions": {
       "navigate": "Ouvrir {{url}}",
       "open_tab": "Ouvrir {{url}} dans un nouvel onglet",
       "click": "Cliquer sur {{target}}",
       "type": "Saisir « {{text}} » dans {{target}}",
       "press": "Appuyer sur {{keys}}",
-      "hover": "Survoler {{target}}",
-      "scroll": "Défiler vers le {{direction}}",
+      "pressOn": "Appuyer sur {{keys}} dans {{target}}",
+      "hover": "Pointer sur {{target}}",
+      "scroll": "Faire défiler vers {{direction}}",
       "select_option": "Choisir « {{option}} » dans {{target}}",
       "go_back": "Revenir en arrière",
       "switch_tab": "Passer à l'onglet {{tab}}",
@@ -283,67 +352,69 @@
       "wait": "Attendre {{seconds}} s",
       "extract": "Lire la page : {{query}}",
       "look": "Regarder l'écran : {{question}}",
-      "web_search": "Rechercher sur le web : {{query}}",
+      "web_search": "Chercher sur le web : {{query}}",
       "ask_user": "Vous demander : {{question}}",
       "hand_off": "Vous passer la main",
       "read_page": "Lire la page",
       "view_page": "Regarder la page"
     },
     "directions": {
-      "up": "haut",
-      "down": "bas"
+      "up": "le haut",
+      "down": "le bas"
     },
     "approval": {
       "title": "Autoriser cette action ?",
       "titleHigh": "Action à haut risque : l'autoriser ?",
-      "body": "Sur {{site}}, l'agent veut :",
+      "titleSuspicious": "Vérifiez avant d'autoriser",
+      "body": "Sur {{site}} :",
+      "submits": "Cela envoie le formulaire « {{button}} ».",
+      "submitsForm": "Cela envoie le formulaire qui contient ce champ.",
       "reason": {
-        "payment": "Cela ressemble à un paiement ou à un achat.",
-        "destructive": "Cela semble difficile à annuler (suppression, résiliation, modification du compte ou de la sécurité).",
-        "submit": "Cela envoie, soumet ou enregistre quelque chose.",
-        "confirmEach": "Votre règle pour ce site demande de confirmer chaque étape.",
-        "sensitiveField": "Cela concerne des informations sensibles.",
-        "manualMode": "Le mode validation manuelle est activé.",
-        "injection": "Cette page a tenté de donner des instructions à l'assistant : jusqu'à la fin de cette tâche, il demande avant de modifier une page ou d'ouvrir un nouveau site.",
-        "exfiltration": "L'adresse contient des données (adresse e-mail, numéro de carte ou long code). Vérifiez que vous voulez les envoyer à ce site.",
-        "newSite": "Ce site n'est pas encore apparu dans cette tâche : il ne figure ni dans votre demande, ni dans votre onglet, ni dans les résultats de recherche.",
-        "secret": "Le texte ressemble à une clé ou à un jeton. Vérifiez que vous voulez bien le saisir sur ce site.",
-        "clipboard": "Cela colle le contenu de votre presse-papiers dans la page. L'assistant ne peut pas voir ce qu'il contient.",
-        "frame": "Cette action a lieu dans un cadre d'un autre site, que l'assistant ne peut pas lire. Vérifiez ce qu'il va cliquer ou saisir.",
-        "download": "Cela télécharge un fichier. Les programmes et les archives peuvent nuire à votre ordinateur : n'autorisez que les fichiers attendus.",
-        "sensitivePage": "Cette page concerne la sécurité de votre compte, des clés, des paiements ou une console cloud : chaque modification vous est soumise."
+        "payment": "Ressemble à un paiement ou un achat.",
+        "destructive": "Semble difficile à annuler : suppression, résiliation ou changement de compte.",
+        "submit": "Envoie, publie ou enregistre quelque chose.",
+        "confirmEach": "Votre règle pour ce site demande à chaque fois.",
+        "sensitiveField": "Concerne des informations sensibles.",
+        "manualMode": "La validation manuelle est activée.",
+        "injection": "Cette page a tenté de donner des instructions à l'assistant : il demande désormais avant toute modification et tout nouveau site.",
+        "exfiltration": "L'adresse contient des données (un e-mail, un numéro de carte, un long code). Les envoyer à ce site ?",
+        "newSite": "Ce site n'est pas apparu dans cette tâche.",
+        "secret": "Le texte ressemble à une clé ou un jeton. Le saisir sur ce site ?",
+        "clipboard": "Colle votre presse-papiers dans la page. L'assistant ne voit pas ce qu'il contient.",
+        "frame": "Agit dans le cadre d'un autre site, que l'assistant ne peut pas lire.",
+        "download": "Télécharge un fichier. N'autorisez que les fichiers attendus.",
+        "sensitivePage": "Cette page gère la sécurité du compte, des clés ou des paiements : chaque modification est demandée."
       },
       "allowOnce": "Autoriser une fois",
       "allowTask": "Autoriser pour cette tâche",
       "allowSite": "Toujours autoriser sur ce site",
-      "deny": "Refuser",
-      "titleSuspicious": "Vérifiez avant d'autoriser"
+      "deny": "Refuser"
     },
     "permission": {
-      "title": "Autoriser l'accès à ce site ?",
-      "body": "L'agent doit lire et utiliser {{origin}} pour continuer.",
+      "title": "Autoriser ce site ?",
+      "body": "L'agent doit lire et utiliser {{origin}}.",
       "allowSite": "Autoriser ce site",
       "allowAll": "Autoriser tous les sites",
       "deny": "Ne pas autoriser"
     },
     "handoff": {
       "title": {
-        "captcha": "Veuillez faire la vérification",
+        "captcha": "Veuillez résoudre la vérification",
         "login": "Veuillez vous connecter",
         "verification": "Veuillez saisir le code",
-        "other": "À vous de jouer"
+        "other": "À vous"
       },
-      "captcha": "{{site}} demande une vérification humaine. Faites-la dans l'onglet, puis continuez.",
-      "login": "Connectez-vous vous-même sur {{site}}, puis continuez.",
-      "verification": "Saisissez le code de vérification sur {{site}}, puis continuez.",
-      "other": "Terminez cette étape sur {{site}}, puis continuez.",
-      "autoResume": "La tâche reprend toute seule une fois la vérification passée.",
+      "captcha": "{{site}} demande une vérification humaine. Résolvez-la dans l'onglet.",
+      "login": "Connectez-vous sur {{site}}.",
+      "verification": "Saisissez le code de vérification sur {{site}}.",
+      "other": "Terminez cette étape sur {{site}}.",
+      "autoResume": "Reprend tout seul une fois la vérification passée.",
       "done": "C'est fait, continuer"
     },
     "question": {
       "title": "L'assistant demande :",
       "hint": "Répondez dans la zone ci-dessous.",
-      "noSecrets": "Ne donnez jamais ici de mot de passe, de numéro de carte ou de code de vérification."
+      "noSecrets": "Ne donnez jamais ici de mot de passe, numéro de carte ou code."
     },
     "controls": {
       "pause": "Pause",
@@ -353,35 +424,35 @@
       "progress": "Étape {{step}}/{{max}}"
     },
     "overlay": {
-      "running": "Browser Helper travaille dans cet onglet",
+      "running": "Browser Helper travaille ici",
       "stop": "Arrêter",
       "resume": "Reprendre",
       "continue": "Continuer",
       "openPanel": "Ouvrir le panneau",
       "paused": {
-        "user": "En pause. Reprenez quand vous êtes prêt.",
-        "interference": "En pause car vous avez utilisé la page. Reprenez quand vous avez fini.",
-        "debuggerDetached": "En pause : la barre de débogage a été fermée. Reprenez pour continuer avec des événements simulés."
+        "user": "En pause.",
+        "interference": "En pause : vous avez utilisé la page.",
+        "debuggerDetached": "En pause : la barre de débogage a été fermée. La reprise utilisera des événements simulés."
       },
       "waiting": {
         "approval": "En attente de votre accord dans le panneau latéral",
-        "question": "L'agent vous pose une question dans le panneau latéral",
-        "handoff": "À vous : terminez cette étape, puis cliquez sur Continuer",
+        "question": "Une question vous attend dans le panneau latéral",
+        "handoff": "À vous. Cliquez sur Continuer ensuite",
         "permission": "En attente de l'accès au site dans le panneau latéral"
       }
     },
     "notification": {
       "title": {
-        "approval": "Accord nécessaire",
+        "approval": "Accord requis",
         "question": "L'agent a une question",
-        "handoff": "À vous de jouer",
-        "permission": "Accès au site nécessaire"
+        "handoff": "À vous",
+        "permission": "Accès au site requis"
       },
       "approval": "{{site}} : {{target}}",
       "permission": "Autoriser l'accès à {{origin}} ?",
       "question": "Ouvrez le panneau latéral pour répondre."
     },
-    "maxStepsSummary": "Je me suis arrêté après {{count}} étapes sans terminer. Consultez les étapes ci-dessus, puis donnez-moi une tâche plus précise ou augmentez la limite d'étapes dans les paramètres.",
+    "maxStepsSummary": "Arrêt après {{count}} étapes sans avoir terminé. Essayez une tâche plus précise, ou augmentez la limite dans les paramètres.",
     "stoppedSummary": "La tâche a été arrêtée.",
     "failedSummary": "La tâche a échoué : {{message}}",
     "thinking": "Réflexion…",
@@ -392,83 +463,83 @@
     "injection": {
       "title": "Cette page a tenté de donner des instructions à l'assistant",
       "titleHidden": "Cette page cache des instructions pour les assistants IA",
-      "body": "On a demandé à l'assistant de les ignorer. Jusqu'à la fin de cette tâche, modifier une page ou ouvrir un nouveau site demande votre accord."
+      "body": "Elles ont été ignorées. Jusqu'à la fin de la tâche, les modifications et les nouveaux sites demandent votre accord."
     }
   },
   "agentSettings": {
     "title": "Agent",
-    "description": "Comment l'assistant utilise les pages web pour vous.",
-    "useCdp": "Utiliser de vraies saisies souris et clavier (CDP)",
-    "useCdpHint": "Plus fiable sur les sites modernes. Chrome affiche une barre « a commencé à déboguer ce navigateur » pendant une tâche.",
-    "cdpUnavailable": "Indisponible : cette version n'inclut pas l'autorisation debugger.",
-    "notifications": "M'avertir quand une tâche a besoin de moi",
-    "notificationsHint": "Notifications Chrome pour les CAPTCHA, les connexions et les autorisations.",
-    "maxSteps": "Nombre maximal d'étapes par tâche",
-    "maxStepsHint": "Entre 5 et 100.",
+    "description": "Comment l'assistant travaille sur les pages web.",
+    "useCdp": "Vraie souris et vrai clavier (CDP)",
+    "useCdpHint": "Plus fiable. Chrome affiche une barre de débogage pendant une tâche.",
+    "cdpUnavailable": "Absent de cette version (pas d'autorisation debugger).",
+    "notifications": "Me prévenir quand une tâche a besoin de moi",
+    "notificationsHint": "Pour les CAPTCHA, connexions et validations.",
+    "maxSteps": "Limite d'étapes par tâche",
+    "maxStepsHint": "De 5 à 100.",
     "mode": "Mode par défaut",
-    "modeHint": "Vous pouvez aussi changer de mode à tout moment sous la zone de message ; cela s'applique aussitôt à une tâche en cours."
+    "modeHint": "Se change aussi sous la zone de message, même en cours de tâche."
   },
   "voice": {
     "start": "Saisie vocale",
     "stop": "Arrêter l'écoute",
     "transcribing": "Transcription…",
-    "listening": "À l’écoute…",
+    "listening": "Écoute…",
     "problems": {
-      "permission": "Autorisez le micro dans l'onglet qui vient de s'ouvrir, puis cliquez de nouveau sur le micro.",
-      "unsupported": "Ce navigateur ne prend pas en charge la reconnaissance vocale. Choisissez un modèle de transcription dans Saisie vocale.",
-      "network": "La reconnaissance vocale de Chrome n'a pas pu joindre le service de Google. Vérifiez le réseau ou utilisez un modèle de transcription.",
-      "transcribe": "L'enregistrement n'a pas pu être transcrit."
+      "permission": "Autorisez le micro dans l'onglet qui s'est ouvert, puis recliquez sur le micro.",
+      "unsupported": "Pas de reconnaissance vocale dans ce navigateur. Utilisez un modèle de transcription.",
+      "network": "Chrome n'a pas pu joindre le service vocal de Google. Vérifiez votre réseau, ou utilisez un modèle de transcription.",
+      "transcribe": "Impossible de transcrire l'enregistrement."
     },
     "permission": {
       "title": "Accès au micro",
       "askingTitle": "Autorisez le micro",
-      "askingBody": "Chrome demande si Browser Helper peut utiliser votre micro. Il ne sert que pendant une saisie vocale.",
+      "askingBody": "Chrome le demande pour Browser Helper. Il ne sert que pendant la saisie vocale.",
       "grantedTitle": "Micro autorisé",
-      "grantedBody": "Vous pouvez maintenant dicter dans le panneau latéral. Cet onglet se ferme tout seul.",
+      "grantedBody": "La saisie vocale est prête. Cet onglet se ferme tout seul.",
       "deniedTitle": "Micro bloqué",
-      "deniedBody": "Autorisez-le avec l'icône à droite de la barre d'adresse, ou dans les paramètres de Chrome › Confidentialité et sécurité › Paramètres des sites › Micro, puis réessayez.",
+      "deniedBody": "Autorisez-le via l'icône à droite de la barre d'adresse, puis réessayez.",
       "retry": "Réessayer"
     },
     "title": "Saisie vocale",
-    "description": "Parlez au lieu de taper : cliquez sur le micro dans la zone de message, puis de nouveau (ou faites une pause de deux secondes) pour terminer.",
+    "description": "Cliquez sur le micro pour parler. Recliquez, ou faites une pause de deux secondes, pour terminer.",
     "engine": "Reconnaissance",
     "engines": {
       "browser": {
         "title": "Reconnaissance vocale de Chrome",
-        "description": "Gratuite et en temps réel. Le son est envoyé au service vocal de Google."
+        "description": "Gratuite, en temps réel. L'audio va au service vocal de Google."
       },
       "stt": {
         "title": "Modèle de transcription",
-        "description": "Enregistre, puis envoie le son au modèle de transcription défini dans Rôles des modèles. Plus précis, gère bien le mélange de langues."
+        "description": "Enregistre, puis envoie l'audio à votre modèle. Plus précis avec plusieurs langues."
       }
     },
     "setSttModel": "Choisir un modèle de transcription",
     "language": "Langue parlée",
-    "languageAuto": "Celle de l'interface",
+    "languageAuto": "Comme l'interface",
     "autoSend": "Envoyer quand j'arrête de parler",
-    "autoSendHint": "Sinon, le texte reste dans la zone pour que vous puissiez le modifier.",
+    "autoSendHint": "Désactivé : le texte attend dans la zone pour être corrigé.",
     "microphone": "Micro",
-    "micHint": "Un panneau latéral ne peut pas demander le micro : un onglet s'ouvre une fois pour le faire.",
+    "micHint": "Un onglet s'ouvre une fois pour demander : les panneaux latéraux ne le peuvent pas.",
     "micGranted": "Browser Helper peut utiliser le micro.",
     "micAllowed": "Autorisé",
     "allowMic": "Autoriser le micro"
   },
   "search": {
     "title": "Recherche",
-    "description": "Comment l'assistant cherche sur le web quand une page n'a pas la réponse.",
-    "provider": "Service de recherche",
+    "description": "Comment l'assistant cherche sur le web.",
+    "provider": "Moteur de recherche",
     "providers": {
       "browser": {
         "title": "Recherche dans le navigateur",
-        "description": "Google, Bing ou DuckDuckGo dans un onglet en arrière-plan. Gratuit, peut rencontrer des CAPTCHA."
+        "description": "Google, Bing ou DuckDuckGo dans un onglet en arrière-plan. Gratuit ; CAPTCHA possibles."
       },
       "deepseek": {
         "title": "API de recherche DeepSeek",
-        "description": "Utilise la clé de votre connexion DeepSeek. Les résultats ont des résumés écrits pour les modèles."
+        "description": "Utilise la clé de votre connexion DeepSeek."
       },
       "cloudflare": {
         "title": "Cloudflare Web Search",
-        "description": "Via votre AI Gateway, facturé sur votre compte Cloudflare. Sources : Ceramic, Exa, Linkup."
+        "description": "Via votre AI Gateway, facturé sur votre compte Cloudflare."
       },
       "tavily": {
         "title": "Tavily",
@@ -480,15 +551,15 @@
       },
       "exa": {
         "title": "Exa",
-        "description": "Recherche sémantique avec les passages clés de chaque page."
+        "description": "Recherche sémantique avec extraits de pages."
       },
       "native": {
-        "title": "Recherche intégrée du modèle",
-        "description": "OpenAI, Anthropic et Gemini cherchent sur le web de leur côté, avec le modèle actuel."
+        "title": "La recherche du modèle",
+        "description": "OpenAI, Anthropic et Gemini cherchent de leur côté."
       }
     },
     "engine": "Moteur de recherche du navigateur",
-    "engineFallbackHint": "Utilisé quand l'API échoue, si vous l'autorisez ci-dessous.",
+    "engineFallbackHint": "Utilisé si l'API échoue, si c'est autorisé ci-dessous.",
     "engines": {
       "google": "Google",
       "bing": "Bing",
@@ -496,30 +567,30 @@
       "custom": "Personnalisé"
     },
     "customUrl": "URL de recherche personnalisée",
-    "customUrlHint": "Utilisez %s à la place de la requête.",
-    "deepseekNoConnection": "La recherche DeepSeek utilise la clé d'une connexion DeepSeek, et vous n'en avez pas encore.",
+    "customUrlHint": "Mettez %s à la place de la requête.",
+    "deepseekNoConnection": "Ajoutez d'abord une connexion DeepSeek : sa clé est utilisée.",
     "deepseekConnection": "Connexion DeepSeek",
-    "deepseekHint": "Sa clé API et son URL de base servent pour /v1/tools/search.",
-    "cloudflareAccount": "ID de compte",
-    "cloudflareGateway": "ID de l'AI Gateway",
+    "deepseekHint": "Sa clé et son URL de base servent pour /v1/tools/search.",
+    "cloudflareAccount": "Account ID",
+    "cloudflareGateway": "AI Gateway ID",
     "cloudflareSource": "Source de recherche",
-    "cloudflareToken": "Jeton API",
-    "cloudflareTokenHint": "Nécessite les autorisations Workers AI Read et AI Gateway Read.",
-    "keyHint": "Enregistrée uniquement sur cet appareil.",
-    "nativeHint": "Utilise la connexion du modèle actuel, qui doit être OpenAI, Anthropic ou Gemini. Chaque recherche est une requête de modèle en plus.",
-    "fallback": "Chercher dans le navigateur si l'API échoue",
-    "fallbackHint": "Par exemple si la clé est erronée ou le quota épuisé.",
+    "cloudflareToken": "Jeton d'API",
+    "cloudflareTokenHint": "Nécessite Workers AI Read et AI Gateway Read.",
+    "keyHint": "Stockée uniquement sur cet appareil.",
+    "nativeHint": "Nécessite un modèle OpenAI, Anthropic ou Gemini. Chaque recherche est une requête de plus.",
+    "fallback": "Se rabattre sur la recherche du navigateur",
+    "fallbackHint": "Quand l'API échoue, par ex. clé erronée ou quota épuisé.",
     "test": "Tester la recherche",
     "testQuery": "Requête de test",
     "testOk_one": "Ça marche. {{count}} résultat :",
     "testOk_many": "Ça marche. {{count}} résultats :",
     "testOk_other": "Ça marche. {{count}} résultats :",
     "testOkText": "Ça marche. Le modèle a répondu :",
-    "verifyNote": "Quel que soit le service, l'assistant doit vérifier les faits sur les pages sources et les citer."
+    "verifyNote": "L'assistant doit toujours vérifier les faits sur les pages sources et les citer."
   },
   "tasks": {
-    "running": "Travaille dans un autre onglet : {{title}}",
-    "waiting": "Un autre onglet a besoin de vous : {{title}}",
-    "show": "Afficher"
+    "running": "En cours dans un autre onglet : {{title}}",
+    "waiting": "À vous dans un autre onglet : {{title}}",
+    "show": "Voir"
   }
 }

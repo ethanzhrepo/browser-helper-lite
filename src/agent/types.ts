@@ -32,7 +32,17 @@ export interface AgentStep {
 export type HandoffReason = 'captcha' | 'login' | 'verification' | 'other';
 
 export type WaitReason =
-  | { kind: 'approval'; actionId: string; risk: RiskLevel; reason: RiskReason; site: string; target: string; tool: string }
+  | {
+      kind: 'approval';
+      actionId: string;
+      risk: RiskLevel;
+      reason: RiskReason;
+      site: string;
+      target: string;
+      tool: string;
+      /** Set when the step sends a form with Enter: the form's submit button text ('' when it has none). */
+      submits?: string;
+    }
   | { kind: 'question'; question: string }
   | { kind: 'handoff'; reason: HandoffReason; message?: string; site: string }
   | { kind: 'permission'; origin: string; url: string };
@@ -110,6 +120,8 @@ export interface AgentTask {
   maxSteps: number;
   createdAt: number;
   updatedAt: number;
+  /** Replaced by a new reply: emptied and no longer shown; kept for the tabs it grouped. */
+  discardedAt?: number;
 }
 
 export type ApprovalDecision = 'allowOnce' | 'allowTask' | 'allowSite' | 'deny';

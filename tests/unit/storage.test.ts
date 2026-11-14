@@ -1,14 +1,25 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { fakeBrowser } from 'wxt/testing/fake-browser';
+import type { AgentTask } from '../../src/agent/types';
 import type { Connection } from '../../src/shared/types';
+import { buildBackup, parseBackup, restoreBackup } from '../../src/storage/backup';
 import {
   appendMessage,
+  clearConversations,
   createConversation,
   db,
   deleteConversation,
   deriveTitle,
   getMessages,
+  getTasks,
   listConversations,
+  PURGE_GRACE_MS,
+  purgeConversation,
+  purgeDeleted,
+  restoreConversation,
+  saveTask,
+  searchMessages,
+  truncateConversation,
 } from '../../src/storage/db';
 import {
   deleteConnection,
@@ -132,5 +143,146 @@ describe('conversation store', () => {
   it('derives a one-line title', () => {
     expect(deriveTitle('  First line\nsecond')).toBe('First line');
     expect(deriveTitle('x'.repeat(100))).toHaveLength(60);
+  });
+});
+
+describe('deleting and replacing conversations', () => {
+  beforeEach(async () => {
+    fakeBrowser.reset();
+    await clearConversations();
+  });
+
+  const task = (id: string, conversationId: string, anchorMessageId: string): AgentTask => ({
+    id,
+    conversationId,
+    goal: 'a goal',
+    anchorMessageId,
+    status: 'done',
+    steps: [{ index: 1, actions: [] }],
+    draft: '',
+    usage: {},
+    model: { connectionId: 'a', modelId: 'm' },
+    mode: 'auto',
+    startTabId: 1,
+    groupedTabs: [7],
+    maxSteps: 30,
+    createdAt: 1,
+    updatedAt: 1,
+  });
+
+  const seedChat = async () => {
+    const conversation = await createConversation('Secret plans');
+    const page = { kind: 'page' as const, title: 'Bank', url: 'https://bank.example/', content: 'balance 1234', truncated: false, capturedAt: 1 };
+    const request = await appendMessage({ conversationId: conversation.id, role: 'user', content: 'What is my balance?', contexts: [page], status: 'done', taskId: 't1' });
+    const reply = await appendMessage({ conversationId: conversation.id, role: 'assistant', content: 'It is 1234 dollars.', status: 'done', taskId: 't1' });
+    await saveTask(task('t1', conversation.id, request.id));
+    return { conversation, request, reply };
+  };
+
+  it('can undo a delete until it is purged, and purging erases the content', async () => {
+    const { conversation } = await seedChat();
+    await deleteConversation(conversation.id);
+    expect(await listConversations()).toHaveLength(0);
+    expect(await restoreConversation(conversation.id)).toBe(true);
+    expect((await listConversations())[0]!.title).toBe('Secret plans');
+
+    await deleteConversation(conversation.id);
+    await purgeConversation(conversation.id);
+    expect(await db.messages.count()).toBe(0);
+    expect(await db.tasks.count()).toBe(0);
+    // Only an empty marker is left.
+    const marker = (await db.conversations.get(conversation.id))!;
+    expect(marker.title).toBe('');
+    expect(JSON.stringify(marker)).not.toContain('Secret');
+    expect(await restoreConversation(conversation.id)).toBe(false);
+  });
+
+  it('writes nothing more into an erased conversation', async () => {
+    const { conversation, request } = await seedChat();
+    await deleteConversation(conversation.id);
+    await purgeConversation(conversation.id);
+    await appendMessage({ conversationId: conversation.id, role: 'assistant', content: 'late reply', status: 'done' });
+    await saveTask(task('t2', conversation.id, request.id));
+    expect(await db.messages.count()).toBe(0);
+    expect(await db.tasks.count()).toBe(0);
+  });
+
+  it('purges forgotten deletions only after the undo time', async () => {
+    const { conversation } = await seedChat();
+    await deleteConversation(conversation.id);
+    expect(await purgeDeleted(Date.now())).toBe(0);
+    expect(await db.messages.count()).toBe(2);
+    expect(await purgeDeleted(Date.now() + PURGE_GRACE_MS + 1)).toBe(1);
+    expect(await db.messages.count()).toBe(0);
+  });
+
+  it('replaces a reply: later messages are emptied and their turns discarded', async () => {
+    const { conversation, request } = await seedChat();
+    await truncateConversation(conversation.id, request.id, { keepFirst: true });
+    expect((await getMessages(conversation.id)).map((m) => m.content)).toEqual(['What is my balance?']);
+    const stored = await db.messages.toArray();
+    expect(JSON.stringify(stored.find((m) => m.role === 'assistant'))).not.toContain('1234');
+    expect(await getTasks(conversation.id)).toHaveLength(0);
+    // Kept for the tabs it grouped, with nothing else in it.
+    const [discarded] = await getTasks(conversation.id, { discarded: true });
+    expect(discarded).toMatchObject({ groupedTabs: [7], steps: [], goal: '' });
+  });
+
+  it('replaces a request and what followed it', async () => {
+    const { conversation, request } = await seedChat();
+    await truncateConversation(conversation.id, request.id);
+    expect(await getMessages(conversation.id)).toHaveLength(0);
+    expect(JSON.stringify(await db.messages.toArray())).not.toContain('balance');
+  });
+
+  it('finds conversations by what was said, not by attached pages', async () => {
+    const { conversation } = await seedChat();
+    expect((await searchMessages('1234 DOLLARS')).get(conversation.id)).toContain('It is 1234 dollars.');
+    expect((await searchMessages('bank.example')).size).toBe(0);
+    await deleteConversation(conversation.id);
+    await purgeConversation(conversation.id);
+    expect((await searchMessages('dollars')).size).toBe(0);
+  });
+});
+
+describe('backups', () => {
+  beforeEach(async () => {
+    fakeBrowser.reset();
+    await clearConversations();
+  });
+
+  it('leaves API keys out unless asked, and round-trips conversations', async () => {
+    await saveConnection(connection('a'), 'sk-secret');
+    const conversation = await createConversation('Hello');
+    await appendMessage({ conversationId: conversation.id, role: 'user', content: 'Hi', status: 'done' });
+    const plain = await buildBackup({ includeKeys: false });
+    expect(JSON.stringify(plain)).not.toContain('sk-secret');
+    const withKeys = parseBackup(JSON.stringify(await buildBackup({ includeKeys: true })));
+    expect(withKeys.secrets).toEqual({ a: 'sk-secret' });
+
+    await clearConversations();
+    fakeBrowser.reset();
+    const summary = await restoreBackup(withKeys);
+    expect(summary).toMatchObject({ settings: true, conversations: 1, keys: 1 });
+    expect(await getApiKey('a')).toBe('sk-secret');
+    expect((await getMessages(conversation.id))[0]!.content).toBe('Hi');
+  });
+
+  it('never sends a stored key to an address a backup file changed', async () => {
+    await saveConnection(connection('a'), 'sk-secret');
+    await saveConnection(connection('b'), 'sk-other');
+    const backup = parseBackup(JSON.stringify(await buildBackup({ includeKeys: false })));
+    backup.settings!.connections[0]!.baseURL = 'https://evil.example/v1';
+    await restoreBackup(backup);
+    expect((await loadSettings()).connections[0]!.baseURL).toBe('https://evil.example/v1');
+    expect(await getApiKey('a')).toBeUndefined();
+    // The connection whose address did not change keeps its key.
+    expect(await getApiKey('b')).toBe('sk-other');
+  });
+
+  it('rejects files that are not backups', () => {
+    expect(() => parseBackup('not json')).toThrow();
+    expect(() => parseBackup('{"app":"something-else","version":1,"exportedAt":1}')).toThrow();
+    expect(() => parseBackup(JSON.stringify({ app: 'browser-helper-lite', version: 1, exportedAt: 1, settings: { connections: [], sitePolicies: { 'bank.example': 'anything' } } }))).toThrow();
   });
 });

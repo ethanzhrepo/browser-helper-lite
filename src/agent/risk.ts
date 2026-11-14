@@ -114,9 +114,18 @@ function sensitiveField(target: TargetInfo): Classification | undefined {
 
 const READ_ONLY_TOOLS = new Set(['read_page', 'view_page', 'scroll', 'wait', 'extract', 'look', 'web_search', 'hover', 'switch_tab', 'ask_user', 'hand_off']);
 
+/**
+ * A search box whose Enter only runs a search. A page names its fields as it
+ * likes, so a field called "q" is not enough: its form must not be sent with
+ * POST, and its submit button must not say something else ("Delete account").
+ */
+export function isPlainSearch(target: TargetInfo): boolean {
+  return target.isSearchField && target.formMethod !== 'post' && !classifyText(target.formSubmitText ?? '');
+}
+
 /** Submitting the form a field belongs to, judged by the form's submit button ("Place order" is a payment). */
 function classifySubmit(target: TargetInfo): Classification {
-  if (target.isSearchField) return { risk: 1 };
+  if (isPlainSearch(target)) return { risk: 1 };
   return classifyText(target.formSubmitText ?? '') ?? { risk: 2, reason: 'submit' };
 }
 
@@ -182,7 +191,7 @@ export function classifyAction(tool: string, args: Record<string, unknown>, targ
     if (containsSecret(text)) return { risk: 3, reason: 'secret' };
     // Enter in a search box only searches; elsewhere it submits the form, judged by its submit button.
     if (args.submit !== true) return { risk: 1 };
-    return target.tag === 'input' ? classifySubmit(target) : target.isSearchField ? { risk: 1 } : { risk: 2, reason: 'submit' };
+    return target.tag === 'input' || target.isSearchField ? classifySubmit(target) : { risk: 2, reason: 'submit' };
   }
 
   if (tool === 'click') return classifyActivation(target);
@@ -199,6 +208,17 @@ export function actionKind(tool: string, args: Record<string, unknown>, target: 
   if (classification.risk > 1 || !target) return 'change';
   const key = tool === 'press' ? parseKeyCombo(String(args.keys ?? '')).key : undefined;
   if ((tool === 'click' || key === 'Enter') && isNavigationLink(target)) return 'browse';
-  if ((tool === 'type' || key === 'Enter') && target.isSearchField) return 'search';
+  if ((tool === 'type' || key === 'Enter') && isPlainSearch(target)) return 'search';
   return 'change';
+}
+
+/**
+ * When the action sends a form by pressing Enter in one of its fields: the
+ * text of the form's submit button ('' when it has none). The approval card
+ * shows it, because "Press Enter" alone does not say what will happen.
+ */
+export function formSubmission(tool: string, args: Record<string, unknown>, target: TargetInfo | undefined): string | undefined {
+  if (!target?.inForm || target.tag !== 'input' || !target.editable) return undefined;
+  const enter = tool === 'press' ? parseKeyCombo(String(args.keys ?? '')).key === 'Enter' : tool === 'type' && args.submit === true;
+  return enter ? (target.formSubmitText ?? '') : undefined;
 }

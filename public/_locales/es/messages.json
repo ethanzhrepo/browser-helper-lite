@@ -1,5 +1,5 @@
 {
   "extName": { "message": "Browser Helper Lite" },
-  "extDescription": { "message": "Un panel lateral de IA que funciona con el modelo que elijas: conversa sobre páginas y, con tu permiso, actúa en los sitios web por ti." },
+  "extDescription": { "message": "Asistente de IA lateral para tu modelo y tu clave de API: pregunta sobre las páginas y deja que actúe en los sitios que permitas." },
   "actionTitle": { "message": "Abrir Browser Helper" }
 }

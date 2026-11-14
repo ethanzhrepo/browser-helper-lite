@@ -74,5 +74,10 @@ export function useAgentTasks(conversationId: string | undefined, onFinished: (t
     }
   }, []);
 
-  return { tasks, send };
+  /** Drops turns that were replaced (a new reply, an edited request), so they are no longer shown. */
+  const forget = useCallback((gone: (task: AgentTask) => boolean) => {
+    setTasks((previous) => Object.fromEntries(Object.entries(previous).filter(([, task]) => !gone(task))));
+  }, []);
+
+  return { tasks, send, forget };
 }

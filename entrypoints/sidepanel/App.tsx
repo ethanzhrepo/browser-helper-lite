@@ -1,17 +1,18 @@
-import { History, Info, Plug, Settings as SettingsIcon, SquarePen, X } from 'lucide-react';
+import { ArrowUpCircle, History, Info, Plug, Settings as SettingsIcon, SquarePen, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { browser } from 'wxt/browser';
 import { ACTIVE_STATUSES, type AgentTask } from '../../src/agent/types';
 import { useAgentTasks } from '../../src/agent/useAgentTasks';
 import { capturePage, captureSelection, type ActiveTab } from '../../src/browser/page-context';
+import { takePanelRequest, watchPanelRequests } from '../../src/browser/panel-requests';
 import { openPanel, panelTabOf } from '../../src/browser/side-panel';
 import { SLASH_COMMANDS, type SlashCommand } from '../../src/chat/commands';
 import { useConversation } from '../../src/chat/useConversation';
 import { useTabConversation } from '../../src/chat/useTabConversation';
 import { isRestrictedUrl, requestHostAccess } from '../../src/permissions/hosts';
-import type { AgentMode, ContextKind, ContextSnapshot, ErrorInfo, Locale } from '../../src/shared/types';
-import { newId } from '../../src/storage/db';
+import type { AgentMode, ContextKind, ContextSnapshot, ErrorInfo, Locale, MessageRecord } from '../../src/shared/types';
+import { deriveTitle, newId, renameConversation, truncateConversation } from '../../src/storage/db';
 import { DEFAULT_VOICE_SETTINGS, updateSettings } from '../../src/storage/settings';
 import { linkTab, unlinkTab } from '../../src/storage/tab-conversations';
 import { Button, IconButton } from '../../src/ui/Button';
@@ -19,6 +20,8 @@ import { errorSummary } from '../../src/ui/errors';
 import { openOptions } from '../../src/ui/navigation';
 import { useActiveTab } from '../../src/ui/useActiveTab';
 import { useSettings } from '../../src/ui/useSettings';
+import { useUpdateNotice } from '../../src/ui/useUpdate';
+import { dismissUpdate } from '../../src/updates/check';
 import { useWindowTabs } from '../../src/ui/useWindowTabs';
 import { useVoiceInput, type VoiceProblem } from '../../src/voice/useVoiceInput';
 import { AgentControls } from './AgentControls';
@@ -54,6 +57,9 @@ export function App() {
   /** Pages of other tabs attached with @. */
   const [tabContexts, setTabContexts] = useState<ContextSnapshot[]>([]);
   const windowTabs = useWindowTabs();
+  const update = useUpdateNotice();
+  /** Bumped to put the cursor in the message box. */
+  const [focusKey, setFocusKey] = useState(0);
 
   // The request's turn has reported back.
   useEffect(() => {
@@ -162,13 +168,18 @@ export function App() {
     });
   };
 
-  /** Stores the request and starts the assistant's turn in the background. */
-  const send = async (prompt: string, contexts: ContextSnapshot[]) => {
+  /**
+   * Stores the request and starts the assistant's turn in the background.
+   * `keepDraft`: the request did not come from the message box, so what is in it stays.
+   */
+  const send = async (prompt: string, contexts: ContextSnapshot[], { keepDraft = false } = {}) => {
     setNotice(undefined);
-    setText('');
-    setIncludePage(false);
-    setSelection(undefined);
-    setTabContexts([]);
+    if (!keepDraft) {
+      setText('');
+      setIncludePage(false);
+      setSelection(undefined);
+      setTabContexts([]);
+    }
     const taskId = newId();
     setPendingTaskId(taskId);
     const { conversationId, message } = await conversation.appendUser({ text: prompt, contexts, taskId });
@@ -217,6 +228,36 @@ export function App() {
     agent.send({ type: 'start', taskId, conversationId: current.id, anchorMessageId: last.id, tabId: tab?.id });
   };
 
+  /** Removes a message (unless `keepFirst`) and everything after it, here and in storage. */
+  const replaceFrom = async (conversationId: string, messageId: string, keepFirst: boolean) => {
+    await truncateConversation(conversationId, messageId, { keepFirst });
+    agent.forget((task) => task.conversationId === conversationId && task.anchorMessageId >= messageId);
+    await conversation.reload();
+  };
+
+  /** A new reply in place of the last one. */
+  const regenerate = async () => {
+    const current = conversation.conversation;
+    const lastUser = conversation.messages.findLast((m) => m.role === 'user');
+    if (!current || !lastUser || !chatSlot || activeTask || pendingTaskId) return;
+    // Answers to the assistant's questions carry their turn's id; the turn's request is the first message with it.
+    const request = (lastUser.taskId && conversation.messages.find((m) => m.role === 'user' && m.taskId === lastUser.taskId)) || lastUser;
+    const taskId = newId();
+    setPendingTaskId(taskId);
+    await replaceFrom(current.id, request.id, true);
+    agent.send({ type: 'start', taskId, conversationId: current.id, anchorMessageId: request.id, tabId: tab?.id });
+  };
+
+  /** Sends a request again with new text: it and everything after it is replaced. Its attachments stay. */
+  const editMessage = async (message: MessageRecord, edited: string) => {
+    const current = conversation.conversation;
+    if (!current || !chatSlot || activeTask || pendingTaskId) return;
+    const first = conversation.messages[0]?.id === message.id;
+    await replaceFrom(current.id, message.id, false);
+    if (first) await renameConversation(current.id, deriveTitle(edited));
+    await send(edited, message.contexts ?? [], { keepDraft: true });
+  };
+
   /** Empty-state shortcuts: attach what the command needs and send at once. */
   const runQuickAction = async (id: SlashCommand['id']) => {
     const command = SLASH_COMMANDS.find((c) => c.id === id)!;
@@ -244,6 +285,19 @@ export function App() {
     conversation.reset();
     setPendingTaskId(undefined);
     setView('chat');
+    setFocusKey((key) => key + 1);
+  };
+
+  /** A conversation was deleted in the history: stop its turn, give its tabs back, and stop showing it. */
+  const forgetConversation = (id: string) => {
+    for (const task of Object.values(agent.tasks)) {
+      if (task.conversationId === id && ACTIVE_STATUSES.includes(task.status)) agent.send({ type: 'stop', taskId: task.id });
+    }
+    agent.send({ type: 'release', conversationId: id });
+    if (conversation.conversation?.id !== id) return;
+    if (tab) void unlinkTab(tab.id);
+    conversation.reset();
+    setPendingTaskId(undefined);
   };
 
   /** A conversation opened from the history continues in this tab. */
@@ -289,6 +343,34 @@ export function App() {
     voice.toggle();
   };
 
+  // Requests from the page's right-click menu: "Ask about the selection" and "Summarize this page".
+  const takeRequest = useRef<() => void>(() => undefined);
+  takeRequest.current = () => {
+    if (!tab || !settings) return;
+    void takePanelRequest(tab.id).then((request) => {
+      if (!request) return;
+      setView('chat');
+      if (request.kind === 'selection') {
+        setSelection(request.context);
+        setFocusKey((key) => key + 1);
+      } else if (!chatSlot) {
+        // The setup card is showing; there is nothing to send with yet.
+      } else if (activeTask || pendingTaskId) {
+        setNotice(t('agent.busy'));
+      } else if (request.context) {
+        void send(commandPrompt('summarize'), [request.context], { keepDraft: true });
+      } else {
+        void runQuickAction('summarize');
+      }
+    });
+  };
+  const ready = Boolean(settings);
+  useEffect(() => {
+    if (tab?.id === undefined || !ready) return;
+    takeRequest.current();
+    return watchPanelRequests(tab.id, () => takeRequest.current());
+  }, [tab?.id, ready]);
+
   if (!settings) return null;
 
   const hasModel = Boolean(chatSlot);
@@ -327,6 +409,7 @@ export function App() {
           currentId={conversation.conversation?.id}
           onOpen={openFromHistory}
           onClose={() => setView('chat')}
+          onDeleted={forgetConversation}
         />
       ) : (
         <>
@@ -337,11 +420,26 @@ export function App() {
               messages={conversation.messages}
               tasks={agent.tasks}
               pendingTaskId={pendingTaskId}
+              canChange={hasModel}
               onRetry={retry}
+              onRegenerate={() => void regenerate()}
+              onEdit={(message, edited) => void editMessage(message, edited)}
               onAgentSend={agent.send}
             />
           )}
           <div className="shrink-0 space-y-2 px-3 pb-3 pt-1">
+            {update && (
+              <div className="flex animate-fade-in items-center gap-2 rounded-xl border border-accent/25 bg-accent-soft px-3 py-1.5 text-xs text-fg" role="status" data-testid="update-notice">
+                <ArrowUpCircle className="h-3.5 w-3.5 shrink-0 text-accent" />
+                <span className="min-w-0 flex-1 truncate">{t('update.available', { version: update.version })}</span>
+                <button type="button" onClick={() => openOptions('about')} className="shrink-0 font-medium text-accent hover:underline">
+                  {t('update.how')}
+                </button>
+                <button type="button" aria-label={t('common.dismiss')} onClick={() => void dismissUpdate(update.version)} className="shrink-0 text-muted hover:text-fg">
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            )}
             {notice && (
               <div
                 className="flex animate-fade-in items-start gap-2 rounded-xl border border-warning/25 bg-warning-soft px-3 py-2 text-xs text-fg"
@@ -362,6 +460,7 @@ export function App() {
               mode={settings.agent.mode}
               onModeChange={(mode: AgentMode) => void updateSettings((s) => ({ ...s, agent: { ...s.agent, mode } }))}
               placeholder={question ? t('composer.placeholderAnswer') : undefined}
+              focusKey={focusKey}
               text={text}
               onTextChange={setText}
               tab={tab}

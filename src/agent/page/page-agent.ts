@@ -121,14 +121,27 @@ function labelText(el: Element): string {
  * Text of the button that submits a form (what pressing Enter in one of its
  * fields does), so the risk check sees "Place order" rather than "Coupon".
  */
-function submitterText(form: HTMLFormElement | null): string | undefined {
-  if (!form) return undefined;
+function submitterOf(form: HTMLFormElement | null): Element | null {
+  if (!form) return null;
   const own = form.querySelector('button[type="submit"], button:not([type]), input[type="submit"], input[type="image"]');
-  const outside = form.id ? document.querySelector(`[form="${CSS.escape(form.id)}"][type="submit"]`) : null;
-  const button = own ?? outside;
+  // getAttribute: a field named "id" would shadow form.id.
+  const id = form.getAttribute('id');
+  return own ?? (id ? document.querySelector(`[form="${CSS.escape(id)}"][type="submit"]`) : null);
+}
+
+function submitterText(form: HTMLFormElement | null): string | undefined {
+  const button = submitterOf(form);
   if (!button) return undefined;
   const parts = [elementText(button), button.getAttribute('aria-label'), (button as HTMLInputElement).value, button.getAttribute('alt')];
   return clip(parts.filter(Boolean).join(' '), LABEL_LIMIT) || undefined;
+}
+
+/** How a form is sent. Read from the attributes: a field named "method" would shadow form.method. */
+function formMethod(form: HTMLFormElement | null): 'get' | 'post' | undefined {
+  if (!form) return undefined;
+  const method = submitterOf(form)?.getAttribute('formmethod') ?? form.getAttribute('method') ?? '';
+  // "dialog" sends nothing, but it is no search either.
+  return /^(post|dialog)$/i.test(method.trim()) ? 'post' : 'get';
 }
 
 function shortHref(href: string): string {
@@ -373,9 +386,14 @@ export function createPageAgent(): PageAgentApi {
   const notify = (action: 'stop' | 'continue' | 'panel' | 'interference') => {
     void browser.runtime.sendMessage({ type: 'agent.overlay', action }).catch(() => undefined);
   };
-  stopButton.addEventListener('click', () => notify('stop'));
-  continueButton.addEventListener('click', () => notify('continue'));
-  panelButton.addEventListener('click', () => notify('panel'));
+  // Only real clicks count: a script in the page cannot press these for the user.
+  const onClick = (button: HTMLButtonElement, action: 'stop' | 'continue' | 'panel') =>
+    button.addEventListener('click', (event) => {
+      if (event.isTrusted) notify(action);
+    });
+  onClick(stopButton, 'stop');
+  onClick(continueButton, 'continue');
+  onClick(panelButton, 'panel');
 
   const mount = () => {
     if (!host.isConnected) document.documentElement.appendChild(host);
@@ -570,6 +588,7 @@ export function createPageAgent(): PageAgentApi {
       editable: isEditable(el),
       disabled: Boolean((el as HTMLButtonElement).disabled) || el.getAttribute('aria-disabled') === 'true',
       formSubmitText: submitterText(form),
+      formMethod: formMethod(form),
       download: el instanceof HTMLAnchorElement && el.hasAttribute('download') ? true : undefined,
       options: el instanceof HTMLSelectElement ? [...el.options].slice(0, 200).map((o) => ({ text: o.text.trim(), value: o.value })) : undefined,
       frameOrigin: frame ? frameOrigin(frame) : undefined,

@@ -15,7 +15,7 @@ import { LOCALES, resolveLocale, resources } from '../i18n/resources';
 import { createTranslator } from '../i18n/translator';
 import { pickSlot } from '../providers/resolve';
 import type { Locale, Settings } from '../shared/types';
-import { appendMessage, db, getMessages, getTasks, markInterruptedTasks, saveTask } from '../storage/db';
+import { appendMessage, db, getMessages, getTasks, markInterruptedTasks, purgeDeleted, saveTask } from '../storage/db';
 import { loadSettings, updateSettings, watchSettings } from '../storage/settings';
 import { linkTab, unlinkTab } from '../storage/tab-conversations';
 import { isExtensionPage } from './trust';
@@ -23,6 +23,10 @@ import { isExtensionPage } from './trust';
 const runners = new Map<string, AgentRunner>();
 const ports = new Set<Browser.runtime.Port>();
 const saveTimers = new Map<string, ReturnType<typeof setTimeout>>();
+/** Turns from the moment they are requested until their reply is stored. */
+const turns = new Map<string, Promise<void>>();
+/** Set while everything is being stopped, so a turn that was just requested does not start. */
+let stoppingAll = false;
 let keepalive: ReturnType<typeof setInterval> | undefined;
 
 /**
@@ -142,6 +146,7 @@ async function startTask(message: Extract<AgentClientMessage, { type: 'start' }>
   const locale: Locale = resolveLocale(settings.language, browser.i18n.getUILanguage());
   const t = await createTranslator(locale);
   const history = await getMessages(message.conversationId);
+  if (stoppingAll) return;
   const tabId =
     message.tabId ?? (await browser.tabs.query({ active: true, lastFocusedWindow: true }).catch(() => []))[0]?.id ?? -1;
   const now = Date.now();
@@ -196,7 +201,7 @@ const GROUP_TITLES = new Set(LOCALES.map((locale) => resources[locale].translati
 
 /** A new chat puts the tabs grouped by this conversation back as they were (M1.5 A4). */
 async function releaseTabs(conversationId: string) {
-  const tasks = await getTasks(conversationId);
+  const tasks = await getTasks(conversationId, { discarded: true });
   if (tasks.some((task) => ACTIVE_STATUSES.includes(task.status))) return;
   for (const task of tasks) {
     for (const tabId of task.groupedTabs ?? []) {
@@ -218,7 +223,14 @@ async function closeTabs(taskId: string) {
 function handleClientMessage(message: AgentClientMessage, port: Browser.runtime.Port) {
   switch (message.type) {
     case 'start':
-      void startTask(message);
+      if (!turns.has(message.taskId)) {
+        turns.set(
+          message.taskId,
+          startTask(message)
+            .catch((error: unknown) => console.error('Could not run the turn', error))
+            .finally(() => turns.delete(message.taskId)),
+        );
+      }
       return;
     case 'subscribe':
       for (const runner of runners.values()) port.postMessage({ type: 'task', task: runner.task } satisfies AgentServerMessage);
@@ -253,10 +265,25 @@ function handleClientMessage(message: AgentClientMessage, port: Browser.runtime.
   }
 }
 
+/** Stops every turn and resolves once their replies are stored, so stored data can be erased safely. */
+export async function stopAllTasks(): Promise<void> {
+  stoppingAll = true;
+  try {
+    for (const runner of runners.values()) runner.stop();
+    await Promise.all(turns.values());
+    for (const timer of saveTimers.values()) clearTimeout(timer);
+    saveTimers.clear();
+  } finally {
+    stoppingAll = false;
+  }
+}
+
 export function registerAgentService(): void {
   // Zod's JIT uses eval, which MV3 forbids; skip the attempt (and its CSP report).
   z.config({ jitless: true });
   void markInterruptedTasks();
+  // Conversations deleted in a panel that closed before it erased them.
+  void purgeDeleted();
 
   browser.runtime.onConnect.addListener((port: Browser.runtime.Port) => {
     if (port.name !== AGENT_PORT_NAME) return;

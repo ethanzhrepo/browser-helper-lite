@@ -15,7 +15,7 @@ import { containsCardNumber, containsSecret, findInjection, newBoundary, siteOf,
 import { decide, modeDecision, policyFor, type ActionKind } from './policy';
 import { buildAssistantSystemPrompt, currentTabNote, formatView, OUTDATED_VIEW, type ObservedState } from './prompt';
 import type { TargetInfo } from './page/types';
-import { actionKind, classifyAction, downloadRisk } from './risk';
+import { actionKind, classifyAction, downloadRisk, formSubmission } from './risk';
 import { isSensitivePage } from './sensitive';
 import { assistantTools, ELEMENT_TOOLS, READING_TOOLS, VIEW_AFTER } from './tools';
 
@@ -95,6 +95,7 @@ export function sameTarget(a: TargetInfo | undefined, b: TargetInfo | undefined)
     (a.editable || a.text === b.text) &&
     a.href === b.href &&
     a.formSubmitText === b.formSubmitText &&
+    a.formMethod === b.formMethod &&
     a.isSubmit === b.isSubmit &&
     a.editable === b.editable &&
     a.frameOrigin === b.frameOrigin &&
@@ -131,6 +132,8 @@ export class AgentRunner {
     | undefined;
   private readonly ctl: AgentBrowser;
   private readonly allowedThisTask = new Set<string>();
+  /** Sites the user refused access to in this turn: they are not asked again. */
+  private readonly deniedOrigins = new Set<string>();
   private recentSignatures: string[] = [];
   private consecutiveErrors = 0;
   /** Set once the turn operates a page: the tab is grouped and shows the overlay. */
@@ -164,6 +167,7 @@ export class AgentRunner {
       onTabOpened: (tabId) => deps.onTabOpened(tabId),
       hasPanel: (tabId) => deps.hasPanel(tabId),
       panelLabel: deps.t('agent.overlay.openPanel'),
+      pageProblem: (url) => this.pageProblem(url),
       onDebuggerDetached: (reason) => {
         if (this.task.driver) this.task.driver = 'dom';
         // The user closed Chrome's debugging bar: pause so they can decide.
@@ -664,16 +668,46 @@ export class AgentRunner {
 
   // ---- Observation ----
 
-  /** The user may need to grant site access first; resolves to an error text when unreadable. */
-  private async ensurePageAccess(url: string): Promise<string | undefined> {
+  /**
+   * Why the assistant may not read or act on a page at this address, if it may
+   * not. Never asks: the browser controller checks it before every step.
+   */
+  private async pageProblem(url: string): Promise<string | undefined> {
     if (isRestrictedUrl(url)) return 'This tab is a browser page that extensions cannot read. Navigate to a website first.';
     const host = hostOf(url);
     if (policyFor(host, this.settings.sitePolicies) === 'blocked') return `The user blocked ${host} for the assistant. Do not use this site.`;
-    if (!(await hasHostAccess(url))) {
-      const response = await this.waitFor({ kind: 'permission', origin: originPattern(url), url });
-      if (response.kind !== 'permission' || !response.granted) return `The user did not allow access to ${host}.`;
-    }
+    if (!(await hasHostAccess(url))) return `The assistant has no access to ${host}.`;
     return undefined;
+  }
+
+  /** Like pageProblem, but asks the user for site access when that is all that is missing. */
+  private async ensurePageAccess(url: string): Promise<string | undefined> {
+    if (isRestrictedUrl(url) || (await hasHostAccess(url))) return this.pageProblem(url);
+    const host = hostOf(url);
+    if (policyFor(host, this.settings.sitePolicies) === 'blocked') return this.pageProblem(url);
+    const origin = originPattern(url);
+    const denied = `The user did not allow access to ${host}. Do not use this site.`;
+    if (this.deniedOrigins.has(origin)) return denied;
+    const response = await this.waitFor({ kind: 'permission', origin, url });
+    if (response.kind !== 'permission' || !response.granted) {
+      this.deniedOrigins.add(origin);
+      return denied;
+    }
+    return this.pageProblem(url);
+  }
+
+  /**
+   * Before acting on the current page: it must be one the assistant may use.
+   * Rejects the action otherwise. Reading tools check the same way, so no
+   * action reaches a page that reading it would not.
+   */
+  private async pageAllowed(action: AgentAction): Promise<boolean> {
+    const tab = await this.ctl.currentTab();
+    const problem = await this.ensurePageAccess(tab.url ?? '');
+    if (!problem) return true;
+    action.status = 'rejected';
+    action.result = problem;
+    return false;
   }
 
   private async observe(): Promise<ObservedState> {
@@ -686,11 +720,20 @@ export class AgentRunner {
     if (problem) return { tab: info, otherTabs, page: { kind: 'unavailable', reason: problem } };
 
     await this.ctl.refreshOverlay();
-    let snapshot = await this.ctl.page('snapshot', { maxChars: SNAPSHOT_CHARS });
-    if (snapshot.blockers.captcha) {
-      await this.waitFor({ kind: 'handoff', reason: 'captcha', site: hostOf(url) }, this.watchCaptcha(info.id));
-      await this.ctl.waitForSettle();
-      snapshot = await this.ctl.page('snapshot', { maxChars: SNAPSHOT_CHARS });
+    const view = () => this.ctl.page('snapshot', { maxChars: SNAPSHOT_CHARS });
+    let snapshot: Awaited<ReturnType<typeof view>>;
+    try {
+      snapshot = await view();
+      if (snapshot.blockers.captcha) {
+        await this.waitFor({ kind: 'handoff', reason: 'captcha', site: hostOf(url) }, this.watchCaptcha(info.id));
+        await this.ctl.waitForSettle();
+        snapshot = await view();
+      }
+    } catch (error) {
+      if (error instanceof StopError || this.stopped) throw new StopError();
+      // Chrome's own error page (the site did not load) takes no scripts: say so instead of failing the turn.
+      const detail = clip(error instanceof Error ? error.message : String(error), 200);
+      return { tab: info, otherTabs, page: { kind: 'unavailable', reason: `This page could not be read; it may have failed to load (${detail}). Go back or open another address.` } };
     }
     return { tab: { ...info, title: snapshot.title || info.title, url: snapshot.url || url }, otherTabs, page: { kind: 'page', snapshot } };
   }
@@ -709,8 +752,8 @@ export class AgentRunner {
   private async execute(action: AgentAction): Promise<Outcome> {
     const warning = this.repeatWarning(action);
     try {
-      // Actions that need no approval take over the tab right away; the others once allowed (see guarded).
-      if (!READING_TOOLS.has(action.tool) && !GUARDED_TOOLS.has(action.tool)) await this.engage();
+      // Actions that need no approval take over the tab right away; the others once allowed (see guarded and scroll).
+      if (!READING_TOOLS.has(action.tool) && !GUARDED_TOOLS.has(action.tool) && action.tool !== 'scroll') await this.engage();
       const outcome = await this.perform(action);
       if (action.status === 'running') action.status = 'done';
       if (action.status !== 'error') this.consecutiveErrors = 0;
@@ -769,6 +812,8 @@ export class AgentRunner {
         action.result = 'ok';
         return 'pageChanged';
       case 'scroll': {
+        if (!(await this.pageAllowed(action))) return 'continue';
+        await this.engage();
         const moved = unwrap(
           await this.ctl.page('scroll', {
             direction: args.direction === 'up' ? 'up' : 'down',
@@ -814,14 +859,12 @@ export class AgentRunner {
         action.result = 'ok';
         return 'pageChanged';
       case 'press': {
-        // Judged by what the key acts on: the focused element.
-        const focused = await this.ctl.page('describeFocused').catch(() => undefined);
-        const target = focused?.ok ? (focused.value ?? undefined) : undefined;
+        if (!(await this.pageAllowed(action))) return 'continue';
+        // Judged by what the key acts on: the focused element. If that cannot be
+        // read, this throws and the key is not pressed: an unknown target is not a safe one.
+        const focused = async () => unwrap(await this.ctl.page('describeFocused')) ?? undefined;
+        const target = await focused();
         if (target) action.target = target.label;
-        const recheck = async () => {
-          const now = await this.ctl.page('describeFocused').catch(() => undefined);
-          return now?.ok ? (now.value ?? undefined) : undefined;
-        };
         return this.guarded(
           action,
           target,
@@ -831,7 +874,7 @@ export class AgentRunner {
             await this.ctl.waitForSettle();
             return (await this.ctl.currentTab()).url !== before ? 'pageChanged' : 'continue';
           },
-          recheck,
+          focused,
         );
       }
       default:
@@ -841,6 +884,7 @@ export class AgentRunner {
   }
 
   private async elementAction(action: AgentAction): Promise<Outcome> {
+    if (!(await this.pageAllowed(action))) return 'continue';
     const index = Number(action.args.index);
     const target = unwrap(await this.ctl.page('describeTarget', index));
     action.target = target.label;
@@ -940,6 +984,7 @@ export class AgentRunner {
         site: host,
         target: action.target ?? action.tool,
         tool: action.tool,
+        submits: formSubmission(action.tool, action.args, target),
       });
       const choice = response.kind === 'approval' ? response.decision : 'deny';
       if (choice === 'deny') {
