@@ -433,8 +433,8 @@ test.describe.serial('research, tables, pictures and reading aloud', () => {
     await expect(approval).toContainText('the page stays open in a collapsed tab group');
     await approval.getByRole('button', { name: /Allow once/ }).click();
     await expect(lastReply()).toContainText('I am watching the page and will tell you.', { timeout: 20_000 });
-    // Chrome's timer only reloads the page now and then; the looking is done inside it.
-    expect(await alarms()).toEqual(['watch:1']);
+    // Chrome's timer reloads the page every half minute; the looking in between is done inside it.
+    expect(await alarms()).toEqual(['watch:0.5']);
 
     await panel.getByTestId('open-watches').click();
     const item = panel.getByTestId('watch-item');
@@ -529,5 +529,55 @@ test.describe.serial('research, tables, pictures and reading aloud', () => {
     expect(sent).toContain('No text changed in the viewport since the previous view.');
     await opened.site.close();
     await opened.panel.close();
+  });
+
+  test('a rush reloads the page every few seconds for a while; a CAPTCHA slows the watch down and says so', async () => {
+    pages['/stock.html'] = stockPage('Out of stock');
+    await site.goto(`${server.origin}/stock.html`);
+    await ask(panel, 'FT-WATCH tell me when it is back, again');
+    await panel.getByTestId('approval-card').getByRole('button', { name: /Allow once/ }).click({ timeout: 20_000 });
+    await expect(lastReply()).toContainText('I am watching the page and will tell you.', { timeout: 20_000 });
+    await panel.getByTestId('open-watches').click();
+    const item = panel.getByTestId('watch-item');
+    await expect(item.getByTestId('watch-state')).toContainText('Still out of stock.', { timeout: 20_000 });
+    const live = () => context.pages().filter((page) => page !== site && page.url().endsWith('/stock.html'));
+    // Every five minutes: the page is opened for a look and closed again.
+    await expect.poll(() => live().length).toBe(0);
+    const asked = server.watchRequests.length;
+    const loads = () => server.hits.filter((hit) => hit === '/stock.html').length;
+
+    // The user asks for a rush, and is told what it may cost.
+    let asking = '';
+    panel.once('dialog', (dialog) => {
+      asking = dialog.message();
+      void dialog.accept();
+    });
+    await item.getByTestId('watch-rush').click();
+    await expect(item.getByTestId('watch-state')).toContainText('rush until', { timeout: 10_000 });
+    expect(asking).toContain('reloaded every 5 seconds');
+    expect(asking).toContain('CAPTCHA');
+    // The page now stays open and is loaded again and again; the model is not asked, because nothing changed.
+    const before = loads();
+    await expect.poll(loads, { timeout: 30_000 }).toBeGreaterThanOrEqual(before + 3);
+    expect(live()).toHaveLength(1);
+    expect(server.watchRequests.length).toBe(asked);
+
+    // The site answers with a CAPTCHA: the rush ends, the watch waits, and the user is told.
+    pages['/stock.html'] = '<!doctype html><title>Just a moment…</title><div class="g-recaptcha" style="width:300px;height:80px;border:1px solid">Verify you are human</div>';
+    await expect(item.getByTestId('watch-state')).toContainText('The site asks to verify that you are human.', { timeout: 30_000 });
+    await expect(item.getByTestId('watch-state')).toContainText('slowed down, next look at');
+    await expect(item.getByTestId('watch-state')).not.toContainText('rush until');
+    await expect(item).toHaveAttribute('data-status', 'active');
+    expect(await notifications()).toEqual(['watch']);
+    expect(server.watchRequests.length).toBe(asked);
+    // Left alone: no more loads, and the tab kept for the rush is gone.
+    const after = loads();
+    await panel.waitForTimeout(7000);
+    expect(loads()).toBe(after);
+    await expect.poll(() => live().length).toBe(0);
+
+    await item.getByRole('button', { name: 'Delete' }).click();
+    await expect(panel.getByTestId('watch-item')).toHaveCount(0);
+    await panel.getByRole('button', { name: 'Back' }).click();
   });
 });

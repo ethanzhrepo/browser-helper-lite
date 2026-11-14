@@ -724,21 +724,30 @@
     "checkNow": "Comprobar ahora",
     "pause": "Pausar",
     "resume": "Vigilar de nuevo",
-    "footnote": "Una página vigilada se abre en segundo plano y solo se lee. Tu modelo se consulta cuando cambia lo vigilado, no en cada comprobación.",
+    "footnote": "Una página vigilada se abre en segundo plano y solo se lee. Tu modelo se consulta cuando cambia lo vigilado, no en cada comprobación. Una página se recarga como mucho cada 30 segundos, salvo que la aceleres.",
     "notification": {
       "metTitle": "Ha ocurrido",
       "met": "{{site}}: {{condition}}",
       "failedTitle": "Una vigilancia se detuvo",
-      "failed": "{{site}} no se pudo comprobar varias veces seguidas: {{condition}}"
+      "failed": "{{site}} no se pudo comprobar varias veces seguidas: {{condition}}",
+      "slowedTitle": "Una vigilancia va más lenta",
+      "slowed": "{{site}} pidió un CAPTCHA o no cargó. Se intentará más tarde: {{condition}}"
     },
     "pace": "Comprobar",
-    "liveHint": "A este ritmo, la página queda abierta en un grupo de pestañas contraído.",
+    "liveHint": "A este ritmo, la página queda abierta en un grupo de pestañas contraído y se recarga cada 30 segundos.",
     "groupTitle": "Vigilando",
     "interval": {
       "seconds": "cada {{n}} s",
       "minutes": "cada {{n}} min",
       "hours": "cada {{n}} h",
       "day": "cada día"
-    }
+    },
+    "rush": {
+      "start": "Acelerar durante {{minutes}} minutos",
+      "stop": "Dejar de acelerar",
+      "on": "acelerada hasta las {{time}}",
+      "confirm": "Durante los próximos {{minutes}} minutos esta página se recarga cada {{seconds}} segundos. El sitio puede responder con un CAPTCHA o bloquearte. ¿Empezar?"
+    },
+    "retry": "más lenta, próximo intento a las {{time}}"
   }
 }

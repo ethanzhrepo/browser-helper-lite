@@ -12,7 +12,7 @@ import { buildBackup, parseBackup, restoreBackup } from '../../src/storage/backu
 import { appendMessage, clearConversations, createConversation, db, getMessages, truncateConversation } from '../../src/storage/db';
 import { numberOf, sortOrder, toCsv } from '../../src/ui/table';
 import { speakable, speechChunks, spokenLanguage } from '../../src/voice/speak';
-import { alarmMinutes, clampSeconds, MAX_WATCHES, parseVerdict, recheckAfterMs, textDigest, unchanged, watchAlarm, type Watch, type WatchPart } from '../../src/watch/watch';
+import { alarmMinutes, clampSeconds, isLive, isRushing, MAX_WATCHES, parseVerdict, recheckAfterMs, retryAfterMs, textDigest, unchanged, watchAlarm, type Watch, type WatchPart } from '../../src/watch/watch';
 
 describe('reading replies aloud', () => {
   it('says the words of a reply, not its markup, code or addresses', () => {
@@ -157,6 +157,7 @@ describe('watched pages', () => {
   let pageError: Error | undefined;
   let noWindow = false;
   let fast = false;
+  let captcha = false;
   let log: string[] = [];
 
   const session: PageSession = {
@@ -168,6 +169,7 @@ describe('watched pages', () => {
       log.push('read');
       return { title: 'Charger', content: `Stock: ${stock}` };
     },
+    blocked: async () => captcha,
     locate: async (quotes) => (quotes.includes(stock) ? [{ locator: '#stock', text: stock }] : [{ locator: '', text: textDigest(stock) }]),
     // Like the real one: only a fast watch's page stays open to go on watching.
     live: async (parts) => void (fast && log.push(`live:${parts.map((part) => part.text).join(',')}`)),
@@ -209,6 +211,7 @@ describe('watched pages', () => {
     pageError = undefined;
     noWindow = false;
     fast = false;
+    captcha = false;
     log = [];
   });
 
@@ -218,8 +221,9 @@ describe('watched pages', () => {
     expect(watch).toMatchObject({ everySeconds: 300, status: 'active', checks: 0 });
     expect(watch.expiresAt - watch.createdAt).toBe(30 * 24 * 60 * 60 * 1000);
     expect(await alarms()).toEqual(['watch:5']);
-    // Chrome's timers do not go below a minute here: a faster watch keeps its page open instead, and the timer reloads it.
-    expect([alarmMinutes({ everySeconds: 1 }), alarmMinutes({ everySeconds: 30 }), alarmMinutes({ everySeconds: 90 }), alarmMinutes({ everySeconds: 3600 })]).toEqual([1, 1, 1.5, 60]);
+    // A page is loaded afresh every half minute at most: a faster watch keeps its page open and looks inside it in between.
+    expect([alarmMinutes({ everySeconds: 1 }), alarmMinutes({ everySeconds: 30 }), alarmMinutes({ everySeconds: 45 }), alarmMinutes({ everySeconds: 90 }), alarmMinutes({ everySeconds: 3600 })]).toEqual([0.5, 0.5, 0.75, 1.5, 60]);
+    expect([isLive({ everySeconds: 1 }), isLive({ everySeconds: 45 }), isLive({ everySeconds: 300 }), isLive({ everySeconds: 300, rushUntil: 2000 }, 1000), isLive({ everySeconds: 300, rushUntil: 2000 }, 3000)]).toEqual([true, true, false, true, false]);
     for (let i = 1; i < MAX_WATCHES; i++) await start();
     await expect(createWatch(input, deps)).rejects.toThrow(/already 20 watches/);
   });
@@ -288,7 +292,7 @@ describe('watched pages', () => {
   it('keeps a fast watch looking from inside its page', async () => {
     fast = true;
     const watch = await start({ everySeconds: 2 });
-    expect(await alarms()).toEqual(['watch:1']);
+    expect(await alarms()).toEqual(['watch:0.5']);
     await checkWatch(watch.id, deps);
     // After the model's answer, and after every look that found nothing new, the page goes on watching.
     expect(log).toEqual(['open:reload', 'read', 'judge', 'live:Sold out', 'done']);
@@ -300,6 +304,8 @@ describe('watched pages', () => {
   it('stops after three failed checks in a row and says so; one good check starts the count again', async () => {
     const watch = await start();
     const fail = async () => {
+      // Past the wait that a failed look puts before the next one.
+      now += retryAfterMs(3);
       pageError = new Error('The page did not load.');
       const result = await checkWatch(watch.id, deps);
       pageError = undefined;
@@ -307,6 +313,7 @@ describe('watched pages', () => {
     };
     await fail();
     await fail();
+    now += retryAfterMs(3);
     expect(await checkWatch(watch.id, deps)).toMatchObject({ status: 'active', failures: 0 });
     // A failed look leaves nothing to compare: the next one asks the model.
     expect(await fail()).toMatchObject({ failures: 1, probe: undefined });
@@ -332,6 +339,41 @@ describe('watched pages', () => {
     now = watch.expiresAt + 1;
     expect(await checkWatch(watch.id, deps)).toMatchObject({ status: 'expired' });
     expect(told).toEqual([]);
+  });
+  it('leaves a site alone for a while after a CAPTCHA, longer after the next, and tells the user that it slowed down', async () => {
+    const watch = await start();
+    await checkWatch(watch.id, deps);
+    log = [];
+    captcha = true;
+    now += 300_000;
+    const blocked = await checkWatch(watch.id, deps);
+    expect(blocked).toMatchObject({ status: 'active', failures: 1, retryAt: now + 5 * 60_000, probe: undefined });
+    expect(blocked!.history.at(-1)).toMatchObject({ error: 'The site asks to verify that you are human.' });
+    // Not read and not judged: the page is not what was asked for.
+    expect(log).toEqual(['open:reload', 'done']);
+    expect(told).toEqual(['slowed:The charger is in stock']);
+    // The timer fires meanwhile: nothing is opened.
+    log = [];
+    now += 60_000;
+    expect(await checkWatch(watch.id, deps)).toMatchObject({ failures: 1, checks: 2 });
+    expect(log).toEqual([]);
+    // The user may still ask for a look right now.
+    captcha = false;
+    expect(await checkWatch(watch.id, deps, { ask: true })).toMatchObject({ failures: 0, retryAt: undefined, checks: 3 });
+    expect([retryAfterMs(1), retryAfterMs(2), retryAfterMs(3)]).toEqual([5 * 60_000, 10 * 60_000, 20 * 60_000]);
+  });
+
+  it('ends a rush when the site objects, and says so', async () => {
+    const watch = await start();
+    await checkWatch(watch.id, deps);
+    await db.watches.update(watch.id, { rushUntil: now + 10 * 60_000 });
+    expect(isRushing((await db.watches.get(watch.id))!, now)).toBe(true);
+    pageError = new Error('The page did not load.');
+    told = [];
+    const after = await checkWatch(watch.id, deps);
+    expect(after).toMatchObject({ status: 'active', failures: 1, rushUntil: undefined });
+    expect(after!.retryAt).toBeGreaterThan(now);
+    expect(told).toEqual(['slowed:The charger is in stock']);
   });
 });
 

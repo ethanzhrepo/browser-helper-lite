@@ -702,21 +702,30 @@
     "checkNow": "立即检查",
     "pause": "暂停",
     "resume": "重新盯",
-    "footnote": "盯着的页面在后台打开，只读不操作。盯着的内容变了才问模型，不是每次都问。",
+    "footnote": "盯着的页面在后台打开，只读不操作。盯着的内容变了才问模型，不是每次都问。页面最快每 30 秒刷新一次，除非你开急速。",
     "notification": {
       "metTitle": "发生了",
       "met": "{{site}}：{{condition}}",
       "failedTitle": "有一项盯着的页面停了",
-      "failed": "{{site}} 连续几次没能检查：{{condition}}"
+      "failed": "{{site}} 连续几次没能检查：{{condition}}",
+      "slowedTitle": "有一项盯着的页面放慢了",
+      "slowed": "{{site}} 要求验证或没打开，稍后再试：{{condition}}"
     },
     "pace": "检查间隔",
-    "liveHint": "这个间隔下，页面会一直开在一个收起的标签组里。",
+    "liveHint": "这个间隔下，页面会一直开在一个收起的标签组里，每 30 秒刷新一次。",
     "groupTitle": "盯着的页面",
     "interval": {
       "seconds": "每 {{n}} 秒",
       "minutes": "每 {{n}} 分钟",
       "hours": "每 {{n}} 小时",
       "day": "每天"
-    }
+    },
+    "rush": {
+      "start": "急速 {{minutes}} 分钟",
+      "stop": "停止急速",
+      "on": "急速到 {{time}}",
+      "confirm": "接下来 {{minutes}} 分钟，每 {{seconds}} 秒刷新一次这个页面。网站可能弹出验证码或拦截你。开始吗？"
+    },
+    "retry": "已放慢，{{time}} 再看"
   }
 }

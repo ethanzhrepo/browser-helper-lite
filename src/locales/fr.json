@@ -724,21 +724,30 @@
     "checkNow": "Vérifier maintenant",
     "pause": "Mettre en pause",
     "resume": "Surveiller à nouveau",
-    "footnote": "Une page surveillée est ouverte en arrière-plan et seulement lue. Votre modèle est interrogé quand ce qui est surveillé change, pas à chaque vérification.",
+    "footnote": "Une page surveillée est ouverte en arrière-plan et seulement lue. Votre modèle est interrogé quand ce qui est surveillé change, pas à chaque vérification. Une page est rechargée au plus toutes les 30 secondes, sauf si vous accélérez.",
     "notification": {
       "metTitle": "C'est arrivé",
       "met": "{{site}} : {{condition}}",
       "failedTitle": "Une surveillance s'est arrêtée",
-      "failed": "{{site}} n'a pas pu être vérifié plusieurs fois de suite : {{condition}}"
+      "failed": "{{site}} n'a pas pu être vérifié plusieurs fois de suite : {{condition}}",
+      "slowedTitle": "Une surveillance a ralenti",
+      "slowed": "{{site}} a demandé un CAPTCHA ou ne s'est pas chargé. Nouvel essai plus tard : {{condition}}"
     },
     "pace": "Vérifier",
-    "liveHint": "À ce rythme, la page reste ouverte dans un groupe d'onglets replié.",
+    "liveHint": "À ce rythme, la page reste ouverte dans un groupe d'onglets replié et est rechargée toutes les 30 secondes.",
     "groupTitle": "Surveillance",
     "interval": {
       "seconds": "toutes les {{n}} s",
       "minutes": "toutes les {{n}} min",
       "hours": "toutes les {{n}} h",
       "day": "chaque jour"
-    }
+    },
+    "rush": {
+      "start": "Accélérer pendant {{minutes}} minutes",
+      "stop": "Arrêter l'accélération",
+      "on": "accéléré jusqu'à {{time}}",
+      "confirm": "Pendant les {{minutes}} prochaines minutes, cette page est rechargée toutes les {{seconds}} secondes. Le site peut répondre par un CAPTCHA ou vous bloquer. Commencer ?"
+    },
+    "retry": "ralentie, prochain essai à {{time}}"
   }
 }

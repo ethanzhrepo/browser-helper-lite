@@ -84,6 +84,8 @@ export type WatchActionRequest = { type: 'watch.action'; id: string } & (
   | { action: 'check' | 'pause' | 'resume' | 'delete' }
   /** How often to look, in seconds. */
   | { action: 'interval'; seconds: number }
+  /** Rush: reload the page every few seconds for the next minutes; `on: false` ends it. */
+  | { action: 'rush'; on: boolean }
 );
 
 export interface WatchActionResult {

@@ -21,10 +21,13 @@ import {
   alarmMinutes,
   clampSeconds,
   isLive,
+  isRushing,
   MAX_WATCHES,
   newWatch,
   parseVerdict,
   recheckAfterMs,
+  RUSH_MINUTES,
+  RUSH_SECONDS,
   textDigest,
   unchanged,
   WATCH_SYSTEM,
@@ -117,6 +120,8 @@ export interface PageSession {
   read(): Promise<{ title: string; content: string }>;
   /** Where the texts the model named are in the page. */
   locate(quotes: string[]): Promise<WatchPart[]>;
+  /** Whether the page asks to prove that a person is there instead of showing what was asked for. */
+  blocked(): Promise<boolean>;
   /** Keeps watching those pieces from inside the page (live watches). */
   live(parts: WatchPart[]): Promise<void>;
   /** Done looking: a tab opened for one look is closed. */
@@ -138,6 +143,7 @@ function tabSession(watch: Watch, tabId: number, keep: boolean): PageSession {
       return { title: page.title, content: page.markdown };
     },
     locate: (quotes) => inPage<WatchPart[]>(tabId, { kind: 'locate', quotes }),
+    blocked: () => inPage<boolean>(tabId, { kind: 'blocked' }),
     live: async (parts) => {
       if (keep) await inPage(tabId, { kind: 'live', id: watch.id, parts, everySeconds: watch.everySeconds });
     },
@@ -160,6 +166,7 @@ function fetchSession(watch: Watch, settings: Settings): PageSession {
     },
     read,
     locate: whole,
+    blocked: async () => false,
     live: async () => undefined,
     done: async () => undefined,
   };
@@ -182,7 +189,9 @@ async function openPage(watch: Watch, settings: Settings, { reload }: { reload: 
     }
     throw new Error(`The assistant has no access to ${host}.`);
   }
-  const keep = isLive(watch);
+  const keep = isLive(watch, Date.now());
+  // A tab kept from a faster pace or a rush that is over goes: from now on the page is opened for each look.
+  if (!keep) await closeLiveTab(watch.id);
   if (keep) {
     const known = (await liveTabs())[watch.id];
     const tab = known === undefined ? undefined : await browser.tabs.get(known).catch(() => undefined);
@@ -232,7 +241,7 @@ async function judge(page: { title: string; content: string }, watch: Watch, set
  * Tells the user with a system notification. Its words are ours and the
  * condition the user approved; nothing a page or a model wrote is in it.
  */
-async function notify(watch: Watch, settings: Settings, kind: 'met' | 'failed'): Promise<void> {
+async function notify(watch: Watch, settings: Settings, kind: WatchNotice): Promise<void> {
   if (!browser.notifications) return;
   const t = await createTranslator(resolveLocale(settings.language, browser.i18n.getUILanguage()));
   await browser.notifications
@@ -246,10 +255,21 @@ async function notify(watch: Watch, settings: Settings, kind: 'met' | 'failed'):
     .catch(() => undefined);
 }
 
+/** What the user is told about: the condition holds, the watch gave up, or the site stopped answering and the watch slowed down. */
+export type WatchNotice = 'met' | 'failed' | 'slowed';
+
+/** The site showed a CAPTCHA or a "checking your browser" page instead of its content. */
+class BlockedError extends Error {
+  constructor() {
+    super('The site asks to verify that you are human.');
+    this.name = 'BlockedError';
+  }
+}
+
 export interface CheckDeps {
   open: (watch: Watch, settings: Settings, options: { reload: boolean }) => Promise<PageSession | undefined>;
   judge: (page: { title: string; content: string }, watch: Watch, settings: Settings) => Promise<{ met: boolean; note: string; quotes: string[]; usage?: Usage }>;
-  notify: (watch: Watch, settings: Settings, kind: 'met' | 'failed') => Promise<void>;
+  notify: (watch: Watch, settings: Settings, kind: WatchNotice) => Promise<void>;
   /** A watch stopped: what was kept for it (a live watch's tab) goes. */
   release: (id: string) => Promise<void>;
   now: () => number;
@@ -296,19 +316,22 @@ export async function checkWatch(id: string, deps: CheckDeps = realDeps, { reloa
       return next;
     };
     if (at >= watch.expiresAt) return settle((current) => ({ ...current, status: 'expired' }));
+    // The last look failed: the site is left alone for a while, unless the user asks for a look now.
+    if (!ask && (watch.retryAt ?? 0) > at) return watch;
 
     let session: PageSession | undefined;
     try {
       session = await deps.open(watch, settings, { reload });
       // Nothing to look with right now (no window): try again next time.
       if (!session) return watch;
+      if (await session.blocked()) throw new BlockedError();
       const probe = watch.probe;
       if (probe && !ask && at - probe.judgedAt < recheckAfterMs(watch)) {
         const now = await session.probe(probe.parts.map((part) => part.locator));
         if (unchanged(probe.parts, now)) {
           // What the verdict rested on reads the same: it still stands, and the model is not asked.
           await session.live(probe.parts);
-          return await settle((current) => ({ ...current, checkedAt: at, failures: 0 }));
+          return await settle((current) => ({ ...current, checkedAt: at, failures: 0, retryAt: undefined }));
         }
       }
       const page = await session.read();
@@ -319,7 +342,10 @@ export async function checkWatch(id: string, deps: CheckDeps = realDeps, { reloa
       return next;
     } catch (error) {
       const message = toErrorInfo(error).message.slice(0, 200);
-      return await settle((current) => afterCheck(current, { at, met: false, note: '', error: message }));
+      const next = await settle((current) => afterCheck(current, { at, met: false, note: '', error: message }));
+      // Stopped by a CAPTCHA, or in the middle of a rush: the watch goes on, slower, and the user should know why nothing is coming.
+      if (next?.status === 'active' && (error instanceof BlockedError || isRushing(watch, at))) await deps.notify(next, settings, 'slowed');
+      return next;
     } finally {
       await session?.done().catch(() => undefined);
     }
@@ -338,6 +364,34 @@ export async function createWatch(input: { url: string; title: string; condition
   // The first look also finds what to compare from then on. Not waited for: the page takes a moment to load.
   void checkWatch(watch.id, deps).catch((error: unknown) => console.error('Watch check failed', error));
   return watch;
+}
+
+// ---- Rush ----
+
+/** Watches being rushed by this service worker. */
+const rushing = new Set<string>();
+
+/**
+ * Reloads a watch's page every few seconds until its rush is over. The
+ * calls it makes keep the service worker awake meanwhile; should Chrome stop
+ * it anyway, the watch's timer starts the rush again within half a minute.
+ */
+function rush(id: string): void {
+  if (rushing.has(id)) return;
+  rushing.add(id);
+  const tick = async () => {
+    const watch = await db.watches.get(id).catch(() => undefined);
+    if (!watch || watch.status !== 'active' || !isRushing(watch, Date.now())) {
+      rushing.delete(id);
+      // The rush is over; a watch that looks less than once a minute lets its tab go.
+      if (watch?.status === 'active' && !isLive(watch, Date.now())) await closeLiveTab(id);
+      return;
+    }
+    const started = Date.now();
+    await checkWatch(id).catch((error: unknown) => console.error('Watch check failed', error));
+    setTimeout(() => void tick(), Math.max(500, RUSH_SECONDS * 1000 - (Date.now() - started)));
+  };
+  void tick();
 }
 
 async function act(request: WatchActionRequest): Promise<WatchActionResult> {
@@ -362,9 +416,21 @@ async function act(request: WatchActionRequest): Promise<WatchActionResult> {
         await browser.alarms.clear(watchAlarm(watch.id));
         await closeLiveTab(watch.id);
         break;
+      case 'rush': {
+        if (watch.status !== 'active') break;
+        if (!request.on) {
+          await db.watches.put({ ...watch, rushUntil: undefined });
+          if (!isLive({ ...watch, rushUntil: undefined })) await closeLiveTab(watch.id);
+          break;
+        }
+        // The user asks for it knowing the site may object: a wait after an earlier failure is lifted.
+        await db.watches.put({ ...watch, rushUntil: Date.now() + RUSH_MINUTES * 60 * 1000, retryAt: undefined });
+        rush(watch.id);
+        break;
+      }
       case 'resume': {
         // A watch that was met, failed or ran out starts over: the user asked for it again.
-        const again: Watch = { ...watch, status: 'active', failures: 0, probe: undefined, expiresAt: Math.max(watch.expiresAt, Date.now() + 24 * 60 * 60 * 1000) };
+        const again: Watch = { ...watch, status: 'active', failures: 0, probe: undefined, retryAt: undefined, rushUntil: undefined, expiresAt: Math.max(watch.expiresAt, Date.now() + 24 * 60 * 60 * 1000) };
         await db.watches.put(again);
         await setAlarm(again);
         void checkWatch(watch.id).catch((error: unknown) => console.error('Watch check failed', error));
@@ -418,9 +484,20 @@ export function registerWatchService(): void {
   if (!browser.alarms) return;
   browser.alarms.onAlarm.addListener((alarm) => {
     const id = watchOfAlarm(alarm.name);
-    if (id) void checkWatch(id).catch((error: unknown) => console.error('Watch check failed', error));
+    if (!id) return;
+    void db.watches.get(id).then((watch) => {
+      // A rush that the service worker lost (Chrome stopped it) goes on from here.
+      if (watch?.status === 'active' && isRushing(watch, Date.now())) rush(id);
+      else void checkWatch(id).catch((error: unknown) => console.error('Watch check failed', error));
+    });
   });
   void syncAlarms().catch((error: unknown) => console.warn('Could not restore the watch timers', error));
+  void db.watches
+    .toArray()
+    .then((watches) => {
+      for (const watch of watches) if (watch.status === 'active' && isRushing(watch, Date.now())) rush(watch.id);
+    })
+    .catch(() => undefined);
 
   browser.runtime.onMessage.addListener((message: WatchActionRequest | { type: 'watch.changed'; id: string }, sender: Browser.runtime.MessageSender, sendResponse) => {
     if (message?.type === 'watch.action') {

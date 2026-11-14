@@ -1,4 +1,4 @@
-import { ArrowLeft, BellRing, CircleAlert, Eye, Loader2, Pause, Play, RefreshCw, Trash2 } from 'lucide-react';
+import { ArrowLeft, BellRing, CircleAlert, Eye, Loader2, Pause, Play, RefreshCw, Trash2, Zap } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { browser } from 'wxt/browser';
@@ -6,7 +6,7 @@ import type { WatchActionRequest } from '../../src/shared/protocol';
 import { db } from '../../src/storage/db';
 import { IconButton } from '../../src/ui/Button';
 import { formatInterval } from '../../src/watch/format';
-import { WATCH_INTERVALS, type Watch } from '../../src/watch/watch';
+import { isRushing, RUSH_MINUTES, RUSH_SECONDS, WATCH_INTERVALS, type Watch } from '../../src/watch/watch';
 
 const REFRESH_MS = 4000;
 
@@ -43,11 +43,15 @@ export function WatchPanel({ onClose }: { onClose: () => void }) {
     return () => document.removeEventListener('keydown', onKey);
   }, [onClose]);
 
-  const act = async (watch: Watch, action: 'check' | 'pause' | 'resume' | 'delete' | { seconds: number }) => {
+  const act = async (watch: Watch, action: 'check' | 'pause' | 'resume' | 'delete' | { seconds: number } | { rush: boolean }) => {
     setBusy(watch.id);
     try {
       const request: WatchActionRequest =
-        typeof action === 'string' ? { type: 'watch.action', id: watch.id, action } : { type: 'watch.action', id: watch.id, action: 'interval', seconds: action.seconds };
+        typeof action === 'string'
+          ? { type: 'watch.action', id: watch.id, action }
+          : 'rush' in action
+            ? { type: 'watch.action', id: watch.id, action: 'rush', on: action.rush }
+            : { type: 'watch.action', id: watch.id, action: 'interval', seconds: action.seconds };
       await browser.runtime.sendMessage(request);
       await load();
     } finally {
@@ -77,6 +81,10 @@ export function WatchPanel({ onClose }: { onClose: () => void }) {
           const looked = Math.max(watch.checkedAt ?? 0, last?.at ?? 0);
           const paces = [...new Set([...WATCH_INTERVALS, watch.everySeconds])].sort((a, b) => a - b);
           const running = watch.status === 'active';
+          const now = Date.now();
+          const rushed = running && isRushing(watch, now);
+          const waiting = running && (watch.retryAt ?? 0) > now;
+          const clock = new Intl.DateTimeFormat(i18n.language, { timeStyle: 'short' });
           const Icon = watch.status === 'met' ? BellRing : watch.status === 'failed' ? CircleAlert : Eye;
           const tone = watch.status === 'met' ? 'text-success' : watch.status === 'failed' ? 'text-danger' : running ? 'text-accent' : 'text-faint';
           return (
@@ -93,6 +101,8 @@ export function WatchPanel({ onClose }: { onClose: () => void }) {
               <p className="mt-2 text-xs leading-relaxed text-muted" data-testid="watch-state">
                 <span className={`font-medium ${tone}`}>{t(`watch.status.${watch.status}`)}</span>
                 {running && <> · {formatInterval(t, watch.everySeconds)}</>}
+                {rushed && <span className="font-medium text-warning"> · {t('watch.rush.on', { time: clock.format(watch.rushUntil) })}</span>}
+                {waiting && <span className="text-warning"> · {t('watch.retry', { time: clock.format(watch.retryAt) })}</span>}
                 {last && (
                   <>
                     {' · '}
@@ -121,6 +131,19 @@ export function WatchPanel({ onClose }: { onClose: () => void }) {
                   </select>
                 )}
                 {busy === watch.id && <Loader2 className="mr-1 mt-2 h-3.5 w-3.5 animate-spin text-faint" />}
+                {running && (
+                  <IconButton
+                    label={rushed ? t('watch.rush.stop') : t('watch.rush.start', { minutes: RUSH_MINUTES })}
+                    // Reloading a page every few seconds is what sites take for a bot: the user says yes knowing that.
+                    onClick={() => (rushed || window.confirm(t('watch.rush.confirm', { minutes: RUSH_MINUTES, seconds: RUSH_SECONDS }))) && void act(watch, { rush: !rushed })}
+                    disabled={Boolean(busy)}
+                    className={`h-7 w-7 ${rushed ? 'text-warning' : ''}`}
+                    aria-pressed={rushed}
+                    data-testid="watch-rush"
+                  >
+                    <Zap className="h-3.5 w-3.5" />
+                  </IconButton>
+                )}
                 {(running || watch.status === 'paused') && (
                   <IconButton label={t('watch.checkNow')} onClick={() => void act(watch, 'check')} disabled={Boolean(busy)} className="h-7 w-7" data-testid="watch-check">
                     <RefreshCw className="h-3.5 w-3.5" />

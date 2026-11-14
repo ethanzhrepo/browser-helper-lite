@@ -55,6 +55,10 @@ export interface Watch {
   checkedAt?: number;
   /** What the last verdict depended on, and when it was given. */
   probe?: { parts: WatchPart[]; judgedAt: number };
+  /** Rush: until then the page is reloaded every few seconds. Turned on by the user, for a few minutes. */
+  rushUntil?: number;
+  /** After a look that failed (a CAPTCHA, a page that did not load): no look before this time. */
+  retryAt?: number;
   usage: Usage;
 }
 
@@ -65,11 +69,22 @@ export const DEFAULT_WATCH_SECONDS = 5 * 60;
 export const WATCH_INTERVALS = [1, 5, 10, 30, 60, 5 * 60, 15 * 60, 30 * 60, 60 * 60, 6 * 60 * 60, 24 * 60 * 60];
 /**
  * Faster than this, the page stays open in a background tab and is watched
- * from the inside as it changes; it is reloaded once in this time. Slower
- * watches open the page for each look and close it again. Chrome's timers do
- * not go below half a minute either.
+ * from the inside as it changes. Slower watches open the page for each look
+ * and close it again.
  */
 export const LIVE_BELOW_SECONDS = 60;
+/**
+ * A page that does not update itself shows a new price only when it is
+ * loaded again. That is not done more often than this: Chrome's timers do
+ * not go below half a minute, and a page reloaded every few seconds for days
+ * is what sites take for a bot.
+ */
+export const RELOAD_FLOOR_SECONDS = 30;
+/** Rush: for a few minutes the user asked for, the page is reloaded every few seconds. */
+export const RUSH_SECONDS = 5;
+export const RUSH_MINUTES = 10;
+/** After a failed look the next one waits this long, and twice as long after the next failure. */
+const RETRY_MINUTES = 5;
 /** A forgotten watch does not go on for ever. */
 export const WATCH_DAYS = 30;
 export const MAX_WATCHES = 20;
@@ -92,10 +107,16 @@ export function clampSeconds(value: unknown): number {
   return Math.min(Math.max(seconds, MIN_WATCH_SECONDS), MAX_WATCH_SECONDS);
 }
 
-export const isLive = (watch: Pick<Watch, 'everySeconds'>) => watch.everySeconds < LIVE_BELOW_SECONDS;
+export const isRushing = (watch: Pick<Watch, 'rushUntil'>, now: number) => (watch.rushUntil ?? 0) > now;
 
-/** Minutes between a watch's timer ticks: its interval, or the reload of a live watch's tab. */
-export const alarmMinutes = (watch: Pick<Watch, 'everySeconds'>) => Math.max(watch.everySeconds, LIVE_BELOW_SECONDS) / 60;
+/** Whether the watch keeps its page open in a background tab between looks. */
+export const isLive = (watch: Pick<Watch, 'everySeconds' | 'rushUntil'>, now = 0) => watch.everySeconds < LIVE_BELOW_SECONDS || isRushing(watch, now);
+
+/** Minutes between a watch's timer ticks, each of which loads the page afresh: its interval, but not below the floor. */
+export const alarmMinutes = (watch: Pick<Watch, 'everySeconds'>) => Math.max(watch.everySeconds, RELOAD_FLOOR_SECONDS) / 60;
+
+/** How long to leave a site alone after the given number of failed looks in a row. */
+export const retryAfterMs = (failures: number) => RETRY_MINUTES * 60 * 1000 * 2 ** Math.max(0, failures - 1);
 
 /**
  * How long a verdict is trusted while the text it depended on stays the
@@ -190,6 +211,9 @@ export function afterCheck(watch: Watch, check: WatchCheck, usage?: Usage, parts
     checkedAt: check.at,
     // After a failure the next look asks the model again.
     probe: check.error || !parts?.length ? undefined : { parts, judgedAt: check.at },
+    // A site that shows a CAPTCHA or does not load is left alone for a while, and no longer rushed.
+    retryAt: check.error ? check.at + retryAfterMs(failures) : undefined,
+    rushUntil: check.error ? undefined : watch.rushUntil,
     usage: {
       inputTokens: (watch.usage.inputTokens ?? 0) + (usage?.inputTokens ?? 0),
       outputTokens: (watch.usage.outputTokens ?? 0) + (usage?.outputTokens ?? 0),

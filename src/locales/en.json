@@ -713,21 +713,30 @@
     "checkNow": "Check now",
     "pause": "Pause",
     "resume": "Watch again",
-    "footnote": "A watched page is opened in the background and only read. Your model is asked when what is watched changes, not at every look.",
+    "footnote": "A watched page is opened in the background and only read. Your model is asked when what is watched changes, not at every look. A page is reloaded at most every 30 seconds, unless you rush it.",
     "notification": {
       "metTitle": "It happened",
       "met": "{{site}}: {{condition}}",
       "failedTitle": "A watch stopped",
-      "failed": "{{site}} could not be checked several times in a row: {{condition}}"
+      "failed": "{{site}} could not be checked several times in a row: {{condition}}",
+      "slowedTitle": "A watch slowed down",
+      "slowed": "{{site}} asked for a CAPTCHA or did not load. It will be tried again later: {{condition}}"
     },
     "pace": "Check",
-    "liveHint": "At this pace the page stays open in a collapsed tab group.",
+    "liveHint": "At this pace the page stays open in a collapsed tab group, and is reloaded every 30 seconds.",
     "groupTitle": "Watching",
     "interval": {
       "seconds": "every {{n}} s",
       "minutes": "every {{n}} min",
       "hours": "every {{n}} h",
       "day": "every day"
-    }
+    },
+    "rush": {
+      "start": "Rush for {{minutes}} minutes",
+      "stop": "Stop the rush",
+      "on": "rush until {{time}}",
+      "confirm": "For the next {{minutes}} minutes this page is reloaded every {{seconds}} seconds. The site may answer with a CAPTCHA or block you. Start?"
+    },
+    "retry": "slowed down, next look at {{time}}"
   }
 }
