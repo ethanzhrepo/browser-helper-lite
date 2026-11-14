@@ -91,7 +91,19 @@ export async function overlayButton(site: Page, action: 'stop' | 'continue' | 'p
       attribute(node, 'data-action') === action ? node : [...(node.children ?? []), ...(node.shadowRoots ?? [])].map(find).find(Boolean);
     const button = find(root);
     if (!button || attribute(button, 'hidden') !== undefined) return undefined;
-    const { model } = (await cdp.send('DOM.getBoxModel', { nodeId: button.nodeId })) as { model: { content: number[] } };
+    // No box: the button is not drawn. Its bar is hidden, or the page is being laid out again (the side panel
+    // opening changes the page's width). A page in a background tab is not always laid out either: bring it forward
+    // and ask a few more times before taking the button for hidden.
+    let model: { content: number[] } | undefined;
+    for (let attempt = 0; !model; attempt++) {
+      try {
+        ({ model } = (await cdp.send('DOM.getBoxModel', { nodeId: button.nodeId })) as { model: { content: number[] } });
+      } catch {
+        if (attempt >= 5) return undefined;
+        if (attempt === 0) await site.bringToFront();
+        await site.waitForTimeout(100);
+      }
+    }
     const [x1, y1, , , x3, y3] = model.content;
     const label = button.children?.find((child) => child.nodeType === 3)?.nodeValue ?? '';
     return { label, click: () => site.mouse.click((x1! + x3!) / 2, (y1! + y3!) / 2) };
@@ -105,6 +117,11 @@ export async function openSiteAndPanel(context: BrowserContext, extensionId: str
   const site = await context.newPage();
   await site.goto(url);
   const panel = await openPanel(context, extensionId);
+  // Sizing the panel's page shrinks the browser window with it, and a window narrower than the site's page shows
+  // (and screenshots) only its left part. Sizing the site's page again makes the window fit it.
+  const size = site.viewportSize() ?? { width: 1280, height: 720 };
+  await site.setViewportSize({ width: size.width, height: size.height + 1 });
+  await site.setViewportSize(size);
   return { site, panel };
 }
 

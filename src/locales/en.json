@@ -12,11 +12,13 @@
   "header": {
     "newChat": "New chat",
     "history": "History",
-    "settings": "Settings"
+    "settings": "Settings",
+    "watches": "Watched pages"
   },
   "menu": {
     "askSelection": "Ask about “%s”",
-    "summarize": "Summarize this page"
+    "summarize": "Summarize this page",
+    "askRegion": "Ask about a part of this page"
   },
   "welcome": {
     "title": "Two steps to get started",
@@ -47,7 +49,11 @@
     "actions": {
       "summarize": "Summarize this page",
       "translate": "Translate the selection or page",
-      "explain": "Explain the selected text"
+      "explain": "Explain the selected text",
+      "prices": "Compare prices at other stores",
+      "reviews": "Summarize the reviews",
+      "flaws": "What to watch out for before buying",
+      "deal": "Is this a good deal?"
     },
     "tip": "/ for commands · @ to attach a page, selection or tab",
     "body": "Ask about this page, or give me a task to do in your tabs.",
@@ -76,7 +82,13 @@
       "autoHint": "Works by itself. Asks before payments, deletions and other high-risk steps.",
       "manualHint": "Reads and searches by itself. Asks before every change."
     },
-    "removeAttachment": "Remove attachment"
+    "removeAttachment": "Remove attachment",
+    "pickRegion": "Ask about a part of the page",
+    "regionHint": "Drag to mark what to ask about · Esc to cancel",
+    "regionFailed": "Couldn't take the screenshot. Right-click the page and choose “Ask about a part of this page”.",
+    "removeImage": "Remove image",
+    "imageAlt": "Part of {{site}}",
+    "removeCommand": "Remove command"
   },
   "context": {
     "unavailable": "This page can't be read",
@@ -111,6 +123,31 @@
       "label": "Extract tables",
       "description": "Page data as Markdown tables",
       "prompt": "Extract the structured data on this page (prices, plans, specs, lists) as Markdown tables."
+    },
+    "research": {
+      "label": "Research",
+      "description": "Many sources, one comparison table",
+      "prompt": "Research this: search several sources, read about eight of the most relevant pages, and compare them in a table with sources.\n\nQuestion: "
+    },
+    "prices": {
+      "label": "Compare prices",
+      "description": "Other stores, delivered price",
+      "prompt": "Compare prices for this product: find the same model at other stores and compare what I would pay delivered (price, shipping, taxes and fees, coupons). Give a table with store, price, shipping, total, stock and link, and say which offer is best."
+    },
+    "reviews": {
+      "label": "Reviews",
+      "description": "What buyers praise and complain about",
+      "prompt": "Summarize this product's reviews: the rating and how many reviews there are, what people like, and the problems several reviewers describe (quote one for each). Read past the first page: the most recent and the lowest-rated reviews. Say if any look fake."
+    },
+    "flaws": {
+      "label": "Watch-outs",
+      "description": "What to check before buying",
+      "prompt": "Before I buy this, what should I watch out for? Check who sells and ships it, returns and warranty, extra costs (shipping, taxes, subscriptions), the specs, common faults in the low-rated reviews, and whether the discount is real. List only what matters."
+    },
+    "deal": {
+      "label": "Good deal?",
+      "description": "Is the discount real",
+      "prompt": "Is this price a good deal? Check whether the discount is real (the price over the last months, the price at other stores), compare with similar products, and tell me: buy now, wait, or skip, and why."
     }
   },
   "message": {
@@ -123,13 +160,19 @@
     "regenerate": "Regenerate",
     "editHint": "Replaces this and the replies after it",
     "tokens": "↑{{input}} ↓{{output}}",
-    "tokensHint": "Tokens sent and received",
+    "tokensHint": "Tokens sent and received; cached ones cost less",
     "toLatest": "Jump to latest",
     "truncated": "partial",
     "diagramError": "Couldn't draw this diagram. Its source:",
     "copySvg": "Copy SVG",
     "image": "Image",
-    "linkData": "This link's address carries data (an email, a long code). Check it, then click again to open:"
+    "linkData": "This link's address carries data (an email, a long code). Check it, then click again to open:",
+    "speak": "Read aloud",
+    "stopSpeaking": "Stop reading",
+    "copyCsv": "Copy CSV",
+    "downloadCsv": "Download CSV",
+    "sortBy": "Sort by this column",
+    "tokensCached": "↑{{input}} ↓{{output}} · {{cached}} cached"
   },
   "history": {
     "title": "History",
@@ -165,7 +208,7 @@
       "about": "About",
       "agent": "Agent",
       "search": "Search",
-      "voice": "Voice input"
+      "voice": "Voice"
     }
   },
   "connections": {
@@ -362,7 +405,9 @@
       "hand_off": "Hand over to you",
       "read_page": "Read the page",
       "view_page": "Look at the page",
-      "click_at": "Click {{target}} at {{x}}, {{y}}"
+      "click_at": "Click {{target}} at {{x}}, {{y}}",
+      "research_pages": "Research: {{question}}",
+      "watch_page": "Watch {{site}}: {{condition}}"
     },
     "directions": {
       "up": "up",
@@ -390,7 +435,8 @@
         "frame": "Acts inside another site's frame, which the assistant can't read.",
         "download": "Downloads a file. Only allow files you expect.",
         "sensitivePage": "This page handles account security, keys or payments, so every change asks.",
-        "unseen": "The assistant can't read what is drawn here. Check the picture."
+        "unseen": "The assistant can't read what is drawn here. Check the picture.",
+        "watch": "The page is read again, in the background, without touching it, for up to 30 days. Your model is asked only when what it watches on the page changes."
       },
       "allowOnce": "Allow once",
       "allowTask": "Allow for this task",
@@ -471,6 +517,36 @@
       "title": "This page tried to instruct the assistant",
       "titleHidden": "This page hides instructions for AI assistants",
       "body": "They were ignored. Until this task ends, changes and new sites need your approval."
+    },
+    "details": "Steps",
+    "activity": {
+      "search": "Searching: {{query}}",
+      "research": "Reading pages {{progress}}",
+      "open": "Opening {{site}}",
+      "read": "Reading the page",
+      "act": "Working on {{site}}",
+      "actHere": "Working on the page"
+    },
+    "summary": {
+      "searches_one": "{{count}} search",
+      "searches_other": "{{count}} searches",
+      "sites_one": "{{count}} site",
+      "sites_other": "{{count}} sites"
+    },
+    "replay": {
+      "open": "Replay",
+      "title": "Replay",
+      "end": "Where the task ended.",
+      "empty": "No pictures were kept for this task.",
+      "play": "Play",
+      "pause": "Pause",
+      "previous": "Previous step",
+      "next": "Next step"
+    },
+    "save": {
+      "button": "Save as command",
+      "name": "Command name",
+      "saved": "Saved. Type /{{name}} to run it again."
     }
   },
   "agentSettings": {
@@ -494,7 +570,13 @@
     },
     "setVisionModel": "Choose a vision model",
     "autoScreenshot": "Look at the screen when text isn't enough",
-    "autoScreenshotHint": "On canvas pages, unnamed buttons and failed steps. Sends a screenshot to the model; never on sign-in, account or payment pages."
+    "autoScreenshotHint": "On canvas pages, unnamed buttons and failed steps. Sends a screenshot to the model; never on sign-in, account or payment pages.",
+    "recordSteps": "Keep pictures for replay",
+    "recordStepsHint": "A small screenshot before each step, stored on this device. Not on sign-in, account or payment pages.",
+    "commands": {
+      "title": "Saved commands",
+      "hint": "When a task has finished, save it as a command and run it again by typing its name after a slash."
+    }
   },
   "voice": {
     "start": "Voice input",
@@ -517,8 +599,8 @@
       "deniedBody": "Allow it from the icon at the right of the address bar, then try again.",
       "retry": "Try again"
     },
-    "title": "Voice input",
-    "description": "Click the microphone to speak. Click again, or pause for two seconds, to finish.",
+    "title": "Voice",
+    "description": "Click the microphone and speak; click again or pause for two seconds to finish. Replies can be read aloud.",
     "engine": "Recognition",
     "engines": {
       "browser": {
@@ -539,7 +621,11 @@
     "micHint": "A tab opens once to ask: side panels can't.",
     "micGranted": "Browser Helper may use the microphone.",
     "micAllowed": "Allowed",
-    "allowMic": "Allow microphone"
+    "allowMic": "Allow microphone",
+    "speakReplies": "Read replies aloud",
+    "speakRepliesHint": "Uses your system's voices; nothing is sent.",
+    "conversation": "Listen again after reading",
+    "conversationHint": "After a spoken question, the microphone reopens once the reply has been read."
   },
   "search": {
     "title": "Search",
@@ -612,5 +698,36 @@
     "running": "Working in another tab: {{title}}",
     "waiting": "Needs you in another tab: {{title}}",
     "show": "Show"
+  },
+  "watch": {
+    "title": "Watched pages",
+    "empty": "Ask the assistant to tell you when something happens on a page, e.g. “tell me when this drops below $20”.",
+    "status": {
+      "active": "Watching",
+      "paused": "Paused",
+      "met": "It happened",
+      "failed": "Stopped: checks kept failing",
+      "expired": "Ended after 30 days"
+    },
+    "checkFailed": "Check failed: {{error}}",
+    "checkNow": "Check now",
+    "pause": "Pause",
+    "resume": "Watch again",
+    "footnote": "A watched page is opened in the background and only read. Your model is asked when what is watched changes, not at every look.",
+    "notification": {
+      "metTitle": "It happened",
+      "met": "{{site}}: {{condition}}",
+      "failedTitle": "A watch stopped",
+      "failed": "{{site}} could not be checked several times in a row: {{condition}}"
+    },
+    "pace": "Check",
+    "liveHint": "At this pace the page stays open in a collapsed tab group.",
+    "groupTitle": "Watching",
+    "interval": {
+      "seconds": "every {{n}} s",
+      "minutes": "every {{n}} min",
+      "hours": "every {{n}} h",
+      "day": "every day"
+    }
   }
 }

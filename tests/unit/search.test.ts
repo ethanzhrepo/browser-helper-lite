@@ -236,7 +236,7 @@ describe('reading pages through DeepSeek', () => {
     expect(toolsFor(withDeepSeek).web_search.description).toContain('lang:en');
     expect(toolsFor(DEFAULT_SEARCH_SETTINGS).web_search.description).not.toContain('lang:en');
     const prompt = (readUrl: boolean) => buildAssistantSystemPrompt({ locale: 'en', now: new Date(0), mode: 'auto', readUrl });
-    expect(prompt(true)).toContain('use read_url');
+    expect(prompt(true)).toContain('with read_url');
     expect(prompt(false)).not.toContain('read_url');
   });
 });

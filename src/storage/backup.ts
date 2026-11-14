@@ -1,6 +1,6 @@
 import { browser } from 'wxt/browser';
 import { z } from 'zod';
-import { ACTIVE_STATUSES, type AgentTask } from '../agent/types';
+import { ACTIVE_STATUSES, type AgentTask, type StepShot } from '../agent/types';
 import { normalizeBaseURL } from '../providers/vendors';
 import type { ConversationRecord, MessageRecord, Settings } from '../shared/types';
 import { MAX_KDF_ITERATIONS, MIN_KDF_ITERATIONS, seal, unseal, type Sealed } from './backup-crypto';
@@ -18,7 +18,7 @@ z.config({ jitless: true });
 export const BACKUP_APP = 'browser-helper-lite';
 export const BACKUP_VERSION = 1;
 
-const usage = z.object({ inputTokens: z.number().optional(), outputTokens: z.number().optional() }).optional();
+const usage = z.object({ inputTokens: z.number().optional(), outputTokens: z.number().optional(), cachedTokens: z.number().optional() }).optional();
 const modelRef = z.object({ connectionId: z.string(), modelId: z.string() });
 const errorInfo = z.object({ code: z.string(), message: z.string(), status: z.number().optional() });
 
@@ -29,6 +29,8 @@ const connectionSchema = z.looseObject({
   baseURL: z.string(),
   models: z.array(z.string()),
 });
+
+const savedCommand = z.object({ name: z.string().min(1).max(64), steps: z.array(z.string().max(400)).max(100), startUrl: z.string().optional() });
 
 const slotSchema = z.object({ connectionId: z.string(), modelId: z.string(), temperature: z.number().optional() });
 
@@ -48,6 +50,7 @@ const settingsSchema = z.looseObject({
     })
     .optional(),
   sitePolicies: z.record(z.string(), z.enum(['blocked', 'readOnly', 'confirmEach', 'confirmRisky', 'auto'])).optional(),
+  commands: z.array(savedCommand.extend({ id: z.string().min(1), prompt: z.string(), createdAt: z.number() })).optional(),
   checkUpdates: z.boolean().optional(),
 });
 
@@ -76,6 +79,21 @@ const messageSchema = z.object({
       }),
     )
     .optional(),
+  images: z
+    .array(
+      z.object({
+        // Shown as an image and sent to the model as one: nothing else may be in it.
+        data: z.string().regex(/^[A-Za-z0-9+/]+={0,2}$/),
+        mediaType: z.literal('image/jpeg'),
+        width: z.number(),
+        height: z.number(),
+        url: z.string().optional(),
+        title: z.string().optional(),
+      }),
+    )
+    .optional(),
+  command: savedCommand.optional(),
+  tab: z.object({ title: z.string(), url: z.string() }).optional(),
   status: z.enum(['done', 'error', 'aborted']),
   error: errorInfo.optional(),
   model: modelRef.optional(),
@@ -106,13 +124,27 @@ const taskSchema = z.looseObject({
     }),
   ),
   draft: z.string(),
-  usage: z.object({ inputTokens: z.number().optional(), outputTokens: z.number().optional() }),
+  usage: z.object({ inputTokens: z.number().optional(), outputTokens: z.number().optional(), cachedTokens: z.number().optional() }),
   model: modelRef,
   mode: z.enum(['query', 'auto', 'manual']),
   startTabId: z.number(),
   maxSteps: z.number(),
   createdAt: z.number(),
   updatedAt: z.number(),
+});
+
+const shotSchema = z.object({
+  id: z.string().min(1),
+  taskId: z.string().min(1),
+  conversationId: z.string().min(1),
+  step: z.number(),
+  // Shown as an image: nothing else may be in it.
+  image: z.string().regex(/^[A-Za-z0-9+/]+={0,2}$/),
+  width: z.number(),
+  height: z.number(),
+  cssWidth: z.number().positive(),
+  url: z.string(),
+  at: z.number(),
 });
 
 const backupSchema = z.object({
@@ -124,6 +156,7 @@ const backupSchema = z.object({
   conversations: z.array(conversationSchema).optional(),
   messages: z.array(messageSchema).optional(),
   tasks: z.array(taskSchema).optional(),
+  shots: z.array(shotSchema).optional(),
 });
 
 const encryptedSchema = z.object({
@@ -158,6 +191,8 @@ export interface Backup {
   conversations?: ConversationRecord[];
   messages?: MessageRecord[];
   tasks?: AgentTask[];
+  /** Replay pictures of the tasks. */
+  shots?: StepShot[];
 }
 
 export async function buildBackup({ includeKeys, includeConversations = true }: { includeKeys: boolean; includeConversations?: boolean }): Promise<Backup> {
@@ -173,7 +208,9 @@ export async function buildBackup({ includeKeys, includeConversations = true }: 
   const kept = new Set(conversations.map((c) => c.id));
   const messages = (await db.messages.toArray()).filter((m) => !m.deletedAt && kept.has(m.conversationId));
   const tasks = (await db.tasks.toArray()).filter((task) => !task.discardedAt && kept.has(task.conversationId));
-  return { ...backup, conversations, messages, tasks };
+  const taskIds = new Set(tasks.map((task) => task.id));
+  const shots = (await db.shots.toArray()).filter((shot) => taskIds.has(shot.taskId));
+  return { ...backup, conversations, messages, tasks, ...(shots.length ? { shots } : {}) };
 }
 
 /**
@@ -264,7 +301,8 @@ export async function restoreBackup(backup: Backup): Promise<RestoreSummary> {
   if (conversations.length > 0) {
     const ids = new Set(conversations.map((c) => c.id));
     const now = Date.now();
-    await db.transaction('rw', db.conversations, db.messages, db.tasks, async () => {
+    await db.transaction('rw', db.conversations, db.messages, db.tasks, db.shots, async () => {
+      await db.shots.bulkPut((backup.shots ?? []).filter((shot) => ids.has(shot.conversationId)));
       await db.conversations.bulkPut(conversations);
       await db.messages.bulkPut((backup.messages ?? []).filter((m) => ids.has(m.conversationId)));
       await db.tasks.bulkPut(

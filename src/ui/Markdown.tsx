@@ -1,6 +1,6 @@
 import 'katex/dist/katex.min.css';
-import { Check, Copy, ImageOff } from 'lucide-react';
-import { lazy, memo, Suspense, useState, type AnchorHTMLAttributes, type ReactNode } from 'react';
+import { ArrowDown, ArrowUp, Check, Copy, Download, ImageOff } from 'lucide-react';
+import { Children, createContext, isValidElement, lazy, memo, Suspense, useContext, useState, type AnchorHTMLAttributes, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import ReactMarkdown from 'react-markdown';
 import rehypeHighlight from 'rehype-highlight';
@@ -9,6 +9,7 @@ import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import { urlDataLeak } from '../agent/injection';
 import { normalizeMath } from './math';
+import { sortOrder, toCsv } from './table';
 
 // Mermaid is large; it loads only when a reply contains a diagram.
 const MermaidDiagram = lazy(() => import('./MermaidDiagram'));
@@ -19,6 +20,7 @@ interface HastNode {
   value?: string;
   properties?: { className?: unknown };
   children?: HastNode[];
+  position?: { start?: { offset?: number } };
 }
 
 function textOf(node: HastNode | undefined): string {
@@ -169,6 +171,93 @@ export function CodeFrame({ language, source, children, actions }: {
   );
 }
 
+interface TableState {
+  /** Where each header cell starts in the source, to tell the columns apart. */
+  columns: (number | undefined)[];
+  sort?: { column: number; descending: boolean };
+  order?: number[];
+  toggle: (column: number) => void;
+}
+
+const TableContext = createContext<TableState | undefined>(undefined);
+
+const elements = (node: HastNode | undefined, tag: string) => (node?.children ?? []).filter((child) => child.tagName === tag);
+const rowCells = (row: HastNode) => (row.children ?? []).filter((c) => c.tagName === 'td' || c.tagName === 'th').map((c) => textOf(c).replace(/\s+/g, ' ').trim());
+
+/**
+ * A table in a reply: click a header to sort by it, and take the data along
+ * as CSV. Comparisons are what the assistant is asked for most.
+ */
+function DataTable({ node, streaming, children }: { node?: HastNode; streaming: boolean; children: ReactNode }) {
+  const { t } = useTranslation();
+  const [sort, setSort] = useState<TableState['sort']>();
+  const headRow = elements(elements(node, 'thead')[0], 'tr')[0];
+  const head = headRow ? rowCells(headRow) : [];
+  const body = elements(elements(node, 'tbody')[0], 'tr').map(rowCells);
+  const sortable = !streaming && body.length > 1;
+  const order = sortable && sort ? sortOrder(body, sort.column, sort.descending) : undefined;
+  const state: TableState = {
+    columns: sortable ? elements(headRow, 'th').map((cell) => cell.position?.start?.offset) : [],
+    sort,
+    order,
+    toggle: (column) => setSort((now) => (now?.column !== column ? { column, descending: false } : now.descending ? undefined : { column, descending: true })),
+  };
+  const csv = () => toCsv([head, ...(order ? order.map((i) => body[i]!) : body)]);
+  const download = () => {
+    // The mark at the start tells spreadsheets the file is UTF-8.
+    const url = URL.createObjectURL(new Blob(['\ufeff', csv()], { type: 'text/csv;charset=utf-8' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'table.csv';
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 10_000);
+  };
+  return (
+    <TableContext.Provider value={state}>
+      <div className="data-table" data-testid="data-table">
+        <table>{children}</table>
+        {!streaming && body.length > 0 && (
+          <div className="flex justify-end gap-0.5 pt-1">
+            <CopyButton text={csv()} label={t('message.copyCsv')} />
+            <button
+              type="button"
+              onClick={download}
+              data-testid="download-csv"
+              className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] text-muted transition-colors hover:bg-hover hover:text-fg"
+            >
+              <Download className="h-3 w-3" />
+              {t('message.downloadCsv')}
+            </button>
+          </div>
+        )}
+      </div>
+    </TableContext.Provider>
+  );
+}
+
+function HeaderCell({ node, children }: { node?: HastNode; children: ReactNode }) {
+  const { t } = useTranslation();
+  const table = useContext(TableContext);
+  const column = table ? table.columns.indexOf(node?.position?.start?.offset) : -1;
+  if (!table || column < 0 || node?.position?.start?.offset === undefined) return <th>{children}</th>;
+  const sorted = table.sort?.column === column ? (table.sort.descending ? 'descending' : 'ascending') : undefined;
+  return (
+    <th aria-sort={sorted ?? 'none'}>
+      <button type="button" onClick={() => table.toggle(column)} title={t('message.sortBy')} className="inline-flex items-center gap-1 font-[inherit] text-left hover:text-accent">
+        {children}
+        {sorted === 'ascending' && <ArrowUp className="h-3 w-3 shrink-0 text-accent" />}
+        {sorted === 'descending' && <ArrowDown className="h-3 w-3 shrink-0 text-accent" />}
+      </button>
+    </th>
+  );
+}
+
+function TableBody({ children }: { children: ReactNode }) {
+  const table = useContext(TableContext);
+  const rows = Children.toArray(children).filter(isValidElement);
+  return <tbody>{table?.order && table.order.length === rows.length ? table.order.map((i) => rows[i]) : rows}</tbody>;
+}
+
 /**
  * Assistant Markdown: GFM tables, highlighted code, math (KaTeX) and Mermaid
  * diagrams. Raw HTML in replies is never rendered.
@@ -185,6 +274,13 @@ export const Markdown = memo(function Markdown({ text, streaming = false }: { te
         components={{
           a: ({ node: _node, ...props }) => <ReplyLink {...props} />,
           img: ({ src, alt }) => <BlockedImage src={typeof src === 'string' ? src : undefined} alt={alt} />,
+          table: ({ node, children }) => (
+            <DataTable node={node as HastNode | undefined} streaming={streaming}>
+              {children}
+            </DataTable>
+          ),
+          th: ({ node, children }) => <HeaderCell node={node as HastNode | undefined}>{children}</HeaderCell>,
+          tbody: ({ children }) => <TableBody>{children}</TableBody>,
           pre: ({ node, children }) => (
             <CodeBlock node={node as HastNode | undefined} streaming={streaming}>
               {children}

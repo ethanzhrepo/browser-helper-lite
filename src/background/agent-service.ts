@@ -19,6 +19,7 @@ import { appendMessage, db, getMessages, getTasks, markInterruptedTasks, purgeDe
 import { loadSettings, updateSettings, watchSettings } from '../storage/settings';
 import { linkTab, unlinkTab } from '../storage/tab-conversations';
 import { isExtensionPage } from './trust';
+import { createWatch } from './watch-service';
 
 const runners = new Map<string, AgentRunner>();
 const ports = new Set<Browser.runtime.Port>();
@@ -178,6 +179,7 @@ async function startTask(message: Extract<AgentClientMessage, { type: 'start' }>
       void persist(next);
     },
     onWaiting: (next) => void notifyWaiting(next, settings, t),
+    createWatch,
     saveSitePolicy: async (host, policy) => {
       await updateSettings((s) => ({ ...s, sitePolicies: { ...s.sitePolicies, [host]: policy } }));
     },

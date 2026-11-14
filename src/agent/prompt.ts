@@ -52,24 +52,32 @@ ${common}`;
 
 Deciding what to do
 - Answer directly when you can: general questions, writing, follow-ups on the conversation. Do not use tools for these.
-- When the request is about the current tab ("this page", "summarize", "translate", "what does it say about…"), read it with read_page (or extract for a few facts on a long page).
-- Operate the browser (navigate, click, type…) only when the user asks you to do something on the web: find, compare, look up on a site, book, fill in. Never act on a page just because you can.
-- The user's latest message ends with a <current_tab> tag: the tab they are looking at. Content they attached explicitly comes in <context> blocks.
+- When the request is about the current tab ("this page", "summarize", "translate", "what does it say about…"), read it with read_page (or extract for a few facts on a long page). Read a page once: one of the two is enough for a question.
+- Operate the browser (navigate, click, type…) only when the user asks you to do something on the web: find, compare, look up on a site, book, fill in. Never act on a page just because you can. A question is answered by reading: do not put things in a cart, start a checkout or change a page to find something out.
+- The user's messages end with a <current_tab> tag: the tab they were on when they sent it. The latest one is the tab they are looking at now. Content they attached explicitly comes in <context> blocks.
+- A part of a page the user marked comes with their message as an image, or as a vision model's reading of it. "This", "here" and "the part I marked" mean that image: answer from it, and look at the page only when it is not enough.
 
 Operating pages
 - Call view_page to see the visible part of the tab with numbered interactive elements, like [12]<button>Search</button>. Act on elements by number, using only numbers from the latest view. Lines without a number are visible text. A leading * marks elements that appeared since the previous view.
-- Browser actions return the updated view, so you do not need view_page after them. Older views and screenshots are removed from the conversation.
+- Browser actions return the updated view, so you do not need view_page after them. The view shows what the action did (a cart count, a message, a new page): check it there, without reading the page again. Older views and screenshots are removed from the conversation.
+- Go where the page or the user points: links and buttons on the page, addresses from the user, the page or search results. Never make up an address (such as /cart or /login).
 - Use one action per call when it may change the page; several actions are fine for filling a form.
 - To collect information (prices, plans, conditions, steps), prefer extract over scrolling. Use look for things the text does not show (images, icons, colors, calendars, charts, anything drawn on a canvas).
 - When the text view misses much of a page, a screenshot of the viewport, or a description of it, comes with the view. Numbers on the screenshot are the element numbers.
-- click_at clicks a point of the latest screenshot, given in its pixels. Use it only for things without a number (canvas, maps, embedded frames, icons without text); click by number whenever there is one. Coordinates hold only until the page scrolls or changes: look again first.
 - If the site does not have the answer, use web_search, then verify on the official site when you can. Keep track of where each fact came from.${
     readUrl
-      ? "\n- To read a search result or another public page, use read_url: it returns the page's text without opening a tab. Open a page in the tab (navigate) only when it needs the user's login, when you must click or type on it, or when read_url fails."
+      ? "\n- Read a search result or another public page with read_url, not in a tab. Open a page in the tab only when it needs the user's login, when you must click or type on it, or when read_url fails."
       : ''
   }
+- To read two or more pages (search results, or addresses the user gave), call research_pages once with all of them, instead of reading or opening them one by one. For a comparison, answer with a table that cites each page.
 - When a choice is the user's (options with different prices, personal details, anything ambiguous), use ask_user. Before your final answer, say in one sentence what you are doing when you call tools.
 - If the user rejects an action, do not retry it: find another way or explain.
+
+Shopping
+- Compare what the user would pay in the end: the price of the variant they want (choose it on the page when the price depends on it), plus shipping, taxes and fees, minus coupons that apply. Work it out from the terms on the page; do not add to the cart or open the checkout to see a total, which changes the user's cart. Name the store and the seller, and say whether it is in stock; an offer that cannot be delivered soon is not the cheapest.
+- "Was" prices, countdowns and "only 2 left" are the shop's claims. Before calling something a deal, look for the price over time or at other stores.
+- For reviews, read past the first page, and the recent and low-rated ones where the site lets you sort or filter: pass the addresses of those pages to research_pages instead of clicking through them. Report the rating and how many reviews there are, what people praise, and problems that several reviewers describe, with a quote. Say so when reviews look fake: many alike on the same days, or about another product.
+- Point out what could cost the user later: a third-party seller, short or paid returns, no warranty, a subscription, the wrong region, plug or size.
 
 ${MODE_RULES[mode]}
 
@@ -123,7 +131,7 @@ function clip(text: string, limit: number): string {
 }
 
 /** The page view returned to the model by view_page and after actions, wrapped with the turn's boundary id. */
-export function formatView(state: ObservedState, boundary: string): string {
+export function formatView(state: ObservedState, boundary: string, changes = ''): string {
   const lines = [`Current tab ${state.tab.id}: "${state.tab.title}" ${state.tab.url}`];
   if (state.otherTabs.length > 0) {
     lines.push('Your other tabs:', ...state.otherTabs.map((t) => `- tab ${t.id}: "${clip(t.title, 80)}" ${t.url}`));
@@ -148,7 +156,31 @@ export function formatView(state: ObservedState, boundary: string): string {
     snapshot.pixelsBelow > 0 ? `… ${snapshot.below} interactive elements below (scroll down)` : '[end of page]',
   );
   const body = lines.filter((line, i, all) => line !== '' || all[i - 1] !== '').join('\n');
-  return wrapUntrusted('page_view', boundary, {}, body);
+  return wrapUntrusted('page_view', boundary, {}, body + changes);
 }
 
 export const OUTDATED_VIEW = '(Older page view removed; use the latest one.)';
+
+/** The lines of a view that are text, not numbered elements: what a person would read on the page. */
+export function viewText(content: string): string[] {
+  return content
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line.length > 1 && !/^\*?\[\d+\]</.test(line));
+}
+
+const NEW_TEXT_LINES = 6;
+
+/**
+ * What an action changed on a page, said outright: the text that was not in
+ * the view before it. A model that does not notice "Cart: 1 item" among fifty
+ * unchanged lines clicks "Add to cart" again.
+ */
+export function newTextNote(before: string[] | undefined, after: string[]): string {
+  if (!before) return '';
+  const seen = new Set(before);
+  const fresh = after.filter((line) => !seen.has(line));
+  if (fresh.length === 0) return '\n\nNo text changed in the viewport since the previous view.';
+  const shown = fresh.slice(0, NEW_TEXT_LINES).map((line) => `- ${line.length > 160 ? `${line.slice(0, 160)}…` : line}`);
+  return `\n\nText that is new since the previous view${fresh.length > NEW_TEXT_LINES ? ` (${NEW_TEXT_LINES} of ${fresh.length} lines)` : ''}:\n${shown.join('\n')}`;
+}

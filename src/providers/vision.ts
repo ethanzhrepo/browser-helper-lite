@@ -6,7 +6,7 @@ const OPENAI_TEXT_ONLY = /^(gpt-3\.5|gpt-4-(?!turbo|vision)|gpt-4$|o1-mini|o1-pr
 
 /** Names by which multimodal models are known on OpenAI-compatible services and local runners. */
 const SEES_IMAGES =
-  /vision|multimodal|omni|(^|[^a-z])vl([^a-z]|$)|gpt-4o|gpt-4\.1|gpt-4\.5|gpt-5|claude|gemini|gemma-?3|llava|bakllava|pixtral|qvq|glm-4v|glm-4\.\d+v|minicpm|internvl|moondream|grok-4|llama-?4|phi-?3\.5-vision|phi-?4-multimodal/i;
+  /vision|multimodal|omni|(^|[^a-z])vl([^a-z]|$)|gpt-4o|gpt-4\.1|gpt-4\.5|gpt-[5-9]|deepseek[\w./-]*flash|claude|gemini|gemma-?3|llava|bakllava|pixtral|qvq|glm-4v|glm-4\.\d+v|minicpm|internvl|moondream|grok-4|llama-?4|phi-?3\.5-vision|phi-?4-multimodal/i;
 
 /**
  * Whether a model reads images, judged by its name. It is a guess: model lists
@@ -19,7 +19,8 @@ export function seesImages(vendor: Vendor, modelId: string): boolean {
     case 'google':
       return true;
     case 'deepseek':
-      return false;
+      // DeepSeek's Flash models take images (its vision guide); the others are not said to.
+      return /flash/i.test(modelId);
     case 'openai':
       return !OPENAI_TEXT_ONLY.test(modelId);
     case 'openai-compatible':

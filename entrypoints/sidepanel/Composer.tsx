@@ -9,6 +9,7 @@ import {
   Loader2,
   Mic,
   Plus,
+  ScanSearch,
   Sparkles,
   Square,
   TextQuote,
@@ -19,13 +20,14 @@ import { Fragment, useEffect, useLayoutEffect, useRef, useState, type KeyboardEv
 import { useTranslation } from 'react-i18next';
 import type { ActiveTab } from '../../src/browser/page-context';
 import { matchCommands, type SlashCommand } from '../../src/chat/commands';
-import type { AgentMode, ContextKind, ContextSnapshot } from '../../src/shared/types';
+import type { AgentMode, ContextKind, ContextSnapshot, MessageImage, SavedCommand } from '../../src/shared/types';
 import { faviconUrl } from '../../src/ui/favicon';
 import type { PageAccess } from '../../src/ui/useActiveTab';
 import type { VoiceState } from '../../src/voice/useVoiceInput';
 
 type MenuItem =
   | { kind: 'command'; command: SlashCommand }
+  | { kind: 'saved'; saved: SavedCommand }
   | { kind: 'mention'; target: ContextKind }
   | { kind: 'tab'; tab: ActiveTab };
 
@@ -66,6 +68,12 @@ export function Composer(props: {
   selection?: ContextSnapshot;
   onRemoveSelection: () => void;
   onCommand: (command: SlashCommand) => void;
+  /** Requests saved from finished tasks, offered after a slash. */
+  savedCommands: SavedCommand[];
+  onSavedCommand: (command: SavedCommand) => void;
+  /** The saved command the request was started from. */
+  command?: SavedCommand;
+  onRemoveCommand: () => void;
   onMention: (target: ContextKind) => void;
   /** Other tabs of the window, offered after @. */
   otherTabs: ActiveTab[];
@@ -73,6 +81,10 @@ export function Composer(props: {
   /** Pages of other tabs attached with @. */
   tabContexts: ContextSnapshot[];
   onRemoveTabContext: (url: string) => void;
+  /** Parts of the page marked to ask about. */
+  images: MessageImage[];
+  onPickRegion: () => void;
+  onRemoveImage: (index: number) => void;
   onSend: () => void;
   onStop: () => void;
   /** A reply is in progress: the send button becomes a stop button. */
@@ -108,7 +120,11 @@ export function Composer(props: {
   let items: MenuItem[] = [];
   if (dismissedFor !== text) {
     if (commandQuery !== undefined) {
-      items = matchCommands(commandQuery, commandLabel).map((command) => ({ kind: 'command', command }));
+      const q = commandQuery.toLowerCase();
+      items = [
+        ...matchCommands(commandQuery, commandLabel).map((command): MenuItem => ({ kind: 'command', command })),
+        ...props.savedCommands.filter((saved) => saved.name.toLowerCase().includes(q)).map((saved): MenuItem => ({ kind: 'saved', saved })),
+      ];
     } else if (mentionQuery !== undefined) {
       const q = mentionQuery.toLowerCase();
       items = [
@@ -129,6 +145,8 @@ export function Composer(props: {
   const select = (item: MenuItem) => {
     if (item.kind === 'command') {
       props.onCommand(item.command);
+    } else if (item.kind === 'saved') {
+      props.onSavedCommand(item.saved);
     } else {
       const remaining = beforeCaret.replace(/@\S*$/, '') + text.slice(caret);
       onTextChange(remaining);
@@ -166,7 +184,7 @@ export function Composer(props: {
     }
   };
 
-  const canSend = !disabled && !busy && Boolean(text.trim() || props.selection || props.includePage || props.tabContexts.length > 0);
+  const canSend = !disabled && !busy && Boolean(text.trim() || props.selection || props.includePage || props.tabContexts.length > 0 || props.images.length > 0);
   const listening = props.voice.state === 'listening';
 
   return (
@@ -177,7 +195,7 @@ export function Composer(props: {
           className="absolute bottom-full left-0 right-0 z-10 mb-2 animate-fade-in overflow-hidden rounded-xl border border-line bg-surface p-1 shadow-float"
         >
           {items.map((item, index) => (
-            <Fragment key={item.kind === 'command' ? item.command.id : item.kind === 'mention' ? item.target : `tab-${item.tab.id}`}>
+            <Fragment key={item.kind === 'command' ? item.command.id : item.kind === 'saved' ? `saved-${item.saved.id}` : item.kind === 'mention' ? item.target : `tab-${item.tab.id}`}>
               {item.kind === 'tab' && items[index - 1]?.kind !== 'tab' && (
                 <p className="px-2.5 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-faint">{t('mentions.otherTabs')}</p>
               )}
@@ -191,7 +209,7 @@ export function Composer(props: {
                 className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm ${index === activeIndex ? 'bg-hover' : ''}`}
               >
                 <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-accent-soft text-accent">
-                  {item.kind === 'command' ? (
+                  {item.kind === 'command' || item.kind === 'saved' ? (
                     <span className="font-mono text-xs font-semibold">/</span>
                   ) : item.kind === 'tab' ? (
                     <img src={faviconUrl(item.tab.url)} alt="" className="h-3.5 w-3.5 rounded-sm" />
@@ -205,6 +223,11 @@ export function Composer(props: {
                   <span className="min-w-0">
                     <span className="block font-medium">{commandLabel(item.command)}</span>
                     <span className="block truncate text-xs text-muted">{t(`commands.${item.command.id}.description`)}</span>
+                  </span>
+                ) : item.kind === 'saved' ? (
+                  <span className="min-w-0" data-testid="saved-command">
+                    <span className="block font-medium">{item.saved.name}</span>
+                    <span className="block truncate text-xs text-muted">{item.saved.prompt}</span>
                   </span>
                 ) : item.kind === 'tab' ? (
                   <span className="min-w-0">
@@ -241,6 +264,31 @@ export function Composer(props: {
                   aria-label={t('composer.removeAttachment')}
                   onClick={() => props.onRemoveTabContext(context.url)}
                   className="rounded-full p-0.5 hover:bg-accent-soft-strong"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+            ))}
+            {props.command && (
+              <span data-testid="command-chip" className="flex max-w-full animate-fade-in items-center gap-1 rounded-full border border-accent/25 bg-accent-soft py-1 pl-2.5 pr-1.5 text-xs text-accent">
+                <span className="truncate font-medium">/{props.command.name}</span>
+                <button type="button" aria-label={t('composer.removeCommand')} onClick={props.onRemoveCommand} className="rounded-full p-0.5 hover:bg-accent-soft-strong">
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+            )}
+            {props.images.map((image, index) => (
+              <span key={`${index}-${image.data.length}`} data-testid="image-chip" className="relative animate-fade-in">
+                <img
+                  src={`data:image/jpeg;base64,${image.data}`}
+                  alt={t('composer.imageAlt', { site: hostOf(image.url ?? '') })}
+                  className="h-12 max-w-32 rounded-lg border border-accent/25 object-cover"
+                />
+                <button
+                  type="button"
+                  aria-label={t('composer.removeImage')}
+                  onClick={() => props.onRemoveImage(index)}
+                  className="absolute -right-1.5 -top-1.5 rounded-full border border-line bg-surface p-0.5 text-muted shadow-soft hover:text-fg"
                 >
                   <X className="h-3 w-3" />
                 </button>
@@ -285,6 +333,17 @@ export function Composer(props: {
           <div className="flex items-center justify-between gap-2 px-2.5 pb-2.5">
             <ModePicker mode={props.mode} onChange={props.onModeChange} />
             <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                data-testid="pick-region"
+                onClick={props.onPickRegion}
+                disabled={disabled || !props.tab || props.access === 'none' || props.access === 'restricted'}
+                aria-label={t('composer.pickRegion')}
+                title={t('composer.pickRegion')}
+                className="flex h-8 w-8 items-center justify-center rounded-full text-muted transition-colors hover:bg-hover hover:text-fg disabled:opacity-45"
+              >
+                <ScanSearch className="h-4 w-4" />
+              </button>
               <MicButton {...props.voice} disabled={disabled} />
               {busy ? (
                 <button

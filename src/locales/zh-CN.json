@@ -12,11 +12,13 @@
   "header": {
     "newChat": "新对话",
     "history": "历史记录",
-    "settings": "设置"
+    "settings": "设置",
+    "watches": "盯着的页面"
   },
   "menu": {
     "askSelection": "询问「%s」",
-    "summarize": "总结此页"
+    "summarize": "总结此页",
+    "askRegion": "框选提问"
   },
   "welcome": {
     "title": "两步开始使用",
@@ -46,7 +48,11 @@
     "actions": {
       "summarize": "总结此页",
       "translate": "翻译选中内容或整页",
-      "explain": "解释选中的文字"
+      "explain": "解释选中的文字",
+      "prices": "去其他商家比价",
+      "reviews": "总结评价",
+      "flaws": "下单前有什么坑",
+      "deal": "这个价格划算吗"
     },
     "tip": "/ 调用指令 · @ 附带页面、选中内容或标签页",
     "body": "可以问这个页面，也可以让我在标签页里办事。",
@@ -75,7 +81,13 @@
       "autoHint": "自动操作。付款、删除等高风险步骤会先问你。",
       "manualHint": "自动读取和搜索。每次改动都先问你。"
     },
-    "removeAttachment": "移除附件"
+    "removeAttachment": "移除附件",
+    "pickRegion": "框选页面的一部分来提问",
+    "regionHint": "拖动框选要问的部分 · Esc 取消",
+    "regionFailed": "没能截图。请在页面上点右键，选「框选提问」。",
+    "removeImage": "移除图片",
+    "imageAlt": "{{site}} 的截图",
+    "removeCommand": "移除指令"
   },
   "context": {
     "unavailable": "无法读取此页面",
@@ -110,6 +122,31 @@
       "label": "提取表格",
       "description": "把页面数据整理成表格",
       "prompt": "请把这个页面上的结构化数据（价格、套餐、规格、列表等）整理成 Markdown 表格。"
+    },
+    "research": {
+      "label": "调研",
+      "description": "多个来源，一张对比表",
+      "prompt": "请调研下面的问题：搜索多个来源，阅读 8 个左右最相关的网页，用表格对比并注明来源。\n\n问题："
+    },
+    "prices": {
+      "label": "比价",
+      "description": "其他商家的到手价",
+      "prompt": "请给这个商品比价：在其他商家找到同款，比较到手价（价格、运费、税费、优惠券）。用表格列出商家、价格、运费、到手价、库存和链接，并指出哪家最划算。"
+    },
+    "reviews": {
+      "label": "看评价",
+      "description": "买家夸什么、吐槽什么",
+      "prompt": "请总结这个商品的评价：评分和评价数量，大家满意的地方，多位买家都提到的问题（各引一条原话）。不要只看第一页：看最新的和评分最低的评价。有刷评迹象请指出。"
+    },
+    "flaws": {
+      "label": "避坑",
+      "description": "下单前要注意什么",
+      "prompt": "下单前帮我看看有什么要注意的：谁在卖、谁发货，退货和保修，额外费用（运费、税费、订阅），规格参数，差评里的常见故障，折扣是不是真的。只列真正要紧的。"
+    },
+    "deal": {
+      "label": "值不值",
+      "description": "折扣是不是真的",
+      "prompt": "这个价格划算吗？核实折扣是否属实（近几个月的价格、其他商家的价格），和同类商品比一比，然后告诉我：现在买、再等等还是不买，以及理由。"
     }
   },
   "message": {
@@ -122,13 +159,19 @@
     "regenerate": "重新生成",
     "editHint": "会替换这条消息和它之后的回复",
     "tokens": "↑{{input}} ↓{{output}}",
-    "tokensHint": "发送和接收的 token 数",
+    "tokensHint": "发送和接收的 token 数；命中缓存的部分更便宜",
     "toLatest": "回到最新",
     "truncated": "部分内容",
     "diagramError": "图表画不出来，源码如下：",
     "copySvg": "复制 SVG",
     "image": "图片",
-    "linkData": "这个链接的网址里带着数据（邮箱、长编码等）。核对后再点一次打开："
+    "linkData": "这个链接的网址里带着数据（邮箱、长编码等）。核对后再点一次打开：",
+    "speak": "朗读",
+    "stopSpeaking": "停止朗读",
+    "copyCsv": "复制 CSV",
+    "downloadCsv": "下载 CSV",
+    "sortBy": "按这一列排序",
+    "tokensCached": "↑{{input}} ↓{{output}} · 缓存 {{cached}}"
   },
   "history": {
     "title": "历史记录",
@@ -164,7 +207,7 @@
       "about": "关于",
       "agent": "Agent",
       "search": "搜索",
-      "voice": "语音输入"
+      "voice": "语音"
     }
   },
   "connections": {
@@ -355,7 +398,9 @@
       "hand_off": "交给你处理",
       "read_page": "读取页面",
       "view_page": "查看页面",
-      "click_at": "在 {{x}}, {{y}} 处点击 {{target}}"
+      "click_at": "在 {{x}}, {{y}} 处点击 {{target}}",
+      "research_pages": "调研：{{question}}",
+      "watch_page": "盯着 {{site}}：{{condition}}"
     },
     "directions": {
       "up": "上",
@@ -383,7 +428,8 @@
         "frame": "作用在另一个网站的嵌入框架里，助手读不到里面的内容。",
         "download": "会下载文件。只允许你预期中的文件。",
         "sensitivePage": "这个页面涉及账户安全、密钥或支付，每次改动都会问你。",
-        "unseen": "助手读不到这里画的内容，请看图确认。"
+        "unseen": "助手读不到这里画的内容，请看图确认。",
+        "watch": "会在后台重新读取这个页面，只读不操作，最长 30 天。只有盯着的内容变了才会用到你的模型。"
       },
       "allowOnce": "允许一次",
       "allowTask": "本任务内都允许",
@@ -463,6 +509,34 @@
       "title": "这个页面试图给助手下指令",
       "titleHidden": "这个页面藏着给 AI 助手的指令",
       "body": "已忽略。任务结束前，改动页面和打开新网站都需要你批准。"
+    },
+    "details": "步骤",
+    "activity": {
+      "search": "搜索：{{query}}",
+      "research": "阅读网页 {{progress}}",
+      "open": "打开 {{site}}",
+      "read": "阅读页面",
+      "act": "在 {{site}} 上操作",
+      "actHere": "操作页面"
+    },
+    "summary": {
+      "searches_other": "搜索 {{count}} 次",
+      "sites_other": "{{count}} 个网站"
+    },
+    "replay": {
+      "open": "回放",
+      "title": "回放",
+      "end": "任务结束时的页面。",
+      "empty": "这个任务没有留下截图。",
+      "play": "播放",
+      "pause": "暂停",
+      "previous": "上一步",
+      "next": "下一步"
+    },
+    "save": {
+      "button": "存为指令",
+      "name": "指令名",
+      "saved": "已保存。输入 /{{name}} 再次运行。"
     }
   },
   "agentSettings": {
@@ -486,7 +560,13 @@
     },
     "setVisionModel": "设置视觉模型",
     "autoScreenshot": "文字不够时自动看屏幕",
-    "autoScreenshotHint": "用于 canvas 页面、没有文字的按钮和连续失败的步骤。会把截图发给模型；登录、账户和支付页面除外。"
+    "autoScreenshotHint": "用于 canvas 页面、没有文字的按钮和连续失败的步骤。会把截图发给模型；登录、账户和支付页面除外。",
+    "recordSteps": "保留截图用于回放",
+    "recordStepsHint": "每一步之前存一张小截图，只存在这台设备上。登录、账户和支付页面不截。",
+    "commands": {
+      "title": "已存的指令",
+      "hint": "任务完成后可以存为指令，下次输入「/」加名字重跑。"
+    }
   },
   "voice": {
     "start": "语音输入",
@@ -509,8 +589,8 @@
       "deniedBody": "点地址栏右侧的图标允许，然后重试。",
       "retry": "重试"
     },
-    "title": "语音输入",
-    "description": "点麦克风开始说话；再点一次或停顿两秒结束。",
+    "title": "语音",
+    "description": "点麦克风开始说话；再点一次或停顿两秒结束。回复可以朗读出来。",
     "engine": "识别方式",
     "engines": {
       "browser": {
@@ -531,7 +611,11 @@
     "micHint": "侧边栏无法请求麦克风，所以会打开一个标签页来询问一次。",
     "micGranted": "Browser Helper 可以使用麦克风。",
     "micAllowed": "已允许",
-    "allowMic": "允许使用麦克风"
+    "allowMic": "允许使用麦克风",
+    "speakReplies": "朗读回复",
+    "speakRepliesHint": "用系统自带的语音，不联网。",
+    "conversation": "读完继续听",
+    "conversationHint": "用语音提的问题，回复读完后自动开麦。"
   },
   "search": {
     "title": "搜索",
@@ -603,5 +687,36 @@
     "running": "正在另一个标签页工作：{{title}}",
     "waiting": "另一个标签页需要你处理：{{title}}",
     "show": "查看"
+  },
+  "watch": {
+    "title": "盯着的页面",
+    "empty": "让助手在页面上发生某件事时告诉你，比如「降到 500 以下告诉我」。",
+    "status": {
+      "active": "正在盯",
+      "paused": "已暂停",
+      "met": "发生了",
+      "failed": "已停止：连续检查失败",
+      "expired": "满 30 天已结束"
+    },
+    "checkFailed": "检查失败：{{error}}",
+    "checkNow": "立即检查",
+    "pause": "暂停",
+    "resume": "重新盯",
+    "footnote": "盯着的页面在后台打开，只读不操作。盯着的内容变了才问模型，不是每次都问。",
+    "notification": {
+      "metTitle": "发生了",
+      "met": "{{site}}：{{condition}}",
+      "failedTitle": "有一项盯着的页面停了",
+      "failed": "{{site}} 连续几次没能检查：{{condition}}"
+    },
+    "pace": "检查间隔",
+    "liveHint": "这个间隔下，页面会一直开在一个收起的标签组里。",
+    "groupTitle": "盯着的页面",
+    "interval": {
+      "seconds": "每 {{n}} 秒",
+      "minutes": "每 {{n}} 分钟",
+      "hours": "每 {{n}} 小时",
+      "day": "每天"
+    }
   }
 }

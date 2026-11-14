@@ -1,6 +1,7 @@
 import { registerAgentService } from '../src/background/agent-service';
 import { registerContextMenus } from '../src/background/menus';
 import { registerRuntimeHandlers } from '../src/background/runtime-handlers';
+import { registerWatchService } from '../src/background/watch-service';
 import { restrictStorage } from '../src/background/trust';
 import { openPanel } from '../src/browser/side-panel';
 import { AUTO_UPDATE_CHECK } from '../src/shared/build-flags';
@@ -21,6 +22,7 @@ export default defineBackground(() => {
   registerRuntimeHandlers();
   registerAgentService();
   registerContextMenus();
+  registerWatchService();
   // Chrome never updates an unpacked extension, so look for a new release ourselves (at most daily).
   if (AUTO_UPDATE_CHECK && !updatedByChrome()) {
     void loadSettings().then((settings) => {

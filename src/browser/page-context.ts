@@ -15,8 +15,25 @@ export interface PageExtraction {
   lang: string;
   markdown: string;
   method: 'readability' | 'innerText';
+  /** The page describes a product in its metadata; its figures lead the Markdown. */
+  product?: boolean;
   /** A sample of the text a person cannot see, which was left out (checked for injected instructions). */
   hiddenText?: string;
+}
+
+/** True when the tab shows a product a shop sells: its metadata says so. Needs access to the site; false when the page cannot be asked. */
+export async function isProductPage(tabId: number): Promise<boolean> {
+  try {
+    const [injection] = await browser.scripting.executeScript({
+      target: { tabId },
+      func: () =>
+        Boolean(document.querySelector('[itemtype*="schema.org/Product" i], meta[property="og:type" i][content*="product" i], meta[property="product:price:amount" i]')) ||
+        [...document.querySelectorAll('script[type="application/ld+json"]')].some((script) => /"@type"\s*:\s*(?:\[[^\]]*)?"Product"/i.test(script.textContent ?? '')),
+    });
+    return injection?.result === true;
+  } catch {
+    return false;
+  }
 }
 
 /** Character budgets per attachment (roughly 15k and 5k tokens). */

@@ -404,11 +404,33 @@ export class AgentBrowser {
     }
   }
 
+  /** Where the pointer last went, in CSS pixels of the viewport; taken once, for the replay. */
+  private lastPoint: { x: number; y: number } | undefined;
+
+  takePoint(): { x: number; y: number } | undefined {
+    const point = this.lastPoint;
+    this.lastPoint = undefined;
+    return point;
+  }
+
+  private notePoint(x: number, y: number): void {
+    this.lastPoint = { x: Math.round(x), y: Math.round(y) };
+  }
+
+  /** The viewport as it is, with its pixel ratio, for the replay. Never brings the tab forward and never attaches the debugger. */
+  async frame(tabId = this.currentTabId): Promise<{ raw: string; pixelRatio: number } | undefined> {
+    await this.assertAllowed(tabId);
+    const { pixelRatio } = await this.call(tabId, 'viewport');
+    const raw = await this.capture(await browser.tabs.get(tabId), false);
+    return raw ? { raw, pixelRatio } : undefined;
+  }
+
   private async pointAt(index: number, click: boolean): Promise<TargetPoint> {
     const point = unwrap(await this.page('locate', index));
     if (point.occludedBy) {
       throw new ActionError(`Element [${index}] is covered by ${point.occludedBy}. Close or move past the covering element first.`);
     }
+    this.notePoint(point.x, point.y);
     await this.quiet('moveCursor', { x: point.x, y: point.y, click });
     await sleep(380);
     return point;
@@ -471,6 +493,7 @@ export class AgentBrowser {
    * throw to cancel.
    */
   async clickAt(x: number, y: number, recheck: () => Promise<void>): Promise<number | undefined> {
+    this.notePoint(x, y);
     await this.quiet('moveCursor', { x, y, click: true });
     await sleep(380);
     const tabId = this.currentTabId;
@@ -497,7 +520,11 @@ export class AgentBrowser {
     await this.assertAllowed(tabId);
     let tab = await browser.tabs.get(tabId);
     // Hidden tabs may not render, so an asked-for look brings the tab to the front first.
-    if (activate && !tab.active) tab = (await browser.tabs.update(tabId, { active: true })) ?? tab;
+    if (activate && !tab.active) {
+      tab = (await browser.tabs.update(tabId, { active: true })) ?? tab;
+      // Chrome takes a moment to put the tab on screen; a capture before that shows the tab that was in front.
+      for (let i = 0; i < 20 && !(await this.call(tabId, 'shown').catch(() => true)); i++) await sleep(75);
+    }
     const viewport = await this.call(tabId, 'viewport');
     await this.call(tabId, 'highlight', true).catch(() => undefined);
     await sleep(150);
@@ -508,7 +535,7 @@ export class AgentBrowser {
       await this.call(tabId, 'highlight', false).catch(() => undefined);
     }
     if (!raw) return undefined;
-    return { ...(await fitScreenshot(raw, viewport)), viewport, tabId, url: tab.url ?? '' };
+    return { ...(await fitScreenshot(raw, viewport.pixelRatio)), viewport, tabId, url: tab.url ?? '' };
   }
 
   private async capture(tab: Browser.tabs.Tab, activate: boolean): Promise<string | undefined> {
@@ -522,9 +549,17 @@ export class AgentBrowser {
       }
     }
     if (!tab.active) return undefined;
-    try {
+    const visible = async () => {
       const dataUrl = await browser.tabs.captureVisibleTab(tab.windowId, { format: 'jpeg', quality: 70 });
       return dataUrl.slice(dataUrl.indexOf(',') + 1);
+    };
+    try {
+      return await visible().catch(async (error: unknown) => {
+        // Chrome allows two captures a second. A view's own screenshot and a replay picture can come closer together than that.
+        if (!/MAX_CAPTURE_VISIBLE_TAB_CALLS_PER_SECOND/.test(String(error))) throw error;
+        await sleep(600);
+        return visible();
+      });
     } catch (error) {
       if (!activate) return undefined;
       // captureVisibleTab needs access to all sites; the debugger works with a single site.

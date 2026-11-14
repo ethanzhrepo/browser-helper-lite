@@ -23,9 +23,11 @@ export function renderContext(context: ContextSnapshot): string {
   return `<context ${attributes}>\n${body}\n</context>`;
 }
 
-export function renderUserMessage(message: Pick<MessageRecord, 'content' | 'contexts'>): string {
+export function renderUserMessage(message: Pick<MessageRecord, 'content' | 'contexts' | 'images'>): string {
   const contexts = (message.contexts ?? []).map(renderContext);
-  return [...contexts, message.content].join('\n\n');
+  // The pictures themselves go with the request they belong to (see the runtime); later turns only know they were there.
+  const images = (message.images ?? []).map((image) => `<attached_image size="${image.width}x${image.height}"${image.url ? ` from="${escapeAttribute(image.url)}"` : ''} />`);
+  return [...contexts, ...images, message.content].join('\n\n');
 }
 
 /**
@@ -35,13 +37,17 @@ export function renderUserMessage(message: Pick<MessageRecord, 'content' | 'cont
  * - consecutive turns of the same role are merged (answers to the agent's
  *   questions follow the request they belong to).
  */
-export function buildHistory(messages: MessageRecord[]): ChatTurn[] {
+export function buildHistory(messages: MessageRecord[], note?: (message: MessageRecord, last: boolean) => string | undefined): ChatTurn[] {
   const lastUser = messages.findLastIndex((m) => m.role === 'user');
   const turns: ChatTurn[] = [];
-  for (const message of messages.slice(0, lastUser + 1)) {
+  for (const [index, message] of messages.slice(0, lastUser + 1).entries()) {
     let turn: ChatTurn | undefined;
-    if (message.role === 'user') turn = { role: 'user', content: renderUserMessage(message) };
-    else if (message.status === 'done' || (message.status === 'aborted' && message.content.trim())) {
+    if (message.role === 'user') {
+      // A note that goes with the message (the tab the user was on), the same whenever the message is sent again.
+      const extra = note?.(message, index === lastUser);
+      turn = { role: 'user', content: extra ? `${renderUserMessage(message)}\n\n${extra}` : renderUserMessage(message) };
+    }
+    if (message.role === 'assistant' && (message.status === 'done' || (message.status === 'aborted' && message.content.trim()))) {
       turn = { role: 'assistant', content: message.content };
     }
     if (!turn) continue;

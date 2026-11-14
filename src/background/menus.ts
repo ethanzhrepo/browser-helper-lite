@@ -8,6 +8,7 @@ import { loadSettings, watchSettings } from '../storage/settings';
 
 const ASK_SELECTION = 'ask-selection';
 const SUMMARIZE_PAGE = 'summarize-page';
+const ASK_REGION = 'ask-region';
 const WEB_PAGES = ['http://*/*', 'https://*/*'];
 
 let building: Promise<void> = Promise.resolve();
@@ -23,6 +24,7 @@ function buildMenus(): Promise<void> {
       await browser.contextMenus.removeAll();
       browser.contextMenus.create({ id: ASK_SELECTION, title: t('menu.askSelection'), contexts: ['selection'], documentUrlPatterns: WEB_PAGES });
       browser.contextMenus.create({ id: SUMMARIZE_PAGE, title: t('menu.summarize'), contexts: ['page'], documentUrlPatterns: WEB_PAGES });
+      browser.contextMenus.create({ id: ASK_REGION, title: t('menu.askRegion'), contexts: ['page', 'image'], documentUrlPatterns: WEB_PAGES });
       builtFor = locale;
     })
     .catch((error: unknown) => console.warn('Could not build the context menu', error));
@@ -40,6 +42,9 @@ function onClicked(info: Browser.contextMenus.OnClickData, tab?: Browser.tabs.Ta
     if (!text) return;
     const context = { kind: 'selection' as const, title: tab.title ?? '', url: info.pageUrl ?? tab.url ?? '', content: text, truncated, capturedAt: at };
     void queuePanelRequest(tabId, { kind: 'selection', context, at });
+  } else if (info.menuItemId === ASK_REGION) {
+    // The click also lets the extension screenshot this tab (activeTab), whatever its site access.
+    void queuePanelRequest(tabId, { kind: 'region', at });
   } else if (info.menuItemId === SUMMARIZE_PAGE) {
     // The click lets us read this tab once (activeTab), even on a site without site access.
     void capturePage(tabId)

@@ -171,6 +171,7 @@ test.describe.serial('one chat per tab', () => {
     await (await overlayButton(shop, 'panel'))!.click();
     await expect.poll(() => overlayButton(shop, 'panel')).toBeUndefined();
 
+    await expect.poll(async () => Boolean(await overlayButton(shop, 'stop'))).toBe(true);
     await (await overlayButton(shop, 'stop'))!.click();
     await expect(shop.locator('browser-helper-overlay')).toHaveCount(0, { timeout: 10_000 });
   });

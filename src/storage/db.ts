@@ -1,12 +1,17 @@
 import Dexie, { type Table } from 'dexie';
 import { monotonicFactory } from 'ulid';
-import { ACTIVE_STATUSES, type AgentTask } from '../agent/types';
+import { ACTIVE_STATUSES, type AgentTask, type StepShot } from '../agent/types';
 import type { ConversationRecord, MessageRecord } from '../shared/types';
+import type { Watch } from '../watch/watch';
 
 class HelperDatabase extends Dexie {
   conversations!: Table<ConversationRecord, string>;
   messages!: Table<MessageRecord, string>;
   tasks!: Table<AgentTask, string>;
+  /** Pictures of the page before each step of a task, for the replay. */
+  shots!: Table<StepShot, string>;
+  /** Pages the assistant looks at again and again for the user (see watch.ts). */
+  watches!: Table<Watch, string>;
 
   constructor() {
     super('browser-helper');
@@ -16,6 +21,10 @@ class HelperDatabase extends Dexie {
     });
     this.version(2).stores({
       tasks: 'id, conversationId, status',
+    });
+    this.version(3).stores({
+      shots: 'id, taskId, conversationId',
+      watches: 'id, status',
     });
   }
 }
@@ -126,11 +135,12 @@ export async function restoreConversation(id: string): Promise<boolean> {
  * deleted, so a later sync can pass the deletion on.
  */
 export async function purgeConversation(id: string): Promise<void> {
-  await db.transaction('rw', db.conversations, db.messages, db.tasks, async () => {
+  await db.transaction('rw', db.conversations, db.messages, db.tasks, db.shots, async () => {
     const conversation = await db.conversations.get(id);
     if (!conversation?.deletedAt || conversation.purgedAt) return;
     await db.messages.where('conversationId').equals(id).delete();
     await db.tasks.where('conversationId').equals(id).delete();
+    await db.shots.where('conversationId').equals(id).delete();
     await db.conversations.update(id, { title: '', purgedAt: Date.now() });
   });
 }
@@ -153,7 +163,7 @@ export async function purgeDeleted(now = Date.now()): Promise<number> {
  */
 export async function truncateConversation(conversationId: string, fromMessageId: string, { keepFirst = false } = {}): Promise<void> {
   const now = Date.now();
-  await db.transaction('rw', db.conversations, db.messages, db.tasks, async () => {
+  await db.transaction('rw', db.conversations, db.messages, db.tasks, db.shots, async () => {
     await db.messages
       .where('conversationId')
       .equals(conversationId)
@@ -164,13 +174,18 @@ export async function truncateConversation(conversationId: string, fromMessageId
         m.updatedAt = now;
         delete m.reasoning;
         delete m.contexts;
+        delete m.images;
+        delete m.command;
+        delete m.tab;
         delete m.error;
         delete m.usage;
       });
-    await db.tasks
+    const replaced = db.tasks
       .where('conversationId')
       .equals(conversationId)
-      .filter((task) => !task.discardedAt && task.anchorMessageId >= fromMessageId)
+      .filter((task) => !task.discardedAt && task.anchorMessageId >= fromMessageId);
+    await db.shots.where('taskId').anyOf(await replaced.primaryKeys()).delete();
+    await replaced
       .modify((task) => {
         task.discardedAt = now;
         task.updatedAt = now;
@@ -188,8 +203,8 @@ export async function truncateConversation(conversationId: string, fromMessageId
 
 /** Erases every conversation, message and task record. */
 export async function clearConversations(): Promise<void> {
-  await db.transaction('rw', db.conversations, db.messages, db.tasks, async () => {
-    await Promise.all([db.conversations.clear(), db.messages.clear(), db.tasks.clear()]);
+  await db.transaction('rw', db.conversations, db.messages, db.tasks, db.shots, async () => {
+    await Promise.all([db.conversations.clear(), db.messages.clear(), db.tasks.clear(), db.shots.clear()]);
   });
 }
 
@@ -200,6 +215,19 @@ export async function saveTask(task: AgentTask): Promise<void> {
     if ((await db.conversations.get(task.conversationId))?.purgedAt) return;
     await db.tasks.put(task);
   });
+}
+
+/** Stores a replay picture, unless its conversation was erased meanwhile. */
+export async function saveShot(shot: StepShot): Promise<void> {
+  await db.transaction('rw', db.conversations, db.shots, async () => {
+    if ((await db.conversations.get(shot.conversationId))?.purgedAt) return;
+    await db.shots.put(shot);
+  });
+}
+
+/** A task's replay pictures, in the order of its steps. */
+export async function getShots(taskId: string): Promise<StepShot[]> {
+  return (await db.shots.where('taskId').equals(taskId).toArray()).sort((a, b) => a.step - b.step);
 }
 
 /** A conversation's turns. Discarded ones (replaced by a new reply) are only wanted for the tabs they grouped. */

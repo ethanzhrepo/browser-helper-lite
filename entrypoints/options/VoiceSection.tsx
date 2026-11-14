@@ -96,6 +96,21 @@ export function VoiceSection({ settings }: { settings: Settings }) {
           label={t('voice.autoSend')}
           hint={t('voice.autoSendHint')}
         />
+        <Toggle
+          id="voice-speak"
+          checked={voice.speakReplies}
+          onChange={(speakReplies) => saveVoice({ speakReplies })}
+          label={t('voice.speakReplies')}
+          hint={t('voice.speakRepliesHint')}
+        />
+        <Toggle
+          id="voice-conversation"
+          checked={voice.speakReplies && voice.conversation}
+          disabled={!voice.speakReplies}
+          onChange={(conversation) => saveVoice({ conversation })}
+          label={t('voice.conversation')}
+          hint={t('voice.conversationHint')}
+        />
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4">
           <div>
             <p className="text-sm font-medium">{t('voice.microphone')}</p>

@@ -1,5 +1,6 @@
 import {
   Ban,
+  BookmarkPlus,
   Check,
   ChevronDown,
   CircleAlert,
@@ -9,6 +10,7 @@ import {
   MessageCircleQuestion,
   Minus,
   Pause,
+  Play,
   ShieldAlert,
   ShieldX,
   Square,
@@ -16,13 +18,28 @@ import {
   XCircle,
 } from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
+import { commandFrom, commandName, outlineOf } from '../../src/agent/outline';
 import { ALL_SITES_PATTERN, requestHostAccess } from '../../src/permissions/hosts';
+import { newId } from '../../src/storage/db';
+import { updateSettings } from '../../src/storage/settings';
+import { formatInterval } from '../../src/watch/format';
+import { clampSeconds, LIVE_BELOW_SECONDS, WATCH_INTERVALS } from '../../src/watch/watch';
 import type { AgentAction, AgentClientMessage, AgentTask, ApprovalDecision, WaitReason } from '../../src/agent/types';
 import { Button } from '../../src/ui/Button';
+import { ReplayView } from './ReplayView';
 
 const clip = (text: string, limit = 60) => (text.length > limit ? `${text.slice(0, limit)}…` : text);
+
+const hostOf = (url: unknown): string => {
+  try {
+    return new URL(String(url)).hostname.replace(/^www\./, '');
+  } catch {
+    return '';
+  }
+};
 
 export function actionLabel(t: TFunction, action: AgentAction): string {
   const a = action.args;
@@ -37,6 +54,8 @@ export function actionLabel(t: TFunction, action: AgentAction): string {
     question: clip(String(a.question ?? ''), 60),
     tab: String(a.tab_id ?? ''),
     seconds: String(a.seconds ?? ''),
+    condition: clip(String(a.condition ?? ''), 120),
+    site: hostOf(a.url),
     x: String(Math.round(Number(a.x ?? 0))),
     y: String(Math.round(Number(a.y ?? 0))),
     direction: a.direction === 'up' ? t('agent.directions.up') : t('agent.directions.down'),
@@ -73,16 +92,113 @@ const STATUS_STYLE: Record<AgentTask['status'], { icon: typeof Check; tone: stri
   stopped: { icon: Square, tone: 'bg-subtle text-muted' },
 };
 
-export function AgentRunView({ task, onSend }: { task: AgentTask; onSend: (message: AgentClientMessage) => void }) {
+const OPENING = new Set(['navigate', 'open_tab', 'read_url']);
+const READING = new Set(['read_page', 'extract', 'look', 'view_page']);
+
+/**
+ * What the run is doing, in words a person cares about: what it searches for,
+ * which site it is on. Waiting, clicking and scrolling are all "working on
+ * the site"; the steps themselves are under the details.
+ */
+export function activityLabel(t: TFunction, task: AgentTask): string {
+  const step = task.steps.at(-1);
+  const action = step?.actions.at(-1);
+  if (!action) return t('agent.thinking');
+  if (action.tool === 'web_search') return t('agent.activity.search', { query: clip(String(action.args.query ?? ''), 50) });
+  if (action.tool === 'research_pages') return t('agent.activity.research', { progress: action.target ?? '' }).trim();
+  const site = OPENING.has(action.tool) ? hostOf(action.args.url) : hostOf(step?.url);
+  if (OPENING.has(action.tool) && site) return t('agent.activity.open', { site });
+  if (READING.has(action.tool)) return t('agent.activity.read');
+  return site ? t('agent.activity.act', { site }) : t('agent.activity.actHere');
+}
+
+/** A finished run in a few words: how often it searched and how many sites it used. */
+export function runSummary(t: TFunction, task: AgentTask): string {
+  const actions = task.steps.flatMap((step) => step.actions).filter((action) => action.status === 'done');
+  const searches = actions.filter((action) => action.tool === 'web_search').length;
+  const sites = new Set(
+    [...task.steps.filter((step) => step.actions.some((a) => a.tool !== 'web_search' && a.tool !== 'ask_user')).map((step) => hostOf(step.url)), ...actions.filter((a) => OPENING.has(a.tool)).map((a) => hostOf(a.args.url))].filter(Boolean),
+  ).size;
+  return [searches > 0 ? t('agent.summary.searches', { count: searches }) : '', sites > 0 ? t('agent.summary.sites', { count: sites }) : ''].filter(Boolean).join(' · ');
+}
+
+/** Saves a finished task as a command to run again by name. A command with the same name is replaced. */
+function SaveCommand({ task, request }: { task: AgentTask; request: string }) {
+  const { t } = useTranslation();
+  const [name, setName] = useState<string>();
+  const [saved, setSaved] = useState<string>();
+
+  const save = async () => {
+    const clean = commandName(name ?? '');
+    if (!clean) return;
+    const command = commandFrom(task, request, clean, newId(), Date.now());
+    await updateSettings((s) => ({ ...s, commands: [...s.commands.filter((c) => c.name !== clean), command] }));
+    setName(undefined);
+    setSaved(clean);
+  };
+
+  if (saved) {
+    return (
+      <span className="mr-auto flex items-center gap-1 px-1 text-xs text-success" role="status" data-testid="command-saved">
+        <Check className="h-3.5 w-3.5 shrink-0" />
+        {t('agent.save.saved', { name: saved })}
+      </span>
+    );
+  }
+  if (name === undefined) {
+    return (
+      <Button size="sm" variant="ghost" onClick={() => setName(commandName(request.split('\n')[0]!.slice(0, 16)))} data-testid="save-command">
+        <BookmarkPlus className="h-3.5 w-3.5" />
+        {t('agent.save.button')}
+      </Button>
+    );
+  }
+  return (
+    <form
+      className="flex min-w-0 flex-1 items-center gap-1"
+      onSubmit={(event) => {
+        event.preventDefault();
+        void save();
+      }}
+    >
+      <span className="font-mono text-xs text-faint">/</span>
+      <input
+        autoFocus
+        value={name}
+        onChange={(event) => setName(event.target.value)}
+        onKeyDown={(event) => event.key === 'Escape' && setName(undefined)}
+        aria-label={t('agent.save.name')}
+        placeholder={t('agent.save.name')}
+        data-testid="command-name"
+        className="h-7 min-w-0 flex-1 rounded-md border border-line bg-surface px-2 text-xs outline-none focus:border-accent/50"
+      />
+      <Button size="sm" variant="primary" type="submit" disabled={!commandName(name)}>
+        {t('common.save')}
+      </Button>
+    </form>
+  );
+}
+
+export function AgentRunView({ task, request, onSend }: {
+  task: AgentTask;
+  /** The request this turn answers, to save it as a command. */
+  request?: string;
+  onSend: (message: AgentClientMessage) => void;
+}) {
   const { t } = useTranslation();
   const active = task.status === 'running' || task.status === 'paused' || task.status === 'waiting';
-  // Runs that were already finished when shown start collapsed; live runs stay open.
-  const [open, setOpen] = useState(active);
-  const expanded = open || active;
+  // The steps (click, wait, scroll…) stay out of the way until asked for.
+  const [open, setOpen] = useState(false);
+  const [replaying, setReplaying] = useState(false);
+  const canReplay = !active && task.steps.some((step) => step.shot);
+  // A task that did something and finished can be kept, to run again by name.
+  const canSave = task.status === 'done' && Boolean(request?.trim()) && outlineOf(task).length > 0;
   const actionCount = task.steps.reduce((n, step) => n + step.actions.length, 0);
   const status = STATUS_STYLE[task.status];
   const StatusIcon = status.icon;
   const openedTabs = task.openedTabs?.length ?? 0;
+  const about = active ? activityLabel(t, task) : runSummary(t, task);
+  const thought = active ? task.steps.at(-1)?.thought : undefined;
 
   return (
     <div
@@ -94,29 +210,25 @@ export function AgentRunView({ task, onSend }: { task: AgentTask; onSend: (messa
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        disabled={active}
-        className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left enabled:hover:bg-subtle/60"
-        aria-expanded={expanded}
+        className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left hover:bg-subtle/60"
+        aria-expanded={open}
+        title={t('agent.details')}
+        data-testid="run-details"
       >
         <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${status.tone}`}>
           <StatusIcon className={`h-3.5 w-3.5 ${status.spin ? 'animate-spin' : ''}`} strokeWidth={2.25} />
         </span>
-        <span className="font-semibold tracking-tight">{t(`agent.status.${task.status}`)}</span>
-        <span className="text-xs text-faint">{t('agent.actionCount', { count: actionCount })}</span>
-        <span className="ml-auto" />
-        {task.driver && (
-          <span
-            className="rounded-md border border-line px-1.5 py-px font-mono text-[10px] tracking-wide text-faint uppercase"
-            title={t('agent.driverHint')}
-            data-testid="driver-badge"
-          >
-            {task.driver}
-          </span>
-        )}
-        {!active && <ChevronDown className={`h-4 w-4 text-faint transition-transform ${expanded ? 'rotate-180' : ''}`} />}
+        <span className="shrink-0 font-semibold tracking-tight">{t(`agent.status.${task.status}`)}</span>
+        <span className="min-w-0 flex-1 truncate text-xs text-muted" data-testid="run-activity">
+          {about}
+        </span>
+        <ChevronDown className={`h-4 w-4 shrink-0 text-faint transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
+      {thought && !open && <p className="-mt-1 line-clamp-2 px-3 pb-2.5 pl-[46px] text-xs leading-relaxed text-muted">{thought}</p>}
 
-      {expanded && task.steps.length > 0 && (
+      {task.steps.length > 0 && (
+        // Kept in the page while closed, so opening it is instant and nothing is re-read.
+        <div hidden={!open} data-testid="run-steps">
         <ol className="relative mx-3 mb-3 ml-[23px] space-y-3 border-l border-line pl-4">
           {task.steps.map((step, i) => {
             const current = active && i === task.steps.length - 1;
@@ -147,7 +259,7 @@ export function AgentRunView({ task, onSend }: { task: AgentTask; onSend: (messa
                         >
                           {actionLabel(t, action)}
                         </span>
-                        {(action.tool === 'web_search' || action.tool === 'read_url') && action.target && (
+                        {(action.tool === 'web_search' || action.tool === 'read_url' || action.tool === 'research_pages') && action.target && (
                           <span className="ml-1.5 rounded bg-subtle px-1 py-px text-[10px] text-faint">{action.target}</span>
                         )}
                         {(action.status === 'error' || action.status === 'rejected') && action.result && (
@@ -167,6 +279,15 @@ export function AgentRunView({ task, onSend }: { task: AgentTask; onSend: (messa
             );
           })}
         </ol>
+        <p className="flex items-center gap-2 px-3.5 pb-2.5 text-[11px] text-faint">
+          {t('agent.actionCount', { count: actionCount })}
+          {task.driver && (
+            <span className="rounded-md border border-line px-1.5 py-px font-mono text-[10px] tracking-wide uppercase" title={t('agent.driverHint')} data-testid="driver-badge">
+              {task.driver}
+            </span>
+          )}
+        </p>
+        </div>
       )}
 
       {task.injection && (
@@ -179,14 +300,25 @@ export function AgentRunView({ task, onSend }: { task: AgentTask; onSend: (messa
           <p className="break-words font-mono text-[11px] leading-relaxed text-muted">“{task.injection.excerpt}”</p>
         </div>
       )}
-      {!active && openedTabs > 0 && expanded && (
-        <div className="flex justify-end border-t border-line px-3 py-2">
-          <Button size="sm" variant="ghost" onClick={() => onSend({ type: 'closeTabs', taskId: task.id })}>
-            <XCircle className="h-3.5 w-3.5" />
-            {t('agent.closeTabs', { count: openedTabs })}
-          </Button>
+      {!active && (openedTabs > 0 || canReplay || canSave) && (
+        <div className="flex flex-wrap items-center justify-end gap-1 border-t border-line px-3 py-2">
+          {canSave && <SaveCommand task={task} request={request!} />}
+          {canReplay && (
+            <Button size="sm" variant="ghost" onClick={() => setReplaying(true)} data-testid="replay-open">
+              <Play className="h-3.5 w-3.5" />
+              {t('agent.replay.open')}
+            </Button>
+          )}
+          {openedTabs > 0 && (
+            <Button size="sm" variant="ghost" onClick={() => onSend({ type: 'closeTabs', taskId: task.id })}>
+              <XCircle className="h-3.5 w-3.5" />
+              {t('agent.closeTabs', { count: openedTabs })}
+            </Button>
+          )}
         </div>
       )}
+      {/* Over the whole panel, not inside this card. */}
+      {replaying && createPortal(<ReplayView task={task} onClose={() => setReplaying(false)} />, document.body)}
       {task.status === 'paused' && (
         <p className="flex items-center gap-2 border-t border-line bg-subtle/60 px-3.5 py-2.5 text-xs text-muted">
           <Pause className="h-3.5 w-3.5 shrink-0" />
@@ -285,6 +417,9 @@ function WaitingCard({ task, waiting, onSend }: {
     onSend({ type: 'respond', taskId: task.id, response });
 
   const approval = waiting.kind === 'approval' ? waiting : undefined;
+  // A watch: how often to look is the user's to say, on the card.
+  const watched = approval?.reason === 'watch' ? task.steps.flatMap((step) => step.actions).find((a) => a.id === approval.actionId) : undefined;
+  const [everySeconds, setEverySeconds] = useState(() => clampSeconds(watched?.args.every_seconds));
   const highRisk = Boolean(approval) && (approval!.risk >= 3 || ['injection', 'exfiltration', 'secret'].includes(approval!.reason));
   const grantSite = () => {
     if (waiting.kind !== 'permission') return;
@@ -296,7 +431,7 @@ function WaitingCard({ task, waiting, onSend }: {
       if (approval) {
         // A high-risk step takes a deliberate key combination, never a stray Enter.
         if (!armed || (highRisk && !(event.metaKey || event.ctrlKey))) return false;
-        respond({ kind: 'approval', actionId: approval.actionId, decision: 'allowOnce' });
+        respond({ kind: 'approval', actionId: approval.actionId, decision: 'allowOnce', ...(watched ? { everySeconds } : {}) });
       } else if (waiting.kind === 'permission') grantSite();
       else if (waiting.kind === 'handoff') respond({ kind: 'continue' });
       else return false;
@@ -311,7 +446,8 @@ function WaitingCard({ task, waiting, onSend }: {
   });
 
   if (waiting.kind === 'approval') {
-    const decide = (decision: ApprovalDecision) => respond({ kind: 'approval', actionId: waiting.actionId, decision });
+    const decide = (decision: ApprovalDecision) => respond({ kind: 'approval', actionId: waiting.actionId, decision, ...(watched ? { everySeconds } : {}) });
+    const paces = [...new Set([...WATCH_INTERVALS, everySeconds])].sort((a, b) => a - b);
     const action = task.steps.flatMap((step) => step.actions).find((a) => a.id === waiting.actionId);
     // Trusting a whole site makes no sense when the page itself is the problem.
     const suspicious = waiting.reason === 'injection' || waiting.reason === 'exfiltration' || waiting.reason === 'secret';
@@ -319,8 +455,8 @@ function WaitingCard({ task, waiting, onSend }: {
     // Site-wide trust makes no sense for these; high-risk steps are approved one at a time (§8.1).
     const oneByOne = waiting.reason === 'exfiltration' || waiting.reason === 'secret' || waiting.reason === 'sensitivePage';
     // Nor for clicks on drawn content: each task's are judged by eye.
-    const canAllowSite = waiting.risk < 3 && !suspicious && !oneByOne && !['newSite', 'download', 'unseen'].includes(waiting.reason);
-    const canAllowTask = waiting.risk < 3 && !oneByOne;
+    const canAllowSite = waiting.risk < 3 && !suspicious && !oneByOne && !['newSite', 'download', 'unseen', 'watch'].includes(waiting.reason);
+    const canAllowTask = waiting.risk < 3 && !oneByOne && waiting.reason !== 'watch';
     const typed = action?.tool === 'type' ? String(action.args.text ?? '') : '';
     const fullUrl = action?.tool === 'navigate' || action?.tool === 'open_tab' ? String(action.args.url ?? '') : '';
     return (
@@ -354,7 +490,27 @@ function WaitingCard({ task, waiting, onSend }: {
               {waiting.submits ? t('agent.approval.submits', { button: clip(waiting.submits, 80) }) : t('agent.approval.submitsForm')}
             </p>
           )}
-          <p className="text-xs text-muted">{t(`agent.approval.reason.${waiting.reason}`)}</p>
+          {watched && (
+            <label className="flex items-center justify-between gap-3 rounded-lg bg-subtle px-3 py-2 text-xs">
+              <span className="font-medium text-fg">{t('watch.pace')}</span>
+              <select
+                value={everySeconds}
+                onChange={(event) => setEverySeconds(Number(event.target.value))}
+                data-testid="watch-pace"
+                className="rounded-md border border-line bg-surface px-2 py-1 text-xs text-fg outline-none focus:border-accent/50"
+              >
+                {paces.map((seconds) => (
+                  <option key={seconds} value={seconds}>
+                    {formatInterval(t, seconds)}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+          <p className="text-xs text-muted">
+            {t(`agent.approval.reason.${waiting.reason}`)}
+            {watched && everySeconds < LIVE_BELOW_SECONDS && <> {t('watch.liveHint')}</>}
+          </p>
         </div>
         <div className="grid grid-cols-2 gap-1.5">
           <Button variant="primary" disabled={!armed} onClick={() => decide('allowOnce')}>

@@ -1,4 +1,5 @@
-import { BookOpenText, Hand, Sparkles, type LucideIcon } from 'lucide-react';
+import { BookOpenText, Hand, Sparkles, Trash2, type LucideIcon } from 'lucide-react';
+import { IconButton } from '../../src/ui/Button';
 import { pickSlot } from '../../src/providers/resolve';
 import { openOptions } from '../../src/ui/navigation';
 import { useEffect, useState } from 'react';
@@ -98,6 +99,40 @@ export function AgentSection({ settings }: { settings: Settings }) {
           label={t('agentSettings.autoScreenshot')}
           hint={t('agentSettings.autoScreenshotHint')}
         />
+        <Toggle
+          id="record-steps"
+          checked={agent.recordSteps}
+          onChange={(recordSteps) => saveAgent({ recordSteps })}
+          label={t('agentSettings.recordSteps')}
+          hint={t('agentSettings.recordStepsHint')}
+        />
+      </Card>
+      <Card className="p-5">
+        <div className="space-y-3" data-testid="saved-commands">
+        <div>
+          <h3 className="text-sm font-medium">{t('agentSettings.commands.title')}</h3>
+          <p className="mt-0.5 text-xs leading-relaxed text-muted">{t('agentSettings.commands.hint')}</p>
+        </div>
+        {settings.commands.length > 0 && (
+          <ul className="divide-y divide-line rounded-lg border border-line">
+            {settings.commands.map((command) => (
+              <li key={command.id} className="flex items-center gap-2 py-1.5 pl-3 pr-1.5">
+                <span className="shrink-0 font-mono text-xs font-medium text-accent">/{command.name}</span>
+                <span className="min-w-0 flex-1 truncate text-xs text-muted" title={command.prompt}>
+                  {command.prompt}
+                </span>
+                <IconButton
+                  label={t('common.delete')}
+                  onClick={() => void updateSettings((s) => ({ ...s, commands: s.commands.filter((c) => c.id !== command.id) }))}
+                  className="h-7 w-7"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </IconButton>
+              </li>
+            ))}
+          </ul>
+        )}
+        </div>
       </Card>
       <Card className="p-5">
         <Field label={t('agentSettings.maxSteps')} htmlFor="max-steps" hint={t('agentSettings.maxStepsHint')}>

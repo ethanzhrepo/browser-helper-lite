@@ -1,4 +1,4 @@
-import { AlertTriangle, ArrowDown, ArrowUp, Brain, Check, ChevronRight, Copy, FileText, Pencil, RotateCcw, Settings2, Square, TextQuote } from 'lucide-react';
+import { AlertTriangle, ArrowDown, ArrowUp, Brain, Check, ChevronRight, Copy, FileText, Pencil, RotateCcw, Settings2, Square, TextQuote, Volume2, VolumeX } from 'lucide-react';
 import { Fragment, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ACTIVE_STATUSES, type AgentClientMessage, type AgentTask } from '../../src/agent/types';
@@ -23,8 +23,10 @@ function turnPositions(messages: MessageRecord[], tasks: AgentTask[]): Map<strin
   return positions;
 }
 
-export function MessageList({ messages, tasks, pendingTaskId, canChange, onRetry, onRegenerate, onEdit, onAgentSend }: {
+export function MessageList({ messages, tasks, pendingTaskId, canChange, speech, onRetry, onRegenerate, onEdit, onAgentSend }: {
   messages: MessageRecord[];
+  /** Reading replies aloud: the id of the one being read, and a switch for each. */
+  speech?: { speaking?: string; toggle: (message: MessageRecord) => void };
   tasks: Record<string, AgentTask>;
   /** A request was sent and its turn has not reported back yet. */
   pendingTaskId?: string;
@@ -87,12 +89,19 @@ export function MessageList({ messages, tasks, pendingTaskId, canChange, onRetry
                   usage={message.usage}
                   aborted={message.status === 'aborted'}
                   error={message.status === 'error' ? message.error : undefined}
+                  speech={speech && { speaking: speech.speaking === message.id, toggle: () => speech.toggle(message) }}
                   // A reply that failed or was stopped stays and gets another try; a finished one is replaced.
                   redo={idle && message.id === last?.id ? (message.status === 'done' ? { kind: 'regenerate', run: onRegenerate } : { kind: 'retry', run: onRetry }) : undefined}
                 />
               )}
               {positions.get(message.id)?.map((task) => (
-                <TurnView key={task.id} task={task} replied={replied.has(task.id)} onSend={onAgentSend} />
+                <TurnView
+                  key={task.id}
+                  task={task}
+                  replied={replied.has(task.id)}
+                  request={(messages.find((m) => m.role === 'user' && m.taskId === task.id) ?? messages.find((m) => m.id === task.anchorMessageId && m.role === 'user'))?.content}
+                  onSend={onAgentSend}
+                />
               ))}
             </Fragment>
           ))}
@@ -116,12 +125,12 @@ export function MessageList({ messages, tasks, pendingTaskId, canChange, onRetry
 }
 
 /** A turn in progress: its tool steps, then the reply as it streams in. */
-function TurnView({ task, replied, onSend }: { task: AgentTask; replied: boolean; onSend: (message: AgentClientMessage) => void }) {
+function TurnView({ task, replied, request, onSend }: { task: AgentTask; replied: boolean; request?: string; onSend: (message: AgentClientMessage) => void }) {
   const active = ACTIVE_STATUSES.includes(task.status);
   const hasActions = task.steps.some((step) => step.actions.length > 0);
   return (
     <>
-      {hasActions && <AgentRunView task={task} onSend={onSend} />}
+      {hasActions && <AgentRunView task={task} request={request} onSend={onSend} />}
       {!replied && (task.draft || (active && !task.waiting)) && (
         // A finished turn without a stored reply was cut off (e.g. the extension restarted).
         <AssistantMessage content={task.draft} modelId={task.model.modelId} streaming={active} aborted={!active && task.status !== 'done'} />
@@ -182,6 +191,17 @@ function UserMessage({ message, onEdit }: { message: MessageRecord; onEdit?: (te
   return (
     <div className="group flex animate-fade-in flex-col items-end gap-1.5" data-testid="user-message">
       {message.contexts?.map((context) => <ContextChip key={`${context.kind}-${context.capturedAt}`} context={context} />)}
+      {message.images?.map((image, index) => (
+        // Our own screenshot, as a data URL: nothing is loaded.
+        <img
+          key={index}
+          src={`data:image/jpeg;base64,${image.data}`}
+          alt={image.title ?? ''}
+          title={image.url}
+          data-testid="message-image"
+          className="max-h-56 max-w-[88%] rounded-xl border border-line object-contain shadow-soft"
+        />
+      ))}
       {draft === undefined ? (
         <>
           <div className="max-w-[88%] whitespace-pre-wrap rounded-2xl rounded-br-md bg-accent-soft px-3.5 py-2 text-sm leading-relaxed text-fg">
@@ -231,7 +251,8 @@ function compact(count: number): string {
   return count >= 1000 ? `${(count / 1000).toFixed(count >= 10_000 ? 0 : 1)}k` : String(count);
 }
 
-function AssistantMessage({ content, reasoning, modelId, usage, streaming, aborted, error, redo }: {
+function AssistantMessage({ content, reasoning, modelId, usage, streaming, aborted, error, redo, speech }: {
+  speech?: { speaking: boolean; toggle: () => void };
   content: string;
   reasoning?: string;
   modelId?: string;
@@ -250,7 +271,8 @@ function AssistantMessage({ content, reasoning, modelId, usage, streaming, abort
     setTimeout(() => setCopied(false), 1500);
   };
   const used = (usage?.inputTokens ?? 0) + (usage?.outputTokens ?? 0);
-  const tokens = used > 0 ? t('message.tokens', { input: compact(usage?.inputTokens ?? 0), output: compact(usage?.outputTokens ?? 0) }) : '';
+  const counts = { input: compact(usage?.inputTokens ?? 0), output: compact(usage?.outputTokens ?? 0), cached: compact(usage?.cachedTokens ?? 0) };
+  const tokens = used > 0 ? t(usage?.cachedTokens ? 'message.tokensCached' : 'message.tokens', counts) : '';
 
   return (
     <div className="group flex animate-fade-in flex-col gap-2 text-sm text-fg" data-testid="assistant-message">
@@ -284,6 +306,17 @@ function AssistantMessage({ content, reasoning, modelId, usage, streaming, abort
           {content && (
             <IconButton label={copied ? t('message.copied') : t('message.copy')} onClick={() => void copy()} className="h-7 w-7">
               {copied ? <Check className="h-3.5 w-3.5 text-success" /> : <Copy className="h-3.5 w-3.5" />}
+            </IconButton>
+          )}
+          {content && speech && (
+            <IconButton
+              label={speech.speaking ? t('message.stopSpeaking') : t('message.speak')}
+              onClick={speech.toggle}
+              className={`h-7 w-7 ${speech.speaking ? 'text-accent' : ''}`}
+              data-testid="speak"
+              aria-pressed={speech.speaking}
+            >
+              {speech.speaking ? <VolumeX className="h-3.5 w-3.5" /> : <Volume2 className="h-3.5 w-3.5" />}
             </IconButton>
           )}
           {redo && (

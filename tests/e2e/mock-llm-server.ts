@@ -340,6 +340,10 @@ export interface MockOptions {
   pages?: Record<string, string>;
   /** What the `extract` tool's model answers. */
   extractAnswer?: string;
+  /** Answers a web search (the DeepSeek search tool) instead of the fixed results; undefined keeps those. */
+  search?: (query: string) => Record<string, unknown>[] | undefined;
+  /** Answers a page fetch (the DeepSeek fetch tool) instead of the fixed page; undefined keeps that. */
+  fetchPage?: (url: string) => { title: string; content: string } | undefined;
 }
 
 /**
@@ -347,13 +351,14 @@ export interface MockOptions {
  * /v1/chat/completions, and a test page. No CORS headers on purpose, so the
  * extension must rely on its host permission like it does for real providers.
  */
-export async function startMockServer({ assistant = scriptedAssistant, pages = {}, extractAnswer }: MockOptions = {}) {
+export async function startMockServer({ assistant = scriptedAssistant, pages = {}, extractAnswer, search, fetchPage }: MockOptions = {}) {
   const chatRequests: ChatRequest[] = [];
   const extractRequests: ChatRequest[] = [];
   const lookRequests: ChatRequest[] = [];
   const searchRequests: { query: string; count?: number; ori_question?: string }[] = [];
   const fetchRequests: { url: string }[] = [];
   const webSearchRequests: ChatRequest[] = [];
+  const watchRequests: ChatRequest[] = [];
   /** Every path requested, to prove that nothing reached an attacker endpoint. */
   const hits: string[] = [];
   const transcriptions: { bytes: number; contentType: string }[] = [];
@@ -393,6 +398,8 @@ export async function startMockServer({ assistant = scriptedAssistant, pages = {
       if (!authorized) return void unauthorized();
       const body = JSON.parse((await readBody(req)).toString()) as { query: string; count?: number; ori_question?: string };
       searchRequests.push(body);
+      const custom = search?.(body.query);
+      if (custom) return void json({ results: custom });
       return void json({
         results: [
           { title: 'Braided cables last longer – Lab test', url: `http://${req.headers.host}/review.html`, snippet: 'short', summary: 'Braided cables survived 10x more bends.', rerank_score: 2.4, site_name: 'Cable Lab', date: '2026-06-01T00:00:00+00:00', authority: 3 },
@@ -408,6 +415,8 @@ export async function startMockServer({ assistant = scriptedAssistant, pages = {
       if (!authorized) return void unauthorized();
       const body = JSON.parse((await readBody(req)).toString()) as { url: string };
       fetchRequests.push(body);
+      const fetched = fetchPage?.(body.url);
+      if (fetched) return void json(fetched);
       if (body.url.includes('missing')) return void json({ error: { message: 'failed to fetch URL', type: 'not_found_error', param: null, code: 'invalid_request_error' } }, 404);
       return void json({ title: 'How long cables last', content: `# How long cables last\n\nFetched guide: braided cables last 10 years. (${body.url})` });
     }
@@ -458,6 +467,13 @@ export async function startMockServer({ assistant = scriptedAssistant, pages = {
       if (!authorized) return void unauthorized();
       const body = JSON.parse((await readBody(req)).toString()) as ChatRequest;
       if (body.tools && body.model === 'mock-notools') return void json({ error: { message: 'tools are not supported by this model' } }, 400);
+      // A watch's check: the condition holds when the page (not the condition) says "In stock".
+      if (textOf(body.messages[0]?.content).includes('You check whether a condition holds')) {
+        watchRequests.push(body);
+        const page = /<page[^>]*>([\s\S]*)<\/page/.exec(textOf(body.messages.at(-1)?.content))?.[1] ?? '';
+        const met = page.includes('In stock');
+        return void res.writeHead(200, { 'content-type': 'application/json' }).end(completion(JSON.stringify({ met, note: met ? 'The page says it is in stock.' : 'Still out of stock.', quotes: [met ? 'In stock' : 'Out of stock'] })));
+      }
       if (textOf(body.messages[0]?.content).includes('You extract information')) {
         extractRequests.push(body);
         return void res.writeHead(200, { 'content-type': 'application/json' }).end(completion(extractAnswer ?? 'Cable A: $9.99 (plain white). Cable B: $5.49 (braided black).'));
@@ -486,6 +502,7 @@ export async function startMockServer({ assistant = scriptedAssistant, pages = {
     searchRequests,
     fetchRequests,
     webSearchRequests,
+    watchRequests,
     transcriptions,
     hits,
     close: () => new Promise<void>((resolve) => server.close(() => resolve())),

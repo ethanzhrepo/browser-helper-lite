@@ -26,6 +26,8 @@ export interface Viewport {
   height: number;
   scrollX: number;
   scrollY: number;
+  /** Device pixels per CSS pixel (display density times zoom). */
+  pixelRatio: number;
 }
 
 export interface PageSnapshot {
@@ -116,6 +118,8 @@ export interface PageAgentApi {
   /** What a click at a point of the viewport (CSS pixels) would land on. */
   describePoint(point: { x: number; y: number }): PageResult<TargetInfo>;
   viewport(): Viewport;
+  /** True when the page is the one on screen (its tab is in front and the window is not minimized). */
+  shown(): boolean;
   /** Scrolls the element into view and returns its center in top-frame viewport pixels. */
   locate(index: number): PageResult<TargetPoint>;
   focus(index: number): PageResult<true>;

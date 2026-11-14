@@ -1,8 +1,8 @@
 import { tool } from 'ai';
 import { z } from 'zod';
 
-const index = z.number().int().min(1).describe('Element number from the latest page view, e.g. 12 for [12]');
-const url = z.string().describe('Absolute URL, e.g. https://www.example.com/page');
+const index = z.number().int().min(1).describe('Element number in the latest view, e.g. 12 for [12]');
+const url = z.string().describe('Absolute URL');
 
 const SEARCH_DESCRIPTION =
   'Search the web and return the top results (title, URL, snippet). Use it when the current site lacks the information, then verify on the source when possible.';
@@ -39,11 +39,28 @@ export const assistantTools = {
     inputSchema: z.object({ question: z.string() }),
   }),
   web_search: searchTool(SEARCH_DESCRIPTION),
+  watch_page: tool({
+    description:
+      'Keep an eye on a page for the user and notify them when a condition holds there (a price drops, tickets go on sale, a status changes). The page is read again on a timer, in the background, without touching it; the user confirms before it starts. Use it only when the user asks to be told later.',
+    inputSchema: z.object({
+      condition: z.string().describe('What must be true on the page, in the user\'s words and language, e.g. "The price of the 65W charger is under $20"'),
+      url: url.optional().describe('The page to watch; the current tab when left out'),
+      every_seconds: z.number().optional().describe('Seconds between checks when the user named a pace (e.g. 10, or 3600 for hourly); leave out otherwise. The user can change it when confirming.'),
+    }),
+  }),
+  research_pages: tool({
+    description:
+      'Read two or more web pages in one call (up to 12) and get short notes from each about one question. Use it for search results and for addresses the user gave, instead of reading or opening pages one by one.',
+    inputSchema: z.object({
+      question: z.string().describe('What to find on each page, e.g. "price, battery life and weight of the laptop"'),
+      urls: z.array(url).min(1).max(12).describe('Addresses from the search results'),
+    }),
+  }),
   navigate: tool({ description: 'Open a URL in the current tab.', inputSchema: z.object({ url }) }),
   click: tool({ description: 'Click an element.', inputSchema: z.object({ index }) }),
   click_at: tool({
     description:
-      'Click a point of the latest screenshot, for things that have no element number: canvas content, maps, embedded frames, icons without text. Whenever an element has a number, use click instead. Needs a screenshot of the page as it is now (look).',
+      'Click a point of the latest screenshot, given in its pixels, for things that have no element number: canvas content, maps, embedded frames, icons without text. Whenever an element has a number, use click instead. Needs a screenshot of the page as it is now: look again after the page scrolled or changed.',
     inputSchema: z.object({
       x: z.number().min(0).describe('Pixels from the left edge of the screenshot'),
       y: z.number().min(0).describe('Pixels from the top edge of the screenshot'),
@@ -120,7 +137,7 @@ export function toolsFor(search: { provider: string; deepseekFetch?: boolean }) 
 export const ELEMENT_TOOLS = new Set<string>(['click', 'type', 'hover', 'select_option']);
 
 /** Tools that only read; they never take over the tab. */
-export const READING_TOOLS = new Set<string>(['read_page', 'view_page', 'extract', 'look', 'web_search', 'read_url', 'ask_user']);
+export const READING_TOOLS = new Set<string>(['read_page', 'view_page', 'extract', 'look', 'web_search', 'read_url', 'research_pages', 'watch_page', 'ask_user']);
 
 /** Tools after which the model gets a fresh page view. */
 export const VIEW_AFTER = new Set<string>([

@@ -770,7 +770,11 @@ export function createPageAgent(): PageAgentApi {
     locate,
 
     viewport() {
-      return { width: innerWidth, height: innerHeight, scrollX: Math.round(scrollX), scrollY: Math.round(scrollY) };
+      return { width: innerWidth, height: innerHeight, scrollX: Math.round(scrollX), scrollY: Math.round(scrollY), pixelRatio: devicePixelRatio || 1 };
+    },
+
+    shown() {
+      return document.visibilityState === 'visible';
     },
 
     domClickAt({ x, y }) {

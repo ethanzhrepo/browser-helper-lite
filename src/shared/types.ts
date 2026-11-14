@@ -62,6 +62,8 @@ export interface AgentSettings {
   screenshots: 'auto' | 'main' | 'vision';
   /** Add a screenshot to a page view when its text is not enough (canvas, unnamed controls, failing steps). */
   autoScreenshot: boolean;
+  /** Keep a small picture of the page before each step, so a task can be replayed. Stored on this device only. */
+  recordSteps: boolean;
 }
 
 export type SearchEngineSetting = 'google' | 'bing' | 'duckduckgo' | 'custom';
@@ -97,6 +99,27 @@ export interface VoiceSettings {
   language: string;
   /** Send the message as soon as you stop speaking. */
   autoSend: boolean;
+  /** Read each reply aloud with the system's voices. */
+  speakReplies: boolean;
+  /** After a reply to a spoken question has been read, listen again. */
+  conversation: boolean;
+}
+
+/**
+ * A request saved from a finished task, to run again by typing its name
+ * after a slash. The steps are a hint for the next run, not a script: the
+ * assistant still looks at each page and is checked at each step.
+ */
+export interface SavedCommand {
+  id: string;
+  name: string;
+  /** The request as the user wrote it. */
+  prompt: string;
+  /** What the task did, one short line a step (see outlineOf). */
+  steps: string[];
+  /** The page the task started on. */
+  startUrl?: string;
+  createdAt: number;
 }
 
 export interface Settings {
@@ -108,6 +131,8 @@ export interface Settings {
   search: SearchSettings;
   voice: VoiceSettings;
   sitePolicies: Record<string, SitePolicy>;
+  /** Requests saved from finished tasks. */
+  commands: SavedCommand[];
   /** Ask GitHub once a day whether a newer release exists (an unpacked extension is not updated by Chrome). */
   checkUpdates: boolean;
   updatedAt: number;
@@ -146,9 +171,23 @@ export interface ContextSnapshot {
   capturedAt: number;
 }
 
+/** A picture sent with a message: a part of a page the user marked. Stored with the message, like attached pages. */
+export interface MessageImage {
+  /** Base64. */
+  data: string;
+  mediaType: 'image/jpeg';
+  width: number;
+  height: number;
+  /** The page it was cut from. */
+  url?: string;
+  title?: string;
+}
+
 export interface Usage {
   inputTokens?: number;
   outputTokens?: number;
+  /** How many of the input tokens the provider read from its prompt cache (and charged less for). */
+  cachedTokens?: number;
 }
 
 export type MessageRole = 'user' | 'assistant';
@@ -166,6 +205,11 @@ export interface MessageRecord {
   content: string;
   reasoning?: string;
   contexts?: ContextSnapshot[];
+  images?: MessageImage[];
+  /** The tab the user was on when they sent this. Kept so the message reads the same in every later call (see caching.ts). */
+  tab?: { title: string; url: string };
+  /** The saved command this request was started from; its steps go to the model as a hint. */
+  command?: Pick<SavedCommand, 'name' | 'steps' | 'startUrl'>;
   status: MessageStatus;
   error?: ErrorInfo;
   model?: ModelRef;

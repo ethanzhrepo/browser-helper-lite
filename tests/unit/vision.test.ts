@@ -31,6 +31,12 @@ describe('which models read images', () => {
     expect(seesImages('anthropic', 'claude-sonnet-5-5')).toBe(true);
     expect(seesImages('google', 'gemini-2.5-flash')).toBe(true);
     expect(seesImages('deepseek', 'deepseek-chat')).toBe(false);
+    // DeepSeek's Flash models read images, under its own name and behind other services.
+    expect(seesImages('deepseek', 'deepseek-flash')).toBe(true);
+    expect(seesImages('deepseek', 'deepseek-v4.1-flash')).toBe(true);
+    expect(seesImages('deepseek', 'deepseek-v4-pro')).toBe(false);
+    expect(seesImages('openai-compatible', 'deepseek/deepseek-v4-flash-0731')).toBe(true);
+    expect(seesImages('openai-compatible', 'gpt-6-luna')).toBe(true);
     expect(seesImages('openai', 'gpt-5-mini')).toBe(true);
     expect(seesImages('openai', 'gpt-4o')).toBe(true);
     expect(seesImages('openai', 'gpt-3.5-turbo')).toBe(false);
@@ -56,18 +62,21 @@ describe('which models read images', () => {
 
 describe('screenshot size', () => {
   it('is the capture in CSS pixels, whatever the display density', () => {
-    expect(screenSize({ width: 1200, height: 800 }, 1200)).toEqual({ width: 1200, height: 800, scale: 1 });
-    expect(screenSize({ width: 2400, height: 1600 }, 1200)).toEqual({ width: 1200, height: 800, scale: 1 });
+    expect(screenSize({ width: 1200, height: 800 }, 1)).toEqual({ width: 1200, height: 800, scale: 1 });
+    expect(screenSize({ width: 2400, height: 1600 }, 2)).toEqual({ width: 1200, height: 800, scale: 1 });
   });
 
   it('is scaled down to the longest edge a model keeps, and maps back by the scale', () => {
-    const large = screenSize({ width: 5120, height: 2880 }, 2560);
+    const large = screenSize({ width: 5120, height: 2880 }, 2);
     expect(large).toEqual({ width: 1280, height: 720, scale: 2 });
     expect(640 * large.scale).toBe(1280);
   });
 
   it('is never stretched when the capture is shorter than the viewport claims', () => {
     // 1280 CSS pixels wide, but only 520 of the 720 were captured.
-    expect(screenSize({ width: 1280, height: 520 }, 1280)).toEqual({ width: 1280, height: 520, scale: 1 });
+    expect(screenSize({ width: 1280, height: 520 }, 1)).toEqual({ width: 1280, height: 520, scale: 1 });
+    // Narrower too: a window 606 pixels wide shows the left part of a page laid out for 1280. A pixel is still a pixel.
+    expect(screenSize({ width: 606, height: 620 }, 1)).toEqual({ width: 606, height: 620, scale: 1 });
+    expect(screenSize({ width: 1212, height: 1240 }, 2)).toEqual({ width: 606, height: 620, scale: 1 });
   });
 });

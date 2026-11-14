@@ -121,7 +121,7 @@ test('connect a provider, attach page context and stream a reply', async () => {
   await ask(panel, 'What does the page say about plans?');
   const run = panel.getByTestId('agent-run');
   await expect(run).toHaveAttribute('data-status', 'done', { timeout: 20_000 });
-  await expect(run.locator('[data-tool="read_page"][data-status="done"]')).toBeVisible();
+  await expect(run.locator('[data-tool="read_page"][data-status="done"]')).toBeAttached();
   await expect(panel.getByTestId('assistant-message')).toHaveCount(3);
   const toolResult = server.chatRequests.at(-1)!.messages.find((m) => m.role === 'tool');
   expect(toolResult?.content).toContain('Plan B costs $65 per month');

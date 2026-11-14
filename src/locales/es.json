@@ -12,11 +12,13 @@
   "header": {
     "newChat": "Nueva conversación",
     "history": "Historial",
-    "settings": "Ajustes"
+    "settings": "Ajustes",
+    "watches": "Páginas vigiladas"
   },
   "menu": {
     "askSelection": "Preguntar sobre «%s»",
-    "summarize": "Resumir esta página"
+    "summarize": "Resumir esta página",
+    "askRegion": "Preguntar por una parte de la página"
   },
   "welcome": {
     "title": "Dos pasos para empezar",
@@ -48,7 +50,11 @@
     "actions": {
       "summarize": "Resumir esta página",
       "translate": "Traducir la selección o la página",
-      "explain": "Explicar el texto seleccionado"
+      "explain": "Explicar el texto seleccionado",
+      "prices": "Comparar precios en otras tiendas",
+      "reviews": "Resumir las opiniones",
+      "flaws": "Qué mirar antes de comprar",
+      "deal": "¿Es una buena oferta?"
     },
     "tip": "/ para comandos · @ para adjuntar una página, selección o pestaña",
     "body": "Pregunta sobre esta página o encárgame una tarea en tus pestañas.",
@@ -77,7 +83,13 @@
       "autoHint": "Trabaja solo. Pregunta antes de pagos, eliminaciones y otros pasos de alto riesgo.",
       "manualHint": "Lee y busca solo. Pregunta antes de cada cambio."
     },
-    "removeAttachment": "Quitar el adjunto"
+    "removeAttachment": "Quitar el adjunto",
+    "pickRegion": "Preguntar por una parte de la página",
+    "regionHint": "Arrastra para marcar la zona · Esc para cancelar",
+    "regionFailed": "No se pudo hacer la captura. Haz clic derecho en la página y elige «Preguntar por una parte de la página».",
+    "removeImage": "Quitar la imagen",
+    "imageAlt": "Parte de {{site}}",
+    "removeCommand": "Quitar el comando"
   },
   "context": {
     "unavailable": "Esta página no se puede leer",
@@ -112,6 +124,31 @@
       "label": "Extraer tablas",
       "description": "Los datos de la página en tablas Markdown",
       "prompt": "Extrae los datos estructurados de esta página (precios, planes, especificaciones, listas) como tablas Markdown."
+    },
+    "research": {
+      "label": "Investigar",
+      "description": "Varias fuentes, una tabla comparativa",
+      "prompt": "Investiga esto: busca en varias fuentes, lee unas ocho de las páginas más relevantes y compáralas en una tabla con las fuentes.\n\nPregunta: "
+    },
+    "prices": {
+      "label": "Comparar precios",
+      "description": "Otras tiendas, precio con envío",
+      "prompt": "Compara precios de este producto: busca el mismo modelo en otras tiendas y compara lo que pagaría con envío (precio, envío, impuestos y tasas, cupones). Dame una tabla con tienda, precio, envío, total, existencias y enlace, y di qué oferta es la mejor."
+    },
+    "reviews": {
+      "label": "Opiniones",
+      "description": "Lo que gusta y lo que no",
+      "prompt": "Resume las opiniones de este producto: la nota y cuántas opiniones hay, qué gusta, y los problemas que describen varios compradores (cita una para cada uno). No te quedes en la primera página: lee las más recientes y las peor valoradas. Di si alguna parece falsa."
+    },
+    "flaws": {
+      "label": "Ojo con esto",
+      "description": "Qué mirar antes de comprar",
+      "prompt": "Antes de comprar esto, ¿en qué debo fijarme? Mira quién lo vende y lo envía, devoluciones y garantía, costes extra (envío, impuestos, suscripciones), las especificaciones, fallos frecuentes en las malas opiniones y si el descuento es real. Lista solo lo importante."
+    },
+    "deal": {
+      "label": "¿Buena oferta?",
+      "description": "Si el descuento es real",
+      "prompt": "¿Es este precio una buena oferta? Comprueba si el descuento es real (el precio de los últimos meses, el precio en otras tiendas), compáralo con productos similares y dime: comprar ya, esperar o pasar, y por qué."
     }
   },
   "message": {
@@ -124,13 +161,19 @@
     "regenerate": "Regenerar",
     "editHint": "Sustituye este mensaje y las respuestas posteriores",
     "tokens": "↑{{input}} ↓{{output}}",
-    "tokensHint": "Tokens enviados y recibidos",
+    "tokensHint": "Tokens enviados y recibidos; los de caché cuestan menos",
     "toLatest": "Ir a lo último",
     "truncated": "parcial",
     "diagramError": "No se pudo dibujar este diagrama. Su código:",
     "copySvg": "Copiar SVG",
     "image": "Imagen",
-    "linkData": "La dirección de este enlace lleva datos (un correo, un código largo). Revísala y pulsa otra vez para abrirlo:"
+    "linkData": "La dirección de este enlace lleva datos (un correo, un código largo). Revísala y pulsa otra vez para abrirlo:",
+    "speak": "Leer en voz alta",
+    "stopSpeaking": "Detener la lectura",
+    "copyCsv": "Copiar CSV",
+    "downloadCsv": "Descargar CSV",
+    "sortBy": "Ordenar por esta columna",
+    "tokensCached": "↑{{input}} ↓{{output}} · {{cached}} en caché"
   },
   "history": {
     "title": "Historial",
@@ -166,7 +209,7 @@
       "about": "Acerca de",
       "agent": "Agente",
       "search": "Búsqueda",
-      "voice": "Entrada de voz"
+      "voice": "Voz"
     }
   },
   "connections": {
@@ -369,7 +412,9 @@
       "hand_off": "Pasarte el control",
       "read_page": "Leer la página",
       "view_page": "Mirar la página",
-      "click_at": "Pulsar {{target}} en {{x}}, {{y}}"
+      "click_at": "Pulsar {{target}} en {{x}}, {{y}}",
+      "research_pages": "Investigar: {{question}}",
+      "watch_page": "Vigilar {{site}}: {{condition}}"
     },
     "directions": {
       "up": "arriba",
@@ -397,7 +442,8 @@
         "frame": "Actúa dentro del marco de otro sitio, que el asistente no puede leer.",
         "download": "Descarga un archivo. Permite solo los archivos que esperas.",
         "sensitivePage": "Esta página gestiona la seguridad de la cuenta, claves o pagos, así que cada cambio pregunta.",
-        "unseen": "El asistente no puede leer lo que está dibujado aquí. Revisa la imagen."
+        "unseen": "El asistente no puede leer lo que está dibujado aquí. Revisa la imagen.",
+        "watch": "La página se vuelve a leer en segundo plano, sin tocarla, durante 30 días como máximo. Tu modelo solo se consulta cuando cambia lo que se vigila."
       },
       "allowOnce": "Permitir una vez",
       "allowTask": "Permitir en esta tarea",
@@ -479,6 +525,38 @@
       "title": "Esta página intentó dar instrucciones al asistente",
       "titleHidden": "Esta página esconde instrucciones para asistentes de IA",
       "body": "Se ignoraron. Hasta que termine la tarea, los cambios y los sitios nuevos necesitan tu aprobación."
+    },
+    "details": "Pasos",
+    "activity": {
+      "search": "Buscando: {{query}}",
+      "research": "Leyendo páginas {{progress}}",
+      "open": "Abriendo {{site}}",
+      "read": "Leyendo la página",
+      "act": "Trabajando en {{site}}",
+      "actHere": "Trabajando en la página"
+    },
+    "summary": {
+      "searches_one": "{{count}} búsqueda",
+      "searches_many": "{{count}} búsquedas",
+      "searches_other": "{{count}} búsquedas",
+      "sites_one": "{{count}} sitio",
+      "sites_many": "{{count}} sitios",
+      "sites_other": "{{count}} sitios"
+    },
+    "replay": {
+      "open": "Repetición",
+      "title": "Repetición",
+      "end": "La página al terminar la tarea.",
+      "empty": "No se guardaron imágenes de esta tarea.",
+      "play": "Reproducir",
+      "pause": "Pausa",
+      "previous": "Paso anterior",
+      "next": "Paso siguiente"
+    },
+    "save": {
+      "button": "Guardar como comando",
+      "name": "Nombre del comando",
+      "saved": "Guardado. Escribe /{{name}} para repetirlo."
     }
   },
   "agentSettings": {
@@ -502,7 +580,13 @@
     },
     "setVisionModel": "Elegir un modelo de visión",
     "autoScreenshot": "Mirar la pantalla cuando el texto no basta",
-    "autoScreenshotHint": "En páginas con canvas, botones sin nombre y pasos fallidos. Envía una captura al modelo; nunca en páginas de inicio de sesión, cuenta o pago."
+    "autoScreenshotHint": "En páginas con canvas, botones sin nombre y pasos fallidos. Envía una captura al modelo; nunca en páginas de inicio de sesión, cuenta o pago.",
+    "recordSteps": "Guardar imágenes para la repetición",
+    "recordStepsHint": "Una captura pequeña antes de cada paso, guardada en este dispositivo. No en páginas de inicio de sesión, cuenta o pago.",
+    "commands": {
+      "title": "Comandos guardados",
+      "hint": "Cuando una tarea termine, guárdala como comando y repítela escribiendo su nombre tras una barra."
+    }
   },
   "voice": {
     "start": "Entrada de voz",
@@ -525,8 +609,8 @@
       "deniedBody": "Permítelo desde el icono a la derecha de la barra de direcciones e inténtalo de nuevo.",
       "retry": "Reintentar"
     },
-    "title": "Entrada de voz",
-    "description": "Pulsa el micrófono para hablar. Pulsa otra vez, o haz una pausa de dos segundos, para terminar.",
+    "title": "Voz",
+    "description": "Haz clic en el micrófono y habla; haz clic otra vez o haz una pausa de dos segundos para terminar. Las respuestas se pueden leer en voz alta.",
     "engine": "Reconocimiento",
     "engines": {
       "browser": {
@@ -547,7 +631,11 @@
     "micHint": "Se abre una pestaña una vez para pedirlo: los paneles laterales no pueden.",
     "micGranted": "Browser Helper puede usar el micrófono.",
     "micAllowed": "Permitido",
-    "allowMic": "Permitir el micrófono"
+    "allowMic": "Permitir el micrófono",
+    "speakReplies": "Leer las respuestas en voz alta",
+    "speakRepliesHint": "Usa las voces de tu sistema; no se envía nada.",
+    "conversation": "Volver a escuchar tras la lectura",
+    "conversationHint": "Tras una pregunta hablada, el micrófono se reabre cuando termina la lectura."
   },
   "search": {
     "title": "Búsqueda",
@@ -621,5 +709,36 @@
     "running": "Trabajando en otra pestaña: {{title}}",
     "waiting": "Te necesita en otra pestaña: {{title}}",
     "show": "Ver"
+  },
+  "watch": {
+    "title": "Páginas vigiladas",
+    "empty": "Pide al asistente que te avise cuando pase algo en una página, p. ej. «avísame cuando baje de 20 €».",
+    "status": {
+      "active": "Vigilando",
+      "paused": "En pausa",
+      "met": "Ha ocurrido",
+      "failed": "Detenida: las comprobaciones fallaban",
+      "expired": "Terminó a los 30 días"
+    },
+    "checkFailed": "Comprobación fallida: {{error}}",
+    "checkNow": "Comprobar ahora",
+    "pause": "Pausar",
+    "resume": "Vigilar de nuevo",
+    "footnote": "Una página vigilada se abre en segundo plano y solo se lee. Tu modelo se consulta cuando cambia lo vigilado, no en cada comprobación.",
+    "notification": {
+      "metTitle": "Ha ocurrido",
+      "met": "{{site}}: {{condition}}",
+      "failedTitle": "Una vigilancia se detuvo",
+      "failed": "{{site}} no se pudo comprobar varias veces seguidas: {{condition}}"
+    },
+    "pace": "Comprobar",
+    "liveHint": "A este ritmo, la página queda abierta en un grupo de pestañas contraído.",
+    "groupTitle": "Vigilando",
+    "interval": {
+      "seconds": "cada {{n}} s",
+      "minutes": "cada {{n}} min",
+      "hours": "cada {{n}} h",
+      "day": "cada día"
+    }
   }
 }

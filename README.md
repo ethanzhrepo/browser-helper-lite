@@ -9,9 +9,13 @@ An AI assistant in Chrome's side panel that works with the model and API key of 
 ## Features
 
 - **Any model, your own key**: OpenAI, Anthropic, Google Gemini, DeepSeek, and any OpenAI-compatible API (Qwen, Kimi, GLM, Doubao, OpenRouter, Groq, Ollama, LM Studio and more).
-- **Chat about pages**: summaries and comparisons of the page you are on, other tabs with `@`, Markdown with code, math and Mermaid diagrams, and voice input.
+- **Chat about pages**: summaries and comparisons of the page you are on, other tabs with `@`, Markdown with code, math and Mermaid diagrams. Mark a part of the page to ask about it. Speak your question and have the reply read aloud.
+- **Shopping**: on a product page, one click compares prices at other stores by what you would pay delivered, sums up the reviews (also the low-rated ones past the first page), lists what to watch out for, or checks whether a discount is real. It never places an order.
+- **Research**: reads a dozen sources side by side and compares them in a table you can sort and export as CSV.
+- **Watches pages for you**: "tell me when this drops below $20". It looks at the page again as often as you choose (every five minutes by default, down to every second), in the background, and notifies you. It only reads, you confirm each watch, and your model is asked only when what it watches on the page changes.
 - **Acts on websites**: searches, clicks, types, scrolls and opens tabs to finish a task, and hands CAPTCHAs and logins back to you.
 - **Sees what text misses**: on canvas apps, maps and buttons without labels it looks at a screenshot, with your current model if it reads images or with a separate vision model, and can click by position. You approve clicks on content it cannot read, with a picture of where they land.
+- **Replay and repeat**: watch a finished task again picture by picture, with a ring where it clicked, and save it as a command to run again by name.
 - **You stay in control**: three modes, Query (read only), Auto (asks before payments, deletions and other high-risk steps) and Manual approval (asks before every change), plus per-site rules. Pause, stop or take over at any time.
 - **Quick to reach**: open the panel with <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>H</kbd>, or right-click a page to summarize it or ask about the selected text.
 - **Defends against prompt injection**: hidden page text never reaches the model, page content cannot pass as instructions, and links that would carry your data out need your approval. See [docs/security](docs/security/README.md).
@@ -87,7 +91,9 @@ The design notes ([docs/product-design.md](docs/product-design.md)) and security
 
 Conversations are stored locally in the browser. Requests go directly from the extension to your model provider. API keys stay in the extension's storage and are never exposed to web pages. Requests to OpenAI set `store: false`. Screenshots the assistant looks at go to the model that reads them, and are not taken by themselves on sign-in, account or payment pages. Deleting a conversation erases its messages and the pages attached to them.
 
-A web search sends the query to the search provider you choose. With DeepSeek search, public pages the assistant only needs to read are fetched by DeepSeek instead of opened in a tab, so their addresses go to DeepSeek (turn it off under Settings › Search). You can also send the first 128 characters of your message with each search for better results; that is off unless you turn it on. An export is encrypted with a password of your choice (AES-256-GCM, key from PBKDF2-SHA-256); API keys are exported only in an encrypted file.
+A web search sends the query to the search provider you choose. With DeepSeek search, public pages the assistant only needs to read are fetched by DeepSeek instead of opened in a tab, so their addresses go to DeepSeek (turn it off under Settings › Search). You can also send the first 128 characters of your message with each search for better results; that is off unless you turn it on. A watched page is opened in a background tab and its text goes to your model, like any page the assistant reads, when the watch starts and whenever the part of the page it depends on changes; a watch faster than once a minute keeps its page open in a collapsed tab group. Watches end after 30 days and are listed in the panel. Pictures kept for the replay, and parts of pages you mark, are stored in the browser with their conversation; the marked parts are sent to the model that reads images. Replies are read aloud by your system's voices, on your device.
+
+An export is encrypted with a password of your choice (AES-256-GCM, key from PBKDF2-SHA-256); API keys are exported only in an encrypted file.
 
 Once a day the extension asks GitHub for this project's latest release number, to tell you about updates. The request carries nothing about you; turn it off under Settings › About.
 

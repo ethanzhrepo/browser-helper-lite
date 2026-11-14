@@ -74,16 +74,24 @@ test.describe.serial('assistant operating pages', () => {
     await expect(site.locator('browser-helper-overlay')).toHaveCount(0);
     expect(await groupOf(panel, site.url())).toEqual({ title: 'Browser Helper', color: 'grey' });
 
+    // The finished run says what it did in a few words; the steps (type, click, look…) show only when asked for.
+    await expect(run.getByTestId('run-activity')).toHaveText('1 search · 1 site');
+    await expect(run.getByTestId('run-steps')).toBeHidden();
+    await run.getByTestId('run-details').click();
     for (const tool of ['web_search', 'view_page', 'type', 'extract', 'look', 'click']) {
       await expect(run.locator(`[data-testid="agent-action"][data-tool="${tool}"][data-status="done"]`).first()).toBeVisible();
     }
+    await run.getByTestId('run-details').click();
+    await expect(run.getByTestId('run-steps')).toBeHidden();
     // Search results and page views reach the model; older views are pruned.
     const last = JSON.stringify(server.chatRequests.at(-1)!.messages);
     expect(last).toContain('USB-C cable buying guide');
     expect(last).toContain('Older page view removed');
     expect(last.match(/<page_view id=/g)).toHaveLength(1);
     expect(server.chatRequests.at(-1)!.tools?.map((t) => t.function.name)).toContain('read_page');
-    expect(JSON.stringify(server.extractRequests[0]?.messages)).toContain('Cable B');
+    // The results page is short: "extract" hands it over whole instead of asking a second model about it.
+    expect(server.extractRequests).toHaveLength(0);
+    expect(JSON.stringify(server.chatRequests.at(-1)!.messages)).toContain('The page is short, so here is all of it');
     const image = server.lookRequests[0]?.messages[0]?.content;
     expect(Array.isArray(image) && image.some((p) => (p.image_url?.url.length ?? 0) > 1000)).toBe(true);
     console.log('driver used:', await run.getByTestId('driver-badge').textContent());
@@ -143,7 +151,10 @@ test.describe.serial('assistant operating pages', () => {
     const { site, panel } = await openSiteAndPanel(context, extensionId, `${server.origin}/shop.html`);
     await startTurn(panel, 'TEST-STOP: keep waiting');
     const run = panel.getByTestId('agent-run');
-    await expect(run.locator('[data-tool="wait"]').first()).toBeVisible({ timeout: 20_000 });
+    await expect(run.locator('[data-tool="wait"]').first()).toBeAttached({ timeout: 20_000 });
+    // "Wait 1 s" is not shown: the run says which site it is working on.
+    await expect(run.locator('[data-tool="wait"]').first()).toBeHidden();
+    await expect(run.getByTestId('run-activity')).toHaveText(/^Working on /);
 
     await site.mouse.click(400, 300);
     await expect(run).toHaveAttribute('data-status', 'paused', { timeout: 10_000 });

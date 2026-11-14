@@ -19,6 +19,7 @@ export const DEFAULT_AGENT_SETTINGS: AgentSettings = {
   notifications: true,
   screenshots: 'auto',
   autoScreenshot: true,
+  recordSteps: true,
 };
 
 export const DEFAULT_SEARCH_SETTINGS: SearchSettings = {
@@ -35,6 +36,8 @@ export const DEFAULT_VOICE_SETTINGS: VoiceSettings = {
   engine: 'browser',
   language: 'auto',
   autoSend: false,
+  speakReplies: false,
+  conversation: false,
 };
 
 export function defaultSettings(): Settings {
@@ -47,6 +50,7 @@ export function defaultSettings(): Settings {
     search: DEFAULT_SEARCH_SETTINGS,
     voice: DEFAULT_VOICE_SETTINGS,
     sitePolicies: {},
+    commands: [],
     checkUpdates: true,
     updatedAt: 0,
   };

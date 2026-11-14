@@ -1,4 +1,4 @@
-import { ArrowRight, FileText, Languages, Plug, Sparkles, TextQuote } from 'lucide-react';
+import { ArrowRight, BadgePercent, FileText, Languages, MessagesSquare, Plug, Scale, ShieldAlert, Sparkles, TextQuote } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { SlashCommand } from '../../src/chat/commands';
@@ -9,6 +9,14 @@ const QUICK_ACTIONS: { id: SlashCommand['id']; icon: typeof FileText }[] = [
   { id: 'summarize', icon: FileText },
   { id: 'translate', icon: Languages },
   { id: 'explain', icon: TextQuote },
+];
+
+/** On a product page. */
+const SHOPPING_ACTIONS: { id: SlashCommand['id']; icon: typeof FileText }[] = [
+  { id: 'prices', icon: Scale },
+  { id: 'reviews', icon: MessagesSquare },
+  { id: 'flaws', icon: ShieldAlert },
+  { id: 'deal', icon: BadgePercent },
 ];
 
 const AGENT_EXAMPLES = ['plans', 'compare', 'process'] as const;
@@ -39,8 +47,10 @@ function Suggestion({ icon: Icon, children, onClick }: { icon: typeof FileText; 
   );
 }
 
-export function EmptyState({ hasModel, onQuickAction, onExample }: {
+export function EmptyState({ hasModel, product, onQuickAction, onExample }: {
   hasModel: boolean;
+  /** The tab shows a product: offer what people ask when shopping. */
+  product?: boolean;
   onQuickAction: (id: SlashCommand['id']) => void;
   onExample: (text: string) => void;
 }) {
@@ -76,17 +86,21 @@ export function EmptyState({ hasModel, onQuickAction, onExample }: {
           <p className="max-w-xs text-sm leading-relaxed text-muted">{t('empty.body')}</p>
         </div>
         <div className="mx-auto flex w-full max-w-sm flex-col gap-2">
-          {QUICK_ACTIONS.map(({ id, icon }) => (
+          {(product ? [...SHOPPING_ACTIONS, QUICK_ACTIONS[0]!] : QUICK_ACTIONS).map(({ id, icon }) => (
             <Suggestion key={id} icon={icon} onClick={() => onQuickAction(id)}>
-              {t(`empty.actions.${id}`)}
+              <span data-testid={`quick-${id}`}>{t(`empty.actions.${id}`)}</span>
             </Suggestion>
           ))}
-          <p className="px-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-faint">{t('empty.tasksTitle')}</p>
-          {AGENT_EXAMPLES.map((id) => (
-            <Suggestion key={id} icon={Sparkles} onClick={() => onExample(t(`empty.examples.${id}`))}>
-              {t(`empty.examples.${id}`)}
-            </Suggestion>
-          ))}
+          {!product && (
+            <>
+              <p className="px-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-faint">{t('empty.tasksTitle')}</p>
+              {AGENT_EXAMPLES.map((id) => (
+                <Suggestion key={id} icon={Sparkles} onClick={() => onExample(t(`empty.examples.${id}`))}>
+                  {t(`empty.examples.${id}`)}
+                </Suggestion>
+              ))}
+            </>
+          )}
         </div>
         <p className="text-center text-xs leading-relaxed text-faint">
           {t('empty.tip')}

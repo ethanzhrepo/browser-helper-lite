@@ -14,39 +14,60 @@ async function decode(base64: string): Promise<ImageBitmap> {
   return createImageBitmap(new Blob([bytes], { type: 'image/jpeg' }));
 }
 
-async function encode(canvas: OffscreenCanvas): Promise<string> {
-  const bytes = new Uint8Array(await (await canvas.convertToBlob({ type: 'image/jpeg', quality: JPEG_QUALITY })).arrayBuffer());
+async function encode(canvas: OffscreenCanvas, quality = JPEG_QUALITY): Promise<string> {
+  const bytes = new Uint8Array(await (await canvas.convertToBlob({ type: 'image/jpeg', quality })).arrayBuffer());
   let binary = '';
   for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
   return btoa(binary);
 }
 
 /**
- * The size of the image a capture becomes. One capture pixel is some number
- * of CSS pixels (a dense display captures two or three per CSS pixel); the
- * image is the capture in CSS pixels, scaled down to fit MAX_SCREEN_EDGE.
+ * The size of the image a capture becomes. A capture has `pixelRatio` pixels
+ * for each CSS pixel (two or three on a dense display, more when the page is
+ * zoomed in); the image is the capture in CSS pixels, scaled down to fit
+ * MAX_SCREEN_EDGE.
  *
- * The scale comes from the widths alone and applies to both axes, so the
- * image is never stretched: a capture may be shorter than the page's
- * `innerHeight` says (an emulated or partly hidden viewport), and stretching
- * it would move every coordinate.
+ * The capture is not assumed to cover the viewport: it may be shorter or
+ * narrower than the page says its viewport is (a window smaller than an
+ * emulated viewport shows only its top left part). Its own size and the
+ * pixel ratio say what it shows; stretching it to the viewport would move
+ * every coordinate.
  */
-export function screenSize(capture: { width: number; height: number }, viewportWidth: number): { width: number; height: number; scale: number } {
-  const cssPerPixel = viewportWidth / Math.max(capture.width, 1);
-  const cssHeight = capture.height * cssPerPixel;
-  const shrink = Math.min(1, MAX_SCREEN_EDGE / Math.max(viewportWidth, cssHeight, 1));
-  const width = Math.max(1, Math.round(viewportWidth * shrink));
-  return { width, height: Math.max(1, Math.round(cssHeight * shrink)), scale: viewportWidth / width };
+export function screenSize(capture: { width: number; height: number }, pixelRatio: number): { width: number; height: number; scale: number } {
+  const ratio = pixelRatio > 0 ? pixelRatio : 1;
+  const cssWidth = capture.width / ratio;
+  const cssHeight = capture.height / ratio;
+  const shrink = Math.min(1, MAX_SCREEN_EDGE / Math.max(cssWidth, cssHeight, 1));
+  const width = Math.max(1, Math.round(cssWidth * shrink));
+  return { width, height: Math.max(1, Math.round(cssHeight * shrink)), scale: cssWidth / width };
 }
 
 /** Scales a capture to the image the model gets; `scale` is CSS pixels per image pixel, on both axes. */
-export async function fitScreenshot(base64: string, viewport: { width: number }): Promise<{ image: string; width: number; height: number; scale: number }> {
+export async function fitScreenshot(base64: string, pixelRatio: number): Promise<{ image: string; width: number; height: number; scale: number }> {
   const bitmap = await decode(base64);
-  const size = screenSize(bitmap, viewport.width);
+  const size = screenSize(bitmap, pixelRatio);
   const canvas = new OffscreenCanvas(size.width, size.height);
   canvas.getContext('2d')!.drawImage(bitmap, 0, 0, size.width, size.height);
   bitmap.close();
   return { image: await encode(canvas), ...size };
+}
+
+const THUMBNAIL_WIDTH = 640;
+
+/**
+ * A small copy of a capture, for the replay: enough to see where the
+ * assistant was and what it clicked. `cssWidth` is how many CSS pixels of the
+ * page its width shows, to place a click on it.
+ */
+export async function thumbnail(base64: string, pixelRatio: number): Promise<{ image: string; width: number; height: number; cssWidth: number }> {
+  const bitmap = await decode(base64);
+  const width = Math.min(THUMBNAIL_WIDTH, bitmap.width);
+  const height = Math.max(1, Math.round((bitmap.height * width) / Math.max(bitmap.width, 1)));
+  const cssWidth = bitmap.width / (pixelRatio > 0 ? pixelRatio : 1);
+  const canvas = new OffscreenCanvas(width, height);
+  canvas.getContext('2d')!.drawImage(bitmap, 0, 0, width, height);
+  bitmap.close();
+  return { image: await encode(canvas, 0.6), width, height, cssWidth };
 }
 
 const PREVIEW_WIDTH = 320;

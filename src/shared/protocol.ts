@@ -62,4 +62,32 @@ export interface DataClearResult {
   ok: boolean;
 }
 
-export type RuntimeRequest = ConnectionTestRequest | SearchTestRequest | TranscribeRequest | DataClearRequest;
+/**
+ * A screenshot of a tab's viewport, for the part of it the user marked. Taken
+ * in the background: when Chrome does not let the extension capture the tab
+ * (no access to all sites), the debugger does it.
+ */
+export interface RegionCaptureRequest {
+  type: 'region.capture';
+  tabId: number;
+}
+
+export interface RegionCaptureResult {
+  ok: boolean;
+  /** Base64. */
+  image?: string;
+  mediaType?: 'image/png' | 'image/jpeg';
+}
+
+/** Something the user does to a watch in the panel; done in the background, which holds the timers. */
+export type WatchActionRequest = { type: 'watch.action'; id: string } & (
+  | { action: 'check' | 'pause' | 'resume' | 'delete' }
+  /** How often to look, in seconds. */
+  | { action: 'interval'; seconds: number }
+);
+
+export interface WatchActionResult {
+  ok: boolean;
+}
+
+export type RuntimeRequest = ConnectionTestRequest | SearchTestRequest | TranscribeRequest | DataClearRequest | RegionCaptureRequest;

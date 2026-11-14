@@ -10,7 +10,9 @@ export type PanelRequest =
   /** Attach the selected text and wait for the question. */
   | { kind: 'selection'; context: ContextSnapshot; at: number }
   /** Summarize the page; `context` is missing when the page could not be read from the menu. */
-  | { kind: 'summarize'; context?: ContextSnapshot; at: number };
+  | { kind: 'summarize'; context?: ContextSnapshot; at: number }
+  /** Let the user mark a part of the page to ask about. */
+  | { kind: 'region'; at: number };
 
 const PREFIX = 'panelRequest:';
 const keyFor = (tabId: number) => `${PREFIX}${tabId}`;

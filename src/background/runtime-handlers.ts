@@ -10,6 +10,8 @@ import type {
   ConnectionTestRequest,
   ConnectionTestResult,
   DataClearRequest,
+  RegionCaptureRequest,
+  RegionCaptureResult,
   DataClearResult,
   RuntimeRequest,
   SearchTestRequest,
@@ -17,10 +19,12 @@ import type {
   TranscribeRequest,
   TranscribeResult,
 } from '../shared/protocol';
+import { ENABLE_CDP_DRIVER } from '../shared/build-flags';
 import { clearConversations } from '../storage/db';
 import { getApiKey, loadSettings } from '../storage/settings';
 import { stopAllTasks } from './agent-service';
 import { isExtensionPage } from './trust';
+import { clearWatches } from './watch-service';
 
 export async function testConnection(request: ConnectionTestRequest): Promise<ConnectionTestResult> {
   const apiKey = request.apiKey || (request.connectionId ? await getApiKey(request.connectionId) : undefined);
@@ -69,6 +73,7 @@ async function clearData(request: DataClearRequest): Promise<DataClearResult> {
     await stopAllTasks();
     await clearConversations();
     if (request.scope === 'everything') {
+      await clearWatches();
       await browser.storage.local.clear();
       await browser.storage.session.clear();
       // Site access granted at runtime goes too; access a build declares itself cannot be removed.
@@ -78,6 +83,36 @@ async function clearData(request: DataClearRequest): Promise<DataClearResult> {
     return { ok: true };
   } catch (error) {
     console.error('Could not erase the data', error);
+    return { ok: false };
+  }
+}
+
+/**
+ * A screenshot of the visible tab. Chrome allows it with access to all sites
+ * or right after the user used the extension on the tab (its menu, its
+ * shortcut); otherwise the debugger takes it and lets go at once.
+ */
+async function captureRegion(request: RegionCaptureRequest): Promise<RegionCaptureResult> {
+  try {
+    let tab = await browser.tabs.get(request.tabId);
+    if (!tab.active) tab = (await browser.tabs.update(request.tabId, { active: true })) ?? tab;
+    try {
+      const dataUrl = await browser.tabs.captureVisibleTab(tab.windowId, { format: 'png' });
+      return { ok: true, image: dataUrl.slice(dataUrl.indexOf(',') + 1), mediaType: 'image/png' };
+    } catch (error) {
+      if (!ENABLE_CDP_DRIVER) throw error;
+      const target = { tabId: request.tabId };
+      // Attached already (the assistant is working there): use it and leave it attached.
+      const attached = await browser.debugger.attach(target, '1.3').then(() => true, () => false);
+      try {
+        const shot = (await browser.debugger.sendCommand(target, 'Page.captureScreenshot', { format: 'png' })) as { data: string };
+        return { ok: true, image: shot.data, mediaType: 'image/png' };
+      } finally {
+        if (attached) await browser.debugger.detach(target).catch(() => undefined);
+      }
+    }
+  } catch (error) {
+    console.warn('Could not take the screenshot', error);
     return { ok: false };
   }
 }
@@ -96,6 +131,10 @@ export function registerRuntimeHandlers(): void {
     }
     if (message?.type === 'stt.transcribe') {
       void transcribe(message).then(sendResponse);
+      return true;
+    }
+    if (message?.type === 'region.capture') {
+      void captureRegion(message).then(sendResponse);
       return true;
     }
     if (message?.type === 'data.clear') {

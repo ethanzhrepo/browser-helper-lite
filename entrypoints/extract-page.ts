@@ -1,6 +1,7 @@
 import { Readability } from '@mozilla/readability';
 import TurndownService from 'turndown';
 import type { PageExtraction } from '../src/browser/page-context';
+import { describeProduct, productFromJsonLd } from '../src/browser/product';
 import { isTransparentColor } from '../src/browser/visibility';
 
 const HIDDEN_SAMPLE = 4000;
@@ -26,12 +27,21 @@ export default defineUnlistedScript((): PageExtraction => {
   } finally {
     for (const el of marked) el.removeAttribute(mark);
   }
+  // A list of choices says which one is chosen only in the live page; write it into the copy, so the text can say it.
+  const lists = [...document.querySelectorAll('select')];
+  for (const [index, copy] of [...clone.querySelectorAll('select')].entries()) {
+    const chosen = lists[index]?.selectedIndex ?? -1;
+    for (const [at, option] of [...copy.options].entries()) option.toggleAttribute('selected', at === chosen);
+  }
   for (const el of clone.querySelectorAll(`[${mark}]`)) {
     if (hiddenText.length < HIDDEN_SAMPLE) hiddenText += ` ${el.textContent ?? ''}`;
     el.remove();
   }
   hiddenText = hiddenText.replace(/\s+/g, ' ').trim().slice(0, HIDDEN_SAMPLE);
-  const extra = hiddenText ? { hiddenText } : {};
+  // A product page says its price, stock and rating in its metadata; that goes in front of the text.
+  const product = productFromJsonLd([...document.querySelectorAll('script[type="application/ld+json"]')].map((script) => script.textContent ?? '').filter((source) => source.length < 200_000));
+  const lead = product ? `${describeProduct(product)}\n\n` : '';
+  const extra = { ...(hiddenText ? { hiddenText } : {}), ...(product ? { product: true } : {}) };
 
   const bodyText = normalizeText(document.body?.innerText ?? '');
   const visibleBody = clone.body?.innerHTML ?? '';
@@ -39,12 +49,12 @@ export default defineUnlistedScript((): PageExtraction => {
     const article = new Readability(clone.cloneNode(true) as Document).parse();
     const articleText = article?.textContent?.trim() ?? '';
     if (article?.content && articleText.length >= Math.min(1000, bodyText.length * 0.5)) {
-      return { ...base, ...extra, markdown: toMarkdown(article.content), method: 'readability' };
+      return { ...base, ...extra, markdown: lead + toMarkdown(article.content), method: 'readability' };
     }
   } catch {
     // Fall through to the whole body.
   }
-  return { ...base, ...extra, markdown: toMarkdown(visibleBody), method: 'innerText' };
+  return { ...base, ...extra, markdown: lead + toMarkdown(visibleBody), method: 'innerText' };
 });
 
 /** Marks elements whose text a person cannot see. Returns them so the marks can be removed again. */
@@ -88,6 +98,14 @@ function isHidden(el: Element, pageWidth: number, pageHeight: number): boolean {
 function toMarkdown(html: string): string {
   const turndown = new TurndownService({ headingStyle: 'atx', codeBlockStyle: 'fenced' });
   turndown.remove(['script', 'style', 'noscript', 'template']);
+  // The choices of a list (sizes, lengths, colors) are part of what a page offers; plain text conversion drops them.
+  turndown.addRule('choices', {
+    filter: 'select',
+    replacement: (_content, node) => {
+      const options = [...(node as HTMLSelectElement).options].slice(0, 30).map((option) => `${(option.textContent ?? '').replace(/\s+/g, ' ').trim().slice(0, 60)}${option.hasAttribute('selected') ? ' (chosen)' : ''}`);
+      return options.length > 0 ? ` [choices: ${options.join(' | ')}] ` : '';
+    },
+  });
   turndown.addRule('images', {
     filter: 'img',
     replacement: (_content, node) => {

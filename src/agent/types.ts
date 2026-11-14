@@ -19,6 +19,8 @@ export interface AgentAction {
   status: ActionStatus;
   /** Shown to the model in later steps; clipped. */
   result?: string;
+  /** Where a click or a pointer landed, in CSS pixels of the viewport (for the replay). */
+  point?: { x: number; y: number };
 }
 
 /** One model call that used tools: the text it wrote first, then its tool calls. */
@@ -27,6 +29,30 @@ export interface AgentStep {
   url?: string;
   thought?: string;
   actions: AgentAction[];
+  /** A picture of the page before this step was stored for the replay (see StepShot). */
+  shot?: boolean;
+}
+
+/**
+ * A small screenshot of the tab before a step that acted on it, or after the
+ * last one. Kept apart from the task: a task is sent to the panel many times
+ * a second while it runs, and pictures would make that heavy.
+ */
+export interface StepShot {
+  /** `${taskId}:${step}`. */
+  id: string;
+  taskId: string;
+  conversationId: string;
+  /** The step's index; one past the last step for the picture taken at the end. */
+  step: number;
+  /** Base64 JPEG. */
+  image: string;
+  width: number;
+  height: number;
+  /** How many CSS pixels of the page the picture's width shows. */
+  cssWidth: number;
+  url: string;
+  at: number;
 }
 
 export type HandoffReason = 'captcha' | 'login' | 'verification' | 'other';
@@ -70,6 +96,8 @@ export type RiskReason =
   | 'frame'
   /** A click by coordinates on drawn content (a canvas, a video), which the extension cannot read. */
   | 'unseen'
+  /** Starts a watch: the page will be read again and again in the background until the condition holds. */
+  | 'watch'
   /** Downloads a file (a program is high risk). */
   | 'download'
   /** Account security, credentials, payments or a cloud console: every change is confirmed. */
@@ -132,7 +160,7 @@ export type ApprovalDecision = 'allowOnce' | 'allowTask' | 'allowSite' | 'deny';
 
 export type WaitResponse =
   /** `actionId` names the action the user saw, so an answer never applies to another one. */
-  | { kind: 'approval'; actionId: string; decision: ApprovalDecision }
+  | { kind: 'approval'; actionId: string; decision: ApprovalDecision; /** For a watch: how often to look, as the user chose on the card. */ everySeconds?: number }
   | { kind: 'answer'; text: string }
   | { kind: 'continue' }
   | { kind: 'permission'; granted: boolean };

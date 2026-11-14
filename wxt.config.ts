@@ -70,6 +70,8 @@ export default defineConfig({
       'tabs',
       'tabGroups',
       'notifications',
+      // Timers for watched pages: they wake the extension to look at a page again.
+      'alarms',
       // "Ask about the selection" and "Summarize this page" in the page's right-click menu.
       'contextMenus',
       // Favicons through Chrome's local service, so our pages never load remote images.

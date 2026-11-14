@@ -12,11 +12,13 @@
   "header": {
     "newChat": "Nouvelle conversation",
     "history": "Historique",
-    "settings": "Paramètres"
+    "settings": "Paramètres",
+    "watches": "Pages surveillées"
   },
   "menu": {
     "askSelection": "Interroger sur « %s »",
-    "summarize": "Résumer cette page"
+    "summarize": "Résumer cette page",
+    "askRegion": "Poser une question sur une partie de la page"
   },
   "welcome": {
     "title": "Deux étapes pour commencer",
@@ -48,7 +50,11 @@
     "actions": {
       "summarize": "Résumer cette page",
       "translate": "Traduire la sélection ou la page",
-      "explain": "Expliquer le texte sélectionné"
+      "explain": "Expliquer le texte sélectionné",
+      "prices": "Comparer les prix ailleurs",
+      "reviews": "Résumer les avis",
+      "flaws": "À quoi faire attention avant d'acheter",
+      "deal": "Est-ce une bonne affaire ?"
     },
     "tip": "/ pour les commandes · @ pour joindre une page, une sélection ou un onglet",
     "body": "Posez une question sur cette page, ou confiez-moi une tâche dans vos onglets.",
@@ -77,7 +83,13 @@
       "autoHint": "Travaille seul. Demande avant les paiements, suppressions et autres étapes à haut risque.",
       "manualHint": "Lit et cherche seul. Demande avant chaque modification."
     },
-    "removeAttachment": "Retirer la pièce jointe"
+    "removeAttachment": "Retirer la pièce jointe",
+    "pickRegion": "Poser une question sur une partie de la page",
+    "regionHint": "Faites glisser pour marquer la zone · Échap pour annuler",
+    "regionFailed": "La capture a échoué. Faites un clic droit sur la page et choisissez « Poser une question sur une partie de la page ».",
+    "removeImage": "Retirer l'image",
+    "imageAlt": "Partie de {{site}}",
+    "removeCommand": "Retirer la commande"
   },
   "context": {
     "unavailable": "Cette page ne peut pas être lue",
@@ -112,6 +124,31 @@
       "label": "Extraire les tableaux",
       "description": "Les données de la page en tableaux Markdown",
       "prompt": "Extrais les données structurées de cette page (prix, forfaits, caractéristiques, listes) sous forme de tableaux Markdown."
+    },
+    "research": {
+      "label": "Recherche approfondie",
+      "description": "Plusieurs sources, un tableau comparatif",
+      "prompt": "Fais une recherche sur ceci : consulte plusieurs sources, lis environ huit des pages les plus pertinentes et compare-les dans un tableau avec les sources.\n\nQuestion : "
+    },
+    "prices": {
+      "label": "Comparer les prix",
+      "description": "D'autres boutiques, prix livré",
+      "prompt": "Compare les prix de ce produit : trouve le même modèle dans d'autres boutiques et compare ce que je paierais livré (prix, livraison, taxes et frais, coupons). Donne un tableau avec boutique, prix, livraison, total, stock et lien, et dis quelle offre est la meilleure."
+    },
+    "reviews": {
+      "label": "Avis",
+      "description": "Ce que les acheteurs aiment et reprochent",
+      "prompt": "Résume les avis sur ce produit : la note et le nombre d'avis, ce qui plaît, et les problèmes décrits par plusieurs acheteurs (cite un avis pour chacun). Ne t'arrête pas à la première page : lis les avis les plus récents et les moins bien notés. Dis si certains semblent faux."
+    },
+    "flaws": {
+      "label": "Points de vigilance",
+      "description": "À vérifier avant d'acheter",
+      "prompt": "Avant d'acheter, à quoi dois-je faire attention ? Vérifie qui vend et expédie, les retours et la garantie, les coûts en plus (livraison, taxes, abonnements), les caractéristiques, les pannes fréquentes dans les mauvais avis, et si la remise est réelle. Ne liste que l'essentiel."
+    },
+    "deal": {
+      "label": "Bonne affaire ?",
+      "description": "La remise est-elle réelle",
+      "prompt": "Ce prix est-il une bonne affaire ? Vérifie si la remise est réelle (le prix des derniers mois, le prix ailleurs), compare avec des produits similaires, et dis-moi : acheter maintenant, attendre ou passer, et pourquoi."
     }
   },
   "message": {
@@ -124,13 +161,19 @@
     "regenerate": "Régénérer",
     "editHint": "Remplace ce message et les réponses qui suivent",
     "tokens": "↑{{input}} ↓{{output}}",
-    "tokensHint": "Jetons envoyés et reçus",
+    "tokensHint": "Jetons envoyés et reçus ; ceux en cache coûtent moins",
     "toLatest": "Aller au plus récent",
     "truncated": "partiel",
     "diagramError": "Impossible de dessiner ce diagramme. Sa source :",
     "copySvg": "Copier le SVG",
     "image": "Image",
-    "linkData": "L'adresse de ce lien contient des données (un e-mail, un long code). Vérifiez-la, puis cliquez à nouveau pour l'ouvrir :"
+    "linkData": "L'adresse de ce lien contient des données (un e-mail, un long code). Vérifiez-la, puis cliquez à nouveau pour l'ouvrir :",
+    "speak": "Lire à voix haute",
+    "stopSpeaking": "Arrêter la lecture",
+    "copyCsv": "Copier en CSV",
+    "downloadCsv": "Télécharger en CSV",
+    "sortBy": "Trier par cette colonne",
+    "tokensCached": "↑{{input}} ↓{{output}} · {{cached}} en cache"
   },
   "history": {
     "title": "Historique",
@@ -166,7 +209,7 @@
       "about": "À propos",
       "agent": "Agent",
       "search": "Recherche",
-      "voice": "Saisie vocale"
+      "voice": "Voix"
     }
   },
   "connections": {
@@ -369,7 +412,9 @@
       "hand_off": "Vous passer la main",
       "read_page": "Lire la page",
       "view_page": "Regarder la page",
-      "click_at": "Cliquer sur {{target}} en {{x}}, {{y}}"
+      "click_at": "Cliquer sur {{target}} en {{x}}, {{y}}",
+      "research_pages": "Recherche approfondie : {{question}}",
+      "watch_page": "Surveiller {{site}} : {{condition}}"
     },
     "directions": {
       "up": "le haut",
@@ -397,7 +442,8 @@
         "frame": "Agit dans le cadre d'un autre site, que l'assistant ne peut pas lire.",
         "download": "Télécharge un fichier. N'autorisez que les fichiers attendus.",
         "sensitivePage": "Cette page gère la sécurité du compte, des clés ou des paiements : chaque modification est demandée.",
-        "unseen": "L'assistant ne peut pas lire ce qui est dessiné ici. Vérifiez l'image."
+        "unseen": "L'assistant ne peut pas lire ce qui est dessiné ici. Vérifiez l'image.",
+        "watch": "La page est relue en arrière-plan, sans y toucher, pendant 30 jours au plus. Votre modèle n'est interrogé que lorsque ce qui est surveillé change."
       },
       "allowOnce": "Autoriser une fois",
       "allowTask": "Autoriser pour cette tâche",
@@ -479,6 +525,38 @@
       "title": "Cette page a tenté de donner des instructions à l'assistant",
       "titleHidden": "Cette page cache des instructions pour les assistants IA",
       "body": "Elles ont été ignorées. Jusqu'à la fin de la tâche, les modifications et les nouveaux sites demandent votre accord."
+    },
+    "details": "Étapes",
+    "activity": {
+      "search": "Recherche : {{query}}",
+      "research": "Lecture des pages {{progress}}",
+      "open": "Ouverture de {{site}}",
+      "read": "Lecture de la page",
+      "act": "Travail sur {{site}}",
+      "actHere": "Travail sur la page"
+    },
+    "summary": {
+      "searches_one": "{{count}} recherche",
+      "searches_many": "{{count}} recherches",
+      "searches_other": "{{count}} recherches",
+      "sites_one": "{{count}} site",
+      "sites_many": "{{count}} sites",
+      "sites_other": "{{count}} sites"
+    },
+    "replay": {
+      "open": "Revoir",
+      "title": "Revoir la tâche",
+      "end": "La page à la fin de la tâche.",
+      "empty": "Aucune image n'a été gardée pour cette tâche.",
+      "play": "Lire",
+      "pause": "Pause",
+      "previous": "Étape précédente",
+      "next": "Étape suivante"
+    },
+    "save": {
+      "button": "Enregistrer comme commande",
+      "name": "Nom de la commande",
+      "saved": "Enregistré. Tapez /{{name}} pour la relancer."
     }
   },
   "agentSettings": {
@@ -502,7 +580,13 @@
     },
     "setVisionModel": "Choisir un modèle de vision",
     "autoScreenshot": "Regarder l'écran quand le texte ne suffit pas",
-    "autoScreenshotHint": "Pages en canvas, boutons sans nom, étapes en échec. Envoie une capture au modèle ; jamais sur les pages de connexion, de compte ou de paiement."
+    "autoScreenshotHint": "Pages en canvas, boutons sans nom, étapes en échec. Envoie une capture au modèle ; jamais sur les pages de connexion, de compte ou de paiement.",
+    "recordSteps": "Garder des images pour revoir la tâche",
+    "recordStepsHint": "Une petite capture avant chaque étape, stockée sur cet appareil. Pas sur les pages de connexion, de compte ou de paiement.",
+    "commands": {
+      "title": "Commandes enregistrées",
+      "hint": "Quand une tâche est terminée, enregistrez-la comme commande et relancez-la en tapant son nom après une barre oblique."
+    }
   },
   "voice": {
     "start": "Saisie vocale",
@@ -525,8 +609,8 @@
       "deniedBody": "Autorisez-le via l'icône à droite de la barre d'adresse, puis réessayez.",
       "retry": "Réessayer"
     },
-    "title": "Saisie vocale",
-    "description": "Cliquez sur le micro pour parler. Recliquez, ou faites une pause de deux secondes, pour terminer.",
+    "title": "Voix",
+    "description": "Cliquez sur le micro et parlez ; cliquez à nouveau ou faites une pause de deux secondes pour terminer. Les réponses peuvent être lues à voix haute.",
     "engine": "Reconnaissance",
     "engines": {
       "browser": {
@@ -547,7 +631,11 @@
     "micHint": "Un onglet s'ouvre une fois pour demander : les panneaux latéraux ne le peuvent pas.",
     "micGranted": "Browser Helper peut utiliser le micro.",
     "micAllowed": "Autorisé",
-    "allowMic": "Autoriser le micro"
+    "allowMic": "Autoriser le micro",
+    "speakReplies": "Lire les réponses à voix haute",
+    "speakRepliesHint": "Utilise les voix de votre système ; rien n'est envoyé.",
+    "conversation": "Réécouter après la lecture",
+    "conversationHint": "Après une question posée à la voix, le micro se rouvre une fois la réponse lue."
   },
   "search": {
     "title": "Recherche",
@@ -621,5 +709,36 @@
     "running": "En cours dans un autre onglet : {{title}}",
     "waiting": "À vous dans un autre onglet : {{title}}",
     "show": "Voir"
+  },
+  "watch": {
+    "title": "Pages surveillées",
+    "empty": "Demandez à l'assistant de vous prévenir quand quelque chose se produit sur une page, par ex. « préviens-moi quand ça passe sous 20 € ».",
+    "status": {
+      "active": "Surveillée",
+      "paused": "En pause",
+      "met": "C'est arrivé",
+      "failed": "Arrêtée : les vérifications échouaient",
+      "expired": "Terminée après 30 jours"
+    },
+    "checkFailed": "Vérification échouée : {{error}}",
+    "checkNow": "Vérifier maintenant",
+    "pause": "Mettre en pause",
+    "resume": "Surveiller à nouveau",
+    "footnote": "Une page surveillée est ouverte en arrière-plan et seulement lue. Votre modèle est interrogé quand ce qui est surveillé change, pas à chaque vérification.",
+    "notification": {
+      "metTitle": "C'est arrivé",
+      "met": "{{site}} : {{condition}}",
+      "failedTitle": "Une surveillance s'est arrêtée",
+      "failed": "{{site}} n'a pas pu être vérifié plusieurs fois de suite : {{condition}}"
+    },
+    "pace": "Vérifier",
+    "liveHint": "À ce rythme, la page reste ouverte dans un groupe d'onglets replié.",
+    "groupTitle": "Surveillance",
+    "interval": {
+      "seconds": "toutes les {{n}} s",
+      "minutes": "toutes les {{n}} min",
+      "hours": "toutes les {{n}} h",
+      "day": "chaque jour"
+    }
   }
 }

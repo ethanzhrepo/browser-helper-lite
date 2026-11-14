@@ -1,17 +1,18 @@
-import { ArrowUpCircle, History, Info, Plug, Settings as SettingsIcon, SquarePen, X } from 'lucide-react';
+import { ArrowUpCircle, Eye, History, Info, Plug, Settings as SettingsIcon, SquarePen, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { browser } from 'wxt/browser';
 import { ACTIVE_STATUSES, type AgentTask } from '../../src/agent/types';
 import { useAgentTasks } from '../../src/agent/useAgentTasks';
-import { capturePage, captureSelection, type ActiveTab } from '../../src/browser/page-context';
+import { capturePage, captureSelection, isProductPage, type ActiveTab } from '../../src/browser/page-context';
 import { takePanelRequest, watchPanelRequests } from '../../src/browser/panel-requests';
+import { captureRegion, pickRegion } from '../../src/browser/region';
 import { openPanel, panelTabOf } from '../../src/browser/side-panel';
 import { SLASH_COMMANDS, type SlashCommand } from '../../src/chat/commands';
 import { useConversation } from '../../src/chat/useConversation';
 import { useTabConversation } from '../../src/chat/useTabConversation';
 import { isRestrictedUrl, requestHostAccess } from '../../src/permissions/hosts';
-import type { AgentMode, ContextKind, ContextSnapshot, ErrorInfo, Locale, MessageRecord } from '../../src/shared/types';
+import type { AgentMode, ContextKind, ContextSnapshot, ErrorInfo, Locale, MessageImage, MessageRecord, SavedCommand } from '../../src/shared/types';
 import { deriveTitle, newId, renameConversation, truncateConversation } from '../../src/storage/db';
 import { DEFAULT_VOICE_SETTINGS, updateSettings } from '../../src/storage/settings';
 import { linkTab, unlinkTab } from '../../src/storage/tab-conversations';
@@ -23,7 +24,8 @@ import { useSettings } from '../../src/ui/useSettings';
 import { useUpdateNotice } from '../../src/ui/useUpdate';
 import { dismissUpdate } from '../../src/updates/check';
 import { useWindowTabs } from '../../src/ui/useWindowTabs';
-import { useVoiceInput, type VoiceProblem } from '../../src/voice/useVoiceInput';
+import { useSpeech } from '../../src/voice/speak';
+import { speechLanguage, useVoiceInput, type VoiceProblem } from '../../src/voice/useVoiceInput';
 import { AgentControls } from './AgentControls';
 import { Composer } from './Composer';
 import { EmptyState } from './EmptyState';
@@ -31,6 +33,10 @@ import { HistoryPanel } from './HistoryPanel';
 import { MessageList } from './MessageList';
 import { ModelSwitcher } from './ModelSwitcher';
 import { OtherTasksBar } from './OtherTasksBar';
+import { WatchPanel } from './WatchPanel';
+
+/** Pictures one message can carry. */
+const MAX_IMAGES = 4;
 
 /** A side panel belongs to one tab (§4.7); opened as a page (in tests), the panel follows the active tab. */
 const ownTab = panelTabOf(location.href) !== undefined;
@@ -48,7 +54,7 @@ export function App() {
   );
   const question = activeTask?.waiting?.kind === 'question' ? activeTask : undefined;
 
-  const [view, setView] = useState<'chat' | 'history'>('chat');
+  const [view, setView] = useState<'chat' | 'history' | 'watches'>('chat');
   const [text, setText] = useState('');
   const [includePage, setIncludePage] = useState(false);
   const [selection, setSelection] = useState<ContextSnapshot>();
@@ -56,10 +62,17 @@ export function App() {
   const [pendingTaskId, setPendingTaskId] = useState<string>();
   /** Pages of other tabs attached with @. */
   const [tabContexts, setTabContexts] = useState<ContextSnapshot[]>([]);
+  /** Parts of the page marked to ask about. */
+  const [images, setImages] = useState<MessageImage[]>([]);
+  /** The saved command the request in the box was started from. */
+  const [command, setCommand] = useState<SavedCommand>();
   const windowTabs = useWindowTabs();
   const update = useUpdateNotice();
   /** Bumped to put the cursor in the message box. */
   const [focusKey, setFocusKey] = useState(0);
+  const speech = useSpeech();
+  /** The turn whose reply will be read aloud, and whether its request was spoken. */
+  const toSpeak = useRef<{ taskId: string; byVoice: boolean } | undefined>(undefined);
 
   // The request's turn has reported back.
   useEffect(() => {
@@ -103,7 +116,21 @@ export function App() {
     setText(tab ? (drafts.current.get(tab.id) ?? '') : '');
     setSelection(undefined);
     setTabContexts([]);
+    setImages([]);
+    setCommand(undefined);
   }, [tab?.id]);
+
+  // On a product page, what people ask when shopping is offered first.
+  const [product, setProduct] = useState(false);
+  useEffect(() => {
+    setProduct(false);
+    if (tab?.id === undefined || access !== 'granted') return;
+    let stale = false;
+    void isProductPage(tab.id).then((found) => !stale && setProduct(found));
+    return () => {
+      stale = true;
+    };
+  }, [tab?.id, tab?.url, access]);
 
   // A page toggle only applies to the tab it was turned on for.
   useEffect(() => setIncludePage(false), [tab?.id, tab?.url]);
@@ -139,10 +166,32 @@ export function App() {
     }
   };
 
+  /**
+   * The user drags a rectangle on the page; that part of it is attached as a
+   * picture. `granted`: the page's menu was used, which lets Chrome take the
+   * screenshot whatever the site access.
+   */
+  const askAboutRegion = async (granted = false) => {
+    if (!tab) return accessNotice();
+    if (!granted && !(await ensureAccess())) return accessNotice();
+    try {
+      const region = await pickRegion(tab.id, t('composer.regionHint'));
+      if (!region) return;
+      const image = await captureRegion(tab, region);
+      if (!image) return setNotice(t('composer.regionFailed'));
+      setImages((previous) => [...previous, image].slice(-MAX_IMAGES));
+      setFocusKey((key) => key + 1);
+    } catch (error) {
+      console.error(error);
+      setNotice(granted ? t('context.unavailable') : t('composer.regionFailed'));
+    }
+  };
+
   const commandPrompt = (id: SlashCommand['id']) => t(`commands.${id}.prompt`, { language: t('languageName') });
 
   const applyCommand = (command: SlashCommand) => {
     setText(commandPrompt(command.id));
+    if (command.attach === 'none') return;
     if (command.attach === 'page') void attachPage();
     else void attachSelection(command.attach === 'selectionOrPage');
   };
@@ -172,17 +221,25 @@ export function App() {
    * Stores the request and starts the assistant's turn in the background.
    * `keepDraft`: the request did not come from the message box, so what is in it stays.
    */
-  const send = async (prompt: string, contexts: ContextSnapshot[], { keepDraft = false } = {}) => {
+  const send = async (
+    prompt: string,
+    contexts: ContextSnapshot[],
+    { keepDraft = false, byVoice = false, images: pictures, command: from }: { keepDraft?: boolean; byVoice?: boolean } & Pick<MessageRecord, 'images' | 'command'> = {},
+  ) => {
     setNotice(undefined);
+    speech.stop();
     if (!keepDraft) {
       setText('');
       setIncludePage(false);
       setSelection(undefined);
       setTabContexts([]);
+      setImages([]);
+      setCommand(undefined);
     }
     const taskId = newId();
     setPendingTaskId(taskId);
-    const { conversationId, message } = await conversation.appendUser({ text: prompt, contexts, taskId });
+    toSpeak.current = settings?.voice.speakReplies ? { taskId, byVoice } : undefined;
+    const { conversationId, message } = await conversation.appendUser({ text: prompt, contexts, images: pictures, command: from, tab: tab && { title: tab.title, url: tab.url }, taskId });
     // This tab shows the conversation from now on (the service links it too).
     if (tab) await linkTab(tab.id, conversationId);
     agent.send({ type: 'start', taskId, conversationId, anchorMessageId: message.id, tabId: tab?.id });
@@ -194,11 +251,11 @@ export function App() {
   const answer = async (reply: string) => {
     if (!question) return;
     setText('');
-    await conversation.appendUser({ text: reply, taskId: question.id });
+    await conversation.appendUser({ text: reply, tab: tab && { title: tab.title, url: tab.url }, taskId: question.id });
     agent.send({ type: 'respond', taskId: question.id, response: { kind: 'answer', text: reply } });
   };
 
-  const handleSend = async (typed = text) => {
+  const handleSend = async (typed = text, { byVoice = false } = {}) => {
     const prompt = typed.trim();
     if (question) return prompt ? answer(prompt) : undefined;
     if (!chatSlot || activeTask || pendingTaskId) return;
@@ -214,8 +271,12 @@ export function App() {
     }
     contexts.push(...tabContexts);
     if (selection) contexts.push(selection);
-    if (!prompt && contexts.length === 0) return;
-    await send(prompt || t('composer.defaultPrompt'), contexts);
+    if (!prompt && contexts.length === 0 && images.length === 0) return;
+    await send(prompt || t('composer.defaultPrompt'), contexts, {
+      byVoice,
+      images,
+      command: command && { name: command.name, steps: command.steps, startUrl: command.startUrl },
+    });
   };
 
   /** A new reply to the same request, after an error or a stop. */
@@ -255,7 +316,7 @@ export function App() {
     const first = conversation.messages[0]?.id === message.id;
     await replaceFrom(current.id, message.id, false);
     if (first) await renameConversation(current.id, deriveTitle(edited));
-    await send(edited, message.contexts ?? [], { keepDraft: true });
+    await send(edited, message.contexts ?? [], { keepDraft: true, images: message.images, command: message.command });
   };
 
   /** Empty-state shortcuts: attach what the command needs and send at once. */
@@ -278,6 +339,7 @@ export function App() {
   };
 
   const newChat = () => {
+    speech.stop();
     const previous = conversation.conversation;
     // Tabs this conversation grouped go back to how they were (M1.5 A4).
     if (previous) agent.send({ type: 'release', conversationId: previous.id });
@@ -334,14 +396,37 @@ export function App() {
     locale,
     onText: (spoken) => setText(withTyped(spoken)),
     onDone: (spoken) => {
-      if (spoken && settings?.voice.autoSend) void handleSend(withTyped(spoken));
+      if (spoken && settings?.voice.autoSend) void handleSend(withTyped(spoken), { byVoice: true });
     },
     onProblem: voiceProblem,
   });
   const toggleVoice = () => {
     if (voice.state === 'idle') typedBeforeVoice.current = text.trim();
+    // Never talk and listen at once.
+    speech.stop();
     voice.toggle();
   };
+  const listen = useRef(toggleVoice);
+  listen.current = toggleVoice;
+
+  const speechLang = speechLanguage(settings?.voice ?? DEFAULT_VOICE_SETTINGS, locale);
+  /** Reads a reply aloud, or stops when it is the one being read. */
+  const toggleSpeech = (message: MessageRecord) => {
+    if (speech.speaking === message.id) speech.stop();
+    else speech.speak(message.id, message.content, speechLang);
+  };
+
+  // The reply to the request just sent is read aloud (Settings › Voice); after a spoken request, the microphone can reopen.
+  useEffect(() => {
+    const pending = toSpeak.current;
+    if (!pending) return;
+    const reply = conversation.messages.find((m) => m.role === 'assistant' && m.taskId === pending.taskId);
+    if (!reply) return;
+    toSpeak.current = undefined;
+    if (reply.status !== 'done' || !reply.content.trim() || document.visibilityState !== 'visible') return;
+    const again = pending.byVoice && settings?.voice.conversation;
+    speech.speak(reply.id, reply.content, speechLang, again ? () => voice.state === 'idle' && listen.current() : undefined);
+  }, [conversation.messages]);
 
   // Requests from the page's right-click menu: "Ask about the selection" and "Summarize this page".
   const takeRequest = useRef<() => void>(() => undefined);
@@ -353,6 +438,8 @@ export function App() {
       if (request.kind === 'selection') {
         setSelection(request.context);
         setFocusKey((key) => key + 1);
+      } else if (request.kind === 'region') {
+        void askAboutRegion(true);
       } else if (!chatSlot) {
         // The setup card is showing; there is nothing to send with yet.
       } else if (activeTask || pendingTaskId) {
@@ -396,6 +483,9 @@ export function App() {
         <IconButton label={t('header.newChat')} onClick={newChat}>
           <SquarePen className="h-4 w-4" />
         </IconButton>
+        <IconButton label={t('header.watches')} onClick={() => setView(view === 'watches' ? 'chat' : 'watches')} data-testid="open-watches">
+          <Eye className="h-4 w-4" />
+        </IconButton>
         <IconButton label={t('header.history')} onClick={() => setView(view === 'history' ? 'chat' : 'history')}>
           <History className="h-4 w-4" />
         </IconButton>
@@ -404,7 +494,9 @@ export function App() {
         </IconButton>
       </header>
 
-      {view === 'history' ? (
+      {view === 'watches' ? (
+        <WatchPanel onClose={() => setView('chat')} />
+      ) : view === 'history' ? (
         <HistoryPanel
           currentId={conversation.conversation?.id}
           onOpen={openFromHistory}
@@ -414,13 +506,14 @@ export function App() {
       ) : (
         <>
           {showEmpty ? (
-            <EmptyState hasModel={hasModel} onQuickAction={(id) => void runQuickAction(id)} onExample={setText} />
+            <EmptyState hasModel={hasModel} product={product} onQuickAction={(id) => void runQuickAction(id)} onExample={setText} />
           ) : (
             <MessageList
               messages={conversation.messages}
               tasks={agent.tasks}
               pendingTaskId={pendingTaskId}
               canChange={hasModel}
+              speech={{ speaking: speech.speaking, toggle: toggleSpeech }}
               onRetry={retry}
               onRegenerate={() => void regenerate()}
               onEdit={(message, edited) => void editMessage(message, edited)}
@@ -470,10 +563,20 @@ export function App() {
               selection={selection}
               onRemoveSelection={() => setSelection(undefined)}
               onCommand={applyCommand}
+              savedCommands={settings.commands}
+              onSavedCommand={(saved) => {
+                setText(saved.prompt);
+                setCommand(saved);
+              }}
+              command={command}
+              onRemoveCommand={() => setCommand(undefined)}
               onMention={applyMention}
               otherTabs={windowTabs}
               onMentionTab={attachTab}
               tabContexts={tabContexts}
+              images={images}
+              onPickRegion={() => void askAboutRegion()}
+              onRemoveImage={(index) => setImages((previous) => previous.filter((_, i) => i !== index))}
               onRemoveTabContext={(url) => setTabContexts((previous) => previous.filter((c) => c.url !== url))}
               onSend={() => void handleSend()}
               onStop={() => activeTask && agent.send({ type: 'stop', taskId: activeTask.id })}
