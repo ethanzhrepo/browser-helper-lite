@@ -5,5 +5,5 @@
     "resolveJsonModule": true,
     "types": ["vitest/globals", "node"]
   },
-  "exclude": ["node_modules", ".output", "tests/e2e/**"]
+  "exclude": ["node_modules", ".output", "tests/e2e/**", "tests/eval/**"]
 }
