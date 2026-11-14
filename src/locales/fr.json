@@ -230,7 +230,7 @@
     },
     "vision": {
       "title": "Modèle de vision",
-      "description": "Lit les captures d'écran pour les modèles qui ne voient pas les images."
+      "description": "Lit les captures d'écran quand le modèle actuel ne voit pas les images."
     },
     "stt": {
       "title": "Modèle de transcription",
@@ -356,7 +356,8 @@
       "ask_user": "Vous demander : {{question}}",
       "hand_off": "Vous passer la main",
       "read_page": "Lire la page",
-      "view_page": "Regarder la page"
+      "view_page": "Regarder la page",
+      "click_at": "Cliquer sur {{target}} en {{x}}, {{y}}"
     },
     "directions": {
       "up": "le haut",
@@ -383,12 +384,14 @@
         "clipboard": "Colle votre presse-papiers dans la page. L'assistant ne voit pas ce qu'il contient.",
         "frame": "Agit dans le cadre d'un autre site, que l'assistant ne peut pas lire.",
         "download": "Télécharge un fichier. N'autorisez que les fichiers attendus.",
-        "sensitivePage": "Cette page gère la sécurité du compte, des clés ou des paiements : chaque modification est demandée."
+        "sensitivePage": "Cette page gère la sécurité du compte, des clés ou des paiements : chaque modification est demandée.",
+        "unseen": "L'assistant ne peut pas lire ce qui est dessiné ici. Vérifiez l'image."
       },
       "allowOnce": "Autoriser une fois",
       "allowTask": "Autoriser pour cette tâche",
       "allowSite": "Toujours autoriser sur ce site",
-      "deny": "Refuser"
+      "deny": "Refuser",
+      "preview": "Le cercle marque le clic."
     },
     "permission": {
       "title": "Autoriser ce site ?",
@@ -477,7 +480,17 @@
     "maxSteps": "Limite d'étapes par tâche",
     "maxStepsHint": "De 5 à 100.",
     "mode": "Mode par défaut",
-    "modeHint": "Se change aussi sous la zone de message, même en cours de tâche."
+    "modeHint": "Se change aussi sous la zone de message, même en cours de tâche.",
+    "screenshots": "Les captures sont lues par",
+    "screenshotsHint": "Auto : le modèle actuel s'il lit les images, sinon le modèle de vision.",
+    "screenshotReaders": {
+      "auto": "Auto",
+      "main": "Modèle actuel",
+      "vision": "Modèle de vision"
+    },
+    "setVisionModel": "Choisir un modèle de vision",
+    "autoScreenshot": "Regarder l'écran quand le texte ne suffit pas",
+    "autoScreenshotHint": "Pages en canvas, boutons sans nom, étapes en échec. Envoie une capture au modèle ; jamais sur les pages de connexion, de compte ou de paiement."
   },
   "voice": {
     "start": "Saisie vocale",

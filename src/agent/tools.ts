@@ -26,7 +26,7 @@ export const assistantTools = {
   }),
   look: tool({
     description:
-      'Look at a screenshot of the viewport (elements are outlined with their numbers) and answer a question. Use it for icons, images, colors, calendars, charts or anything the text does not show.',
+      'Look at a screenshot of the viewport (elements are outlined with their numbers) and answer a question. Use it for icons, images, colors, calendars, charts, canvas content or anything the text does not show.',
     inputSchema: z.object({ question: z.string() }),
   }),
   web_search: tool({
@@ -36,6 +36,14 @@ export const assistantTools = {
   }),
   navigate: tool({ description: 'Open a URL in the current tab.', inputSchema: z.object({ url }) }),
   click: tool({ description: 'Click an element.', inputSchema: z.object({ index }) }),
+  click_at: tool({
+    description:
+      'Click a point of the latest screenshot, for things that have no element number: canvas content, maps, embedded frames, icons without text. Whenever an element has a number, use click instead. Needs a screenshot of the page as it is now (look).',
+    inputSchema: z.object({
+      x: z.number().min(0).describe('Pixels from the left edge of the screenshot'),
+      y: z.number().min(0).describe('Pixels from the top edge of the screenshot'),
+    }),
+  }),
   type: tool({
     description: 'Type text into a text field. Replaces existing text unless clear is false.',
     inputSchema: z.object({
@@ -97,6 +105,6 @@ export const READING_TOOLS = new Set<string>(['read_page', 'view_page', 'extract
 
 /** Tools after which the model gets a fresh page view. */
 export const VIEW_AFTER = new Set<string>([
-  'view_page', 'navigate', 'click', 'type', 'press', 'hover', 'scroll', 'select_option',
+  'view_page', 'navigate', 'click', 'click_at', 'type', 'press', 'hover', 'scroll', 'select_option',
   'go_back', 'open_tab', 'switch_tab', 'close_tab', 'wait', 'hand_off',
 ]);

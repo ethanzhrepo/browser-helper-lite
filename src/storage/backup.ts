@@ -41,6 +41,8 @@ const settingsSchema = z.looseObject({
       useCdp: z.boolean().optional(),
       maxSteps: z.number().int().min(5).max(100).optional(),
       notifications: z.boolean().optional(),
+      screenshots: z.enum(['auto', 'main', 'vision']).optional(),
+      autoScreenshot: z.boolean().optional(),
     })
     .optional(),
   sitePolicies: z.record(z.string(), z.enum(['blocked', 'readOnly', 'confirmEach', 'confirmRisky', 'auto'])).optional(),

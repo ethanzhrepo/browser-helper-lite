@@ -9,6 +9,7 @@ const snapshot = (overrides: Partial<PageSnapshot> = {}): PageSnapshot => ({
   title: 'Shop',
   content: '[1]<input placeholder="Search products">\n[2]<button>Search</button>',
   elementCount: 2,
+  visual: { drawn: 0, frames: 0, pictures: 0, unlabeled: 0 },
   above: 0,
   below: 3,
   pixelsAbove: 0,

@@ -1,4 +1,6 @@
 import { BookOpenText, Hand, Sparkles, type LucideIcon } from 'lucide-react';
+import { pickSlot } from '../../src/providers/resolve';
+import { openOptions } from '../../src/ui/navigation';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ENABLE_CDP_DRIVER } from '../../src/shared/build-flags';
@@ -11,6 +13,8 @@ const MODES: { id: AgentMode; icon: LucideIcon }[] = [
   { id: 'auto', icon: Sparkles },
   { id: 'manual', icon: Hand },
 ];
+
+const SCREENSHOT_READERS: AgentSettings['screenshots'][] = ['auto', 'main', 'vision'];
 
 function saveAgent(patch: Partial<AgentSettings>) {
   void updateSettings((s) => ({ ...s, agent: { ...s.agent, ...patch } }));
@@ -63,6 +67,36 @@ export function AgentSection({ settings }: { settings: Settings }) {
           onChange={(notifications) => saveAgent({ notifications })}
           label={t('agentSettings.notifications')}
           hint={t('agentSettings.notificationsHint')}
+        />
+      </Card>
+      <Card className="divide-y divide-line p-0 [&>*]:px-5 [&>*]:py-4">
+        <div>
+          <Field label={t('agentSettings.screenshots')} htmlFor="screenshots" hint={t('agentSettings.screenshotsHint')}>
+            <select
+              id="screenshots"
+              className={`${inputClass} sm:w-64`}
+              value={agent.screenshots}
+              onChange={(e) => saveAgent({ screenshots: e.target.value as AgentSettings['screenshots'] })}
+            >
+              {SCREENSHOT_READERS.map((reader) => (
+                <option key={reader} value={reader}>
+                  {t(`agentSettings.screenshotReaders.${reader}`)}
+                </option>
+              ))}
+            </select>
+          </Field>
+          {agent.screenshots === 'vision' && !pickSlot(settings, ['vision']) && (
+            <button type="button" onClick={() => openOptions('models')} className="mt-2 text-xs text-accent underline" data-testid="set-vision-model">
+              {t('agentSettings.setVisionModel')}
+            </button>
+          )}
+        </div>
+        <Toggle
+          id="auto-screenshot"
+          checked={agent.autoScreenshot}
+          onChange={(autoScreenshot) => saveAgent({ autoScreenshot })}
+          label={t('agentSettings.autoScreenshot')}
+          hint={t('agentSettings.autoScreenshotHint')}
         />
       </Card>
       <Card className="p-5">

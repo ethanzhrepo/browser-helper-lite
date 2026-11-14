@@ -227,7 +227,7 @@
     },
     "vision": {
       "title": "Vision model",
-      "description": "Reads screenshots for models that can't see images."
+      "description": "Reads screenshots when the current model can't see images."
     },
     "stt": {
       "title": "Speech-to-text model",
@@ -349,7 +349,8 @@
       "ask_user": "Ask you: {{question}}",
       "hand_off": "Hand over to you",
       "read_page": "Read the page",
-      "view_page": "Look at the page"
+      "view_page": "Look at the page",
+      "click_at": "Click {{target}} at {{x}}, {{y}}"
     },
     "directions": {
       "up": "up",
@@ -376,12 +377,14 @@
         "clipboard": "Pastes your clipboard into the page. The assistant can't see what's on it.",
         "frame": "Acts inside another site's frame, which the assistant can't read.",
         "download": "Downloads a file. Only allow files you expect.",
-        "sensitivePage": "This page handles account security, keys or payments, so every change asks."
+        "sensitivePage": "This page handles account security, keys or payments, so every change asks.",
+        "unseen": "The assistant can't read what is drawn here. Check the picture."
       },
       "allowOnce": "Allow once",
       "allowTask": "Allow for this task",
       "allowSite": "Always allow on this site",
-      "deny": "Deny"
+      "deny": "Deny",
+      "preview": "The ring marks the click."
     },
     "permission": {
       "title": "Allow this site?",
@@ -469,7 +472,17 @@
     "maxSteps": "Step limit per task",
     "maxStepsHint": "5 to 100.",
     "mode": "Default mode",
-    "modeHint": "Also switchable below the message box, even mid-task."
+    "modeHint": "Also switchable below the message box, even mid-task.",
+    "screenshots": "Screenshots are read by",
+    "screenshotsHint": "Auto: the current model if it reads images, else the vision model.",
+    "screenshotReaders": {
+      "auto": "Auto",
+      "main": "Current model",
+      "vision": "Vision model"
+    },
+    "setVisionModel": "Choose a vision model",
+    "autoScreenshot": "Look at the screen when text isn't enough",
+    "autoScreenshotHint": "On canvas pages, unnamed buttons and failed steps. Sends a screenshot to the model; never on sign-in, account or payment pages."
   },
   "voice": {
     "start": "Voice input",

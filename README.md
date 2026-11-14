@@ -11,6 +11,7 @@ An AI assistant in Chrome's side panel that works with the model and API key of 
 - **Any model, your own key**: OpenAI, Anthropic, Google Gemini, DeepSeek, and any OpenAI-compatible API (Qwen, Kimi, GLM, Doubao, OpenRouter, Groq, Ollama, LM Studio and more).
 - **Chat about pages**: summaries and comparisons of the page you are on, other tabs with `@`, Markdown with code, math and Mermaid diagrams, and voice input.
 - **Acts on websites**: searches, clicks, types, scrolls and opens tabs to finish a task, and hands CAPTCHAs and logins back to you.
+- **Sees what text misses**: on canvas apps, maps and buttons without labels it looks at a screenshot, with your current model if it reads images or with a separate vision model, and can click by position. You approve clicks on content it cannot read, with a picture of where they land.
 - **You stay in control**: three modes, Query (read only), Auto (asks before payments, deletions and other high-risk steps) and Manual approval (asks before every change), plus per-site rules. Pause, stop or take over at any time.
 - **Quick to reach**: open the panel with <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>H</kbd>, or right-click a page to summarize it or ask about the selected text.
 - **Defends against prompt injection**: hidden page text never reaches the model, page content cannot pass as instructions, and links that would carry your data out need your approval. See [docs/security](docs/security/README.md).
@@ -84,7 +85,7 @@ The design notes ([docs/product-design.md](docs/product-design.md)) and security
 
 ## Privacy
 
-Conversations are stored locally in the browser. Requests go directly from the extension to your model provider. API keys stay in the extension's storage and are never exposed to web pages. Requests to OpenAI set `store: false`. Deleting a conversation erases its messages and the pages attached to them.
+Conversations are stored locally in the browser. Requests go directly from the extension to your model provider. API keys stay in the extension's storage and are never exposed to web pages. Requests to OpenAI set `store: false`. Screenshots the assistant looks at go to the model that reads them, and are not taken by themselves on sign-in, account or payment pages. Deleting a conversation erases its messages and the pages attached to them.
 
 Once a day the extension asks GitHub for this project's latest release number, to tell you about updates. The request carries nothing about you; turn it off under Settings › About.
 

@@ -89,6 +89,20 @@ describe('classifyAction', () => {
     expect(formSubmission('press', { keys: 'Enter' }, undefined)).toBeUndefined();
   });
 
+  it('judges a click by coordinates by what is at the point', () => {
+    const at = (overrides: Partial<TargetInfo>) => classifyAction('click_at', { x: 10, y: 10 }, target(overrides));
+    // A readable element is judged like any click on it.
+    expect(at({ text: 'Pay now' })).toMatchObject({ risk: 3, reason: 'payment' });
+    expect(at({ text: 'Next' })).toEqual({ risk: 1 });
+    expect(at({ tag: 'a', text: 'Plans', href: 'https://shop.example/plans' }).risk).toBe(1);
+    // Drawn content cannot be judged: the user is asked in every mode, also on a site marked automatic.
+    const canvas = at({ tag: 'canvas', unreadable: true });
+    expect(canvas).toEqual({ risk: 2, reason: 'unseen', confirm: true });
+    expect(actionKind('click_at', { x: 10, y: 10 }, target({ tag: 'canvas', unreadable: true }), canvas)).toBe('change');
+    expect(decide('query', undefined, canvas.risk, 'change')).toBe('deny');
+    expect(at({ frameOrigin: 'https://pay.example' })).toMatchObject({ risk: 3, reason: 'frame' });
+  });
+
   it('judges key presses by what they act on', () => {
     const press = (keys: string, focused?: Partial<TargetInfo>) => classifyAction('press', { keys }, focused ? target(focused) : undefined);
     expect(press('Enter', { text: 'Place order' })).toMatchObject({ risk: 3, reason: 'payment' });

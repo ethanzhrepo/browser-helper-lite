@@ -68,6 +68,8 @@ export interface Classification {
   reason?: RiskReason;
   /** Set when the action must never be done by the agent. */
   forbidden?: 'password' | 'payment' | 'oneTimeCode';
+  /** The user is asked whatever the mode and site rule say (but may allow it for the task). */
+  confirm?: boolean;
 }
 
 function classifyText(text: string): Classification | undefined {
@@ -195,6 +197,12 @@ export function classifyAction(tool: string, args: Record<string, unknown>, targ
   }
 
   if (tool === 'click') return classifyActivation(target);
+  if (tool === 'click_at') {
+    if (target.frameOrigin) return { risk: 3, reason: 'frame' };
+    // Drawn content cannot be read, so no rule can judge the click: the user looks at where it lands.
+    if (target.unreadable) return { risk: 2, reason: 'unseen', confirm: true };
+    return classifyActivation(target);
+  }
   if (tool === 'select_option') {
     // Judged by the option that will be picked, which may be matched by its value.
     const chosen = matchOption(target.options ?? [], String(args.option ?? ''));
@@ -207,7 +215,7 @@ export function classifyAction(tool: string, args: Record<string, unknown>, targ
 export function actionKind(tool: string, args: Record<string, unknown>, target: TargetInfo | undefined, classification: Classification): ActionKind {
   if (classification.risk > 1 || !target) return 'change';
   const key = tool === 'press' ? parseKeyCombo(String(args.keys ?? '')).key : undefined;
-  if ((tool === 'click' || key === 'Enter') && isNavigationLink(target)) return 'browse';
+  if ((tool === 'click' || tool === 'click_at' || key === 'Enter') && isNavigationLink(target)) return 'browse';
   if ((tool === 'type' || key === 'Enter') && isPlainSearch(target)) return 'search';
   return 'change';
 }

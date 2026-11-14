@@ -8,6 +8,7 @@ import type {
   PageBlockers,
   PageResult,
   PageSnapshot,
+  PageVisuals,
   SearchEngine,
   SearchResult,
   TargetInfo,
@@ -443,6 +444,7 @@ export function createPageAgent(): PageAgentApi {
     let truncated = false;
     let above = 0;
     let below = 0;
+    let unlabeled = 0;
     let lastLine = '';
 
     const emit = (line: string) => {
@@ -515,6 +517,8 @@ export function createPageAgent(): PageAgentApi {
           if (!truncated) {
             const index = next.size + 1;
             next.set(index, el);
+            // A control with no name at all, such as an icon-only button.
+            if (shortLabel(el) === el.tagName.toLowerCase()) unlabeled++;
             emit(`${hasPrevious && !previous.has(el) ? '*' : ''}[${index}]${describe(el)}`);
           }
         } else if (rect.top >= innerHeight) below++;
@@ -547,7 +551,81 @@ export function createPageAgent(): PageAgentApi {
       pixelsBelow: Math.max(0, Math.round(scroller.scrollHeight - scroller.scrollTop - innerHeight)),
       truncated,
       blockers: detectBlockers(),
+      visual: { ...visuals(), unlabeled },
     };
+  };
+
+  /** The share of the viewport covered by elements the text view cannot show. */
+  const visuals = (): Omit<PageVisuals, 'unlabeled'> => {
+    const area = innerWidth * innerHeight || 1;
+    const covered = (selector: string, keep: (el: Element) => boolean = () => true) => {
+      let sum = 0;
+      for (const el of document.querySelectorAll(selector)) {
+        if (el === host || !keep(el)) continue;
+        const rect = el.getBoundingClientRect();
+        const width = Math.min(rect.right, innerWidth) - Math.max(rect.left, 0);
+        const height = Math.min(rect.bottom, innerHeight) - Math.max(rect.top, 0);
+        // Small ones are icons and trackers.
+        if (width > 48 && height > 48 && getComputedStyle(el).visibility !== 'hidden') sum += width * height;
+      }
+      return Math.min(1, Math.round((sum / area) * 100) / 100);
+    };
+    return {
+      drawn: covered('canvas, video, object, embed'),
+      frames: covered('iframe, frame', isOpaqueFrame),
+      pictures: covered('img:not([alt]), img[alt=""], svg'),
+    };
+  };
+
+  /** The innermost element at a point of the top viewport, through open shadow roots and same-origin frames. */
+  const elementAt = (x: number, y: number): Element | null => {
+    let el = document.elementFromPoint(x, y);
+    let offsetX = 0;
+    let offsetY = 0;
+    for (let depth = 0; el && depth < 20; depth++) {
+      let inner: Element | null = null;
+      if (el.shadowRoot) inner = el.shadowRoot.elementFromPoint(x - offsetX, y - offsetY);
+      else if (el instanceof HTMLIFrameElement) {
+        let frameDocument: Document | null = null;
+        try {
+          frameDocument = el.contentDocument;
+        } catch {
+          // Another site's frame: the walk ends at the frame itself.
+        }
+        if (frameDocument) {
+          const rect = el.getBoundingClientRect();
+          offsetX += rect.left + el.clientLeft;
+          offsetY += rect.top + el.clientTop;
+          inner = frameDocument.elementFromPoint(x - offsetX, y - offsetY);
+        }
+      }
+      if (!inner || inner === el) break;
+      el = inner;
+    }
+    return el;
+  };
+
+  const DRAWN_TAGS = new Set(['CANVAS', 'VIDEO', 'OBJECT', 'EMBED']);
+
+  /** The control a click on `el` acts on: the nearest interactive element around it, else the element itself. */
+  const controlOf = (el: Element): Element => {
+    for (let node: Element | null = el; node; node = node.parentElement) {
+      if (isInteractive(node, getComputedStyle(node))) return node;
+    }
+    return el;
+  };
+
+  const describePoint = ({ x, y }: { x: number; y: number }): PageResult<TargetInfo> => {
+    const hit = elementAt(x, y);
+    if (!hit) return { ok: false, error: 'Nothing is at that point.' };
+    if (hit === host) return { ok: false, error: "That point is on the assistant's own status bar." };
+    const control = controlOf(hit);
+    const info = targetInfo(control);
+    if (isOpaqueFrame(hit)) return { ok: true, value: { ...info, frameOrigin: frameOrigin(hit), label: `a frame from ${frameOrigin(hit)}` } };
+    // Judged by the point, not by frames elsewhere inside the control.
+    const value: TargetInfo = { ...info, frameOrigin: undefined, label: shortLabel(control) };
+    if (DRAWN_TAGS.has(hit.tagName)) return { ok: true, value: { ...value, unreadable: true, label: `${hit.tagName.toLowerCase()} (drawn content)` } };
+    return { ok: true, value };
   };
 
   const detectBlockers = (): PageBlockers => {
@@ -688,7 +766,31 @@ export function createPageAgent(): PageAgentApi {
     snapshot,
     describeTarget,
     describeFocused,
+    describePoint,
     locate,
+
+    viewport() {
+      return { width: innerWidth, height: innerHeight, scrollX: Math.round(scrollX), scrollY: Math.round(scrollY) };
+    },
+
+    domClickAt({ x, y }) {
+      const el = elementAt(x, y);
+      if (!el || el === host) return { ok: false, error: 'Nothing is at that point.' };
+      if (isOpaqueFrame(el)) return { ok: false, error: "Simulated events cannot reach another site's frame; this needs real mouse input (CDP)." };
+      const init = { bubbles: true, cancelable: true, composed: true, clientX: x, clientY: y, button: 0 };
+      const pointer = (type: string) => el.dispatchEvent(new PointerEvent(type, { ...init, pointerType: 'mouse', isPrimary: true }));
+      const mouse = (type: string) => el.dispatchEvent(new MouseEvent(type, init));
+      pointer('pointerover');
+      mouse('mouseover');
+      pointer('pointerdown');
+      mouse('mousedown');
+      (controlOf(el) as HTMLElement).focus?.();
+      pointer('pointerup');
+      mouse('mouseup');
+      mouse('click');
+      return { ok: true, value: true };
+    },
+
     detectBlockers,
 
     focus(index) {

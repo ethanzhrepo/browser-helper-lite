@@ -37,6 +37,8 @@ export function actionLabel(t: TFunction, action: AgentAction): string {
     question: clip(String(a.question ?? ''), 60),
     tab: String(a.tab_id ?? ''),
     seconds: String(a.seconds ?? ''),
+    x: String(Math.round(Number(a.x ?? 0))),
+    y: String(Math.round(Number(a.y ?? 0))),
     direction: a.direction === 'up' ? t('agent.directions.up') : t('agent.directions.down'),
   };
   // A key press says what it lands on, when something has the focus.
@@ -316,7 +318,8 @@ function WaitingCard({ task, waiting, onSend }: {
     const high = waiting.risk >= 3 || suspicious;
     // Site-wide trust makes no sense for these; high-risk steps are approved one at a time (§8.1).
     const oneByOne = waiting.reason === 'exfiltration' || waiting.reason === 'secret' || waiting.reason === 'sensitivePage';
-    const canAllowSite = waiting.risk < 3 && !suspicious && !oneByOne && waiting.reason !== 'newSite' && waiting.reason !== 'download';
+    // Nor for clicks on drawn content: each task's are judged by eye.
+    const canAllowSite = waiting.risk < 3 && !suspicious && !oneByOne && !['newSite', 'download', 'unseen'].includes(waiting.reason);
     const canAllowTask = waiting.risk < 3 && !oneByOne;
     const typed = action?.tool === 'type' ? String(action.args.text ?? '') : '';
     const fullUrl = action?.tool === 'navigate' || action?.tool === 'open_tab' ? String(action.args.url ?? '') : '';
@@ -337,6 +340,13 @@ function WaitingCard({ task, waiting, onSend }: {
             <p className="max-h-32 overflow-y-auto whitespace-pre-wrap break-all rounded-lg bg-subtle px-3 py-2 font-mono text-[11px] leading-relaxed text-muted" data-testid="approval-detail">
               {clip(typed || fullUrl, 1000)}
             </p>
+          )}
+          {/* Where a click by coordinates lands. Our own screenshot, as a data URL: nothing is loaded. */}
+          {waiting.preview?.startsWith('data:image/jpeg;base64,') && (
+            <figure className="overflow-hidden rounded-lg border border-line bg-surface" data-testid="approval-preview">
+              <img src={waiting.preview} alt="" className="block w-full" />
+              <figcaption className="px-3 py-1.5 text-[11px] text-muted">{t('agent.approval.preview')}</figcaption>
+            </figure>
           )}
           {/* "Press Enter" alone does not say what happens: name the form it sends. */}
           {waiting.submits !== undefined && (

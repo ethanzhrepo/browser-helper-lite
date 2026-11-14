@@ -9,6 +9,25 @@ export interface PageBlockers {
   oneTimeCodeField: boolean;
 }
 
+/** How much of the viewport the text view cannot show (fractions of its area), and how many controls have no name. */
+export interface PageVisuals {
+  /** Canvas, video and plugin content. */
+  drawn: number;
+  /** Frames from other sites. */
+  frames: number;
+  /** Images without alternative text, and large SVG drawings. */
+  pictures: number;
+  /** Numbered elements without any text or label (icon-only buttons). */
+  unlabeled: number;
+}
+
+export interface Viewport {
+  width: number;
+  height: number;
+  scrollX: number;
+  scrollY: number;
+}
+
 export interface PageSnapshot {
   url: string;
   title: string;
@@ -22,6 +41,7 @@ export interface PageSnapshot {
   pixelsBelow: number;
   truncated: boolean;
   blockers: PageBlockers;
+  visual: PageVisuals;
 }
 
 /** What the risk classifier needs to know about a target element. */
@@ -52,6 +72,8 @@ export interface TargetInfo {
   options?: { text: string; value: string }[];
   /** Set when a click or key would land in a frame from another site, which the extension cannot read. */
   frameOrigin?: string;
+  /** Drawn content (a canvas, a video): what is at the point cannot be read. Only set for a click by coordinates. */
+  unreadable?: boolean;
   /** Short human label, e.g. `button "Add to cart"`. */
   label: string;
 }
@@ -87,11 +109,15 @@ export interface PageAgentApi {
   describeTarget(index: number): PageResult<TargetInfo>;
   /** The focused element, which a key press acts on. */
   describeFocused(): PageResult<TargetInfo | null>;
+  /** What a click at a point of the viewport (CSS pixels) would land on. */
+  describePoint(point: { x: number; y: number }): PageResult<TargetInfo>;
+  viewport(): Viewport;
   /** Scrolls the element into view and returns its center in top-frame viewport pixels. */
   locate(index: number): PageResult<TargetPoint>;
   focus(index: number): PageResult<true>;
   selectText(index: number): PageResult<true>;
   domClick(index: number): PageResult<true>;
+  domClickAt(point: { x: number; y: number }): PageResult<true>;
   domHover(index: number): PageResult<true>;
   domType(params: { index: number; text: string; clear: boolean }): PageResult<true>;
   domPress(keys: string): PageResult<true>;

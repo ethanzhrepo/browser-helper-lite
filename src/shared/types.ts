@@ -53,6 +53,15 @@ export interface AgentSettings {
   maxSteps: number;
   /** Chrome notifications when a task needs you. */
   notifications: boolean;
+  /**
+   * Which model reads screenshots:
+   * - auto: the current model when it reads images, else the vision model
+   * - main: always the current model
+   * - vision: always the vision model (Model roles)
+   */
+  screenshots: 'auto' | 'main' | 'vision';
+  /** Add a screenshot to a page view when its text is not enough (canvas, unnamed controls, failing steps). */
+  autoScreenshot: boolean;
 }
 
 export type SearchEngineSetting = 'google' | 'bing' | 'duckduckgo' | 'custom';

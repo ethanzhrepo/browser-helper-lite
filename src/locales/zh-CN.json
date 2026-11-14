@@ -224,7 +224,7 @@
     },
     "vision": {
       "title": "视觉模型",
-      "description": "替不能看图的模型查看截图。"
+      "description": "当前模型不能看图时，由它来看截图。"
     },
     "stt": {
       "title": "语音识别模型",
@@ -342,7 +342,8 @@
       "ask_user": "询问你：{{question}}",
       "hand_off": "交给你处理",
       "read_page": "读取页面",
-      "view_page": "查看页面"
+      "view_page": "查看页面",
+      "click_at": "在 {{x}}, {{y}} 处点击 {{target}}"
     },
     "directions": {
       "up": "上",
@@ -369,12 +370,14 @@
         "clipboard": "会把剪贴板里的内容粘贴到页面上，助手看不到里面是什么。",
         "frame": "作用在另一个网站的嵌入框架里，助手读不到里面的内容。",
         "download": "会下载文件。只允许你预期中的文件。",
-        "sensitivePage": "这个页面涉及账户安全、密钥或支付，每次改动都会问你。"
+        "sensitivePage": "这个页面涉及账户安全、密钥或支付，每次改动都会问你。",
+        "unseen": "助手读不到这里画的内容，请看图确认。"
       },
       "allowOnce": "允许一次",
       "allowTask": "本任务内都允许",
       "allowSite": "总是允许此网站",
-      "deny": "拒绝"
+      "deny": "拒绝",
+      "preview": "红圈是点击的位置。"
     },
     "permission": {
       "title": "允许访问这个网站吗？",
@@ -461,7 +464,17 @@
     "maxSteps": "每个任务的步数上限",
     "maxStepsHint": "5 到 100。",
     "mode": "默认模式",
-    "modeHint": "也可以在输入框下方随时切换，任务进行中也生效。"
+    "modeHint": "也可以在输入框下方随时切换，任务进行中也生效。",
+    "screenshots": "由谁看截图",
+    "screenshotsHint": "自动：当前模型能看图就用它，否则用视觉模型。",
+    "screenshotReaders": {
+      "auto": "自动",
+      "main": "当前模型",
+      "vision": "视觉模型"
+    },
+    "setVisionModel": "设置视觉模型",
+    "autoScreenshot": "文字不够时自动看屏幕",
+    "autoScreenshotHint": "用于 canvas 页面、没有文字的按钮和连续失败的步骤。会把截图发给模型；登录、账户和支付页面除外。"
   },
   "voice": {
     "start": "语音输入",

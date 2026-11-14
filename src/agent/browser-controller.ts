@@ -1,7 +1,8 @@
 import { browser, type Browser } from 'wxt/browser';
 import type { PageExtraction } from '../browser/page-context';
 import { CdpDriver } from './drivers/cdp';
-import type { OverlayState, PageAgentApi, PageResult, TargetPoint } from './page/types';
+import type { OverlayState, PageAgentApi, PageResult, TargetPoint, Viewport } from './page/types';
+import { fitScreenshot } from './screenshot';
 import type { TabInfo } from './prompt';
 
 /** An error the agent should see and can recover from (bad index, covered element…). */
@@ -27,6 +28,20 @@ function invokePageAgent(method: string, args: unknown[]): InvokeResult {
   } catch (error) {
     return { status: 'thrown', message: error instanceof Error ? error.message : String(error) };
   }
+}
+
+/** A screenshot of a tab's viewport and what is needed to turn its pixels back into page coordinates. */
+export interface Screen {
+  /** JPEG, base64. */
+  image: string;
+  width: number;
+  height: number;
+  /** CSS pixels per image pixel. */
+  scale: number;
+  /** The viewport when it was taken: coordinates are stale once this changes. */
+  viewport: Viewport;
+  tabId: number;
+  url: string;
 }
 
 export function unwrap<T>(result: PageResult<T>): T {
@@ -450,32 +465,71 @@ export class AgentBrowser {
     );
   }
 
-  /** Viewport screenshot (JPEG, base64) with numbered element boxes drawn on it. */
-  async screenshot(tabId = this.currentTabId): Promise<string> {
+  /**
+   * Clicks a point of the viewport (CSS pixels), for things the page view has
+   * no number for. `recheck` runs right before the button goes down and may
+   * throw to cancel.
+   */
+  async clickAt(x: number, y: number, recheck: () => Promise<void>): Promise<number | undefined> {
+    await this.quiet('moveCursor', { x, y, click: true });
+    await sleep(380);
+    const tabId = this.currentTabId;
+    return this.followNewTabs(() =>
+      this.input(
+        (cdp) => cdp.click(tabId, x, y, recheck),
+        async () => {
+          await recheck();
+          unwrap(await this.page('domClickAt', { x, y }));
+        },
+      ),
+    );
+  }
+
+  /**
+   * The viewport as the model gets it: a JPEG scaled to CSS pixels, with
+   * numbered boxes on the elements of the latest page view.
+   *
+   * `activate: false` never disturbs the user: the tab stays where it is and
+   * the debugger is not attached for it, so this resolves undefined when the
+   * tab is hidden and the debugger is not already in use.
+   */
+  async screen({ activate }: { activate: boolean }, tabId = this.currentTabId): Promise<Screen | undefined> {
     await this.assertAllowed(tabId);
-    // Hidden tabs may not render, so bring the agent's tab to the front first.
-    const tab = await browser.tabs.update(tabId, { active: true });
+    let tab = await browser.tabs.get(tabId);
+    // Hidden tabs may not render, so an asked-for look brings the tab to the front first.
+    if (activate && !tab.active) tab = (await browser.tabs.update(tabId, { active: true })) ?? tab;
+    const viewport = await this.call(tabId, 'viewport');
     await this.call(tabId, 'highlight', true).catch(() => undefined);
     await sleep(150);
+    let raw: string | undefined;
     try {
-      // Only reuse an attached debugger; attaching just for a screenshot would show Chrome's debugging bar.
-      if (this.cdp && this.usedInput) {
-        try {
-          return await this.cdp.screenshot(tabId);
-        } catch (error) {
-          this.dropCdp(error);
-        }
-      }
-      try {
-        const dataUrl = await browser.tabs.captureVisibleTab(tab!.windowId, { format: 'jpeg', quality: 70 });
-        return dataUrl.slice(dataUrl.indexOf(',') + 1);
-      } catch (error) {
-        // captureVisibleTab needs access to all sites; the debugger works with a single site.
-        if (this.cdp) return await this.cdp.screenshot(tabId);
-        throw error;
-      }
+      raw = await this.capture(tab, activate);
     } finally {
       await this.call(tabId, 'highlight', false).catch(() => undefined);
+    }
+    if (!raw) return undefined;
+    return { ...(await fitScreenshot(raw, viewport)), viewport, tabId, url: tab.url ?? '' };
+  }
+
+  private async capture(tab: Browser.tabs.Tab, activate: boolean): Promise<string | undefined> {
+    const tabId = tab.id!;
+    // Only reuse an attached debugger; attaching just for a screenshot would show Chrome's debugging bar.
+    if (this.cdp && this.usedInput) {
+      try {
+        return await this.cdp.screenshot(tabId);
+      } catch (error) {
+        this.dropCdp(error);
+      }
+    }
+    if (!tab.active) return undefined;
+    try {
+      const dataUrl = await browser.tabs.captureVisibleTab(tab.windowId, { format: 'jpeg', quality: 70 });
+      return dataUrl.slice(dataUrl.indexOf(',') + 1);
+    } catch (error) {
+      if (!activate) return undefined;
+      // captureVisibleTab needs access to all sites; the debugger works with a single site.
+      if (this.cdp) return await this.cdp.screenshot(tabId);
+      throw error;
     }
   }
 

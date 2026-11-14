@@ -230,7 +230,7 @@
     },
     "vision": {
       "title": "Modelo de visión",
-      "description": "Lee capturas de pantalla para modelos que no ven imágenes."
+      "description": "Lee capturas de pantalla cuando el modelo actual no ve imágenes."
     },
     "stt": {
       "title": "Modelo de voz a texto",
@@ -356,7 +356,8 @@
       "ask_user": "Preguntarte: {{question}}",
       "hand_off": "Pasarte el control",
       "read_page": "Leer la página",
-      "view_page": "Mirar la página"
+      "view_page": "Mirar la página",
+      "click_at": "Pulsar {{target}} en {{x}}, {{y}}"
     },
     "directions": {
       "up": "arriba",
@@ -383,12 +384,14 @@
         "clipboard": "Pega tu portapapeles en la página. El asistente no ve lo que contiene.",
         "frame": "Actúa dentro del marco de otro sitio, que el asistente no puede leer.",
         "download": "Descarga un archivo. Permite solo los archivos que esperas.",
-        "sensitivePage": "Esta página gestiona la seguridad de la cuenta, claves o pagos, así que cada cambio pregunta."
+        "sensitivePage": "Esta página gestiona la seguridad de la cuenta, claves o pagos, así que cada cambio pregunta.",
+        "unseen": "El asistente no puede leer lo que está dibujado aquí. Revisa la imagen."
       },
       "allowOnce": "Permitir una vez",
       "allowTask": "Permitir en esta tarea",
       "allowSite": "Permitir siempre en este sitio",
-      "deny": "Denegar"
+      "deny": "Denegar",
+      "preview": "El círculo marca el clic."
     },
     "permission": {
       "title": "¿Permitir este sitio?",
@@ -477,7 +480,17 @@
     "maxSteps": "Límite de pasos por tarea",
     "maxStepsHint": "De 5 a 100.",
     "mode": "Modo predeterminado",
-    "modeHint": "También se cambia bajo el cuadro de mensaje, incluso en plena tarea."
+    "modeHint": "También se cambia bajo el cuadro de mensaje, incluso en plena tarea.",
+    "screenshots": "Quién lee las capturas",
+    "screenshotsHint": "Auto: el modelo actual si lee imágenes; si no, el modelo de visión.",
+    "screenshotReaders": {
+      "auto": "Auto",
+      "main": "Modelo actual",
+      "vision": "Modelo de visión"
+    },
+    "setVisionModel": "Elegir un modelo de visión",
+    "autoScreenshot": "Mirar la pantalla cuando el texto no basta",
+    "autoScreenshotHint": "En páginas con canvas, botones sin nombre y pasos fallidos. Envía una captura al modelo; nunca en páginas de inicio de sesión, cuenta o pago."
   },
   "voice": {
     "start": "Entrada de voz",

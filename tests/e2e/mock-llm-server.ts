@@ -162,7 +162,9 @@ export function indexOf(state: string, pattern: RegExp): number {
 
 /** The request, the tools used in this turn so far (`- name {args} → result`) and the latest page view. */
 export function readTurn(messages: ChatMessage[]) {
-  const lastUser = messages.findLastIndex((m) => m.role === 'user' && !textOf(m.content).startsWith('You have reached the step limit'));
+  // Not the request: the step-limit note, and the screenshot the extension adds after tool results.
+  const added = /^(You have reached the step limit|Screenshot of the tab's viewport|The current model cannot read images)/;
+  const lastUser = messages.findLastIndex((m) => m.role === 'user' && !added.test(textOf(m.content)));
   const request = textOf(messages[lastUser]?.content);
   const names = new Map<string, string>();
   const lines: string[] = [];
@@ -403,7 +405,11 @@ export async function startMockServer({ assistant = scriptedAssistant, pages = {
         extractRequests.push(body);
         return void res.writeHead(200, { 'content-type': 'application/json' }).end(completion(extractAnswer ?? 'Cable A: $9.99 (plain white). Cable B: $5.49 (braided black).'));
       }
-      if (body.messages.some((m) => Array.isArray(m.content) && m.content.some((part) => part.type === 'image_url'))) {
+      const hasImage = body.messages.some((m) => Array.isArray(m.content) && m.content.some((part) => part.type === 'image_url'));
+      // A model that takes no images, to test the fallback.
+      if (hasImage && body.model === 'mock-noimages') return void json({ error: { message: 'image input is not supported by this model' } }, 400);
+      // With tools it is the assistant's own turn, carrying a screenshot; without, a question for the vision model.
+      if (hasImage && !body.tools) {
         lookRequests.push(body);
         return void res.writeHead(200, { 'content-type': 'application/json' }).end(completion('The product with the braided black cable is Cable B.'));
       }

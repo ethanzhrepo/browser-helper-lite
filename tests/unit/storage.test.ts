@@ -92,7 +92,7 @@ describe('settings defaults and migration', () => {
       agent: { useCdp: false, maxSteps: 20, notifications: true, searchEngine: 'custom', customSearchUrl: 'https://s.example/?q=%s' },
       slots: { chat: { connectionId: 'a', modelId: 'm' }, agent: { connectionId: 'b', modelId: 'n' } },
     } as never);
-    expect(migrated.agent).toEqual({ mode: 'auto', useCdp: false, maxSteps: 20, notifications: true });
+    expect(migrated.agent).toEqual({ mode: 'auto', useCdp: false, maxSteps: 20, notifications: true, screenshots: 'auto', autoScreenshot: true });
     expect(migrated.search.engine).toBe('custom');
     expect(migrated.search.customUrl).toBe('https://s.example/?q=%s');
     expect(Object.keys(migrated.slots)).toEqual(['chat']);

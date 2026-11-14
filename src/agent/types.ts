@@ -42,6 +42,8 @@ export type WaitReason =
       tool: string;
       /** Set when the step sends a form with Enter: the form's submit button text ('' when it has none). */
       submits?: string;
+      /** For a click by coordinates: the part of the screenshot around the point, as a data URL. */
+      preview?: string;
     }
   | { kind: 'question'; question: string }
   | { kind: 'handoff'; reason: HandoffReason; message?: string; site: string }
@@ -66,6 +68,8 @@ export type RiskReason =
   | 'clipboard'
   /** The click or key lands in a frame from another site, which the extension cannot read. */
   | 'frame'
+  /** A click by coordinates on drawn content (a canvas, a video), which the extension cannot read. */
+  | 'unseen'
   /** Downloads a file (a program is high risk). */
   | 'download'
   /** Account security, credentials, payments or a cloud console: every change is confirmed. */

@@ -17,6 +17,8 @@ export const DEFAULT_AGENT_SETTINGS: AgentSettings = {
   useCdp: true,
   maxSteps: 30,
   notifications: true,
+  screenshots: 'auto',
+  autoScreenshot: true,
 };
 
 export const DEFAULT_SEARCH_SETTINGS: SearchSettings = {
