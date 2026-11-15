@@ -2,12 +2,22 @@
 export type CommandAttachment = 'page' | 'selection' | 'selectionOrPage' | 'none';
 
 /** What people ask on a product page: these come up first there. */
-export type ShoppingCommand = 'prices' | 'reviews' | 'flaws' | 'deal';
-export const SHOPPING_COMMANDS: ShoppingCommand[] = ['prices', 'reviews', 'flaws', 'deal'];
+export type ShoppingCommand = 'prices' | 'reviews' | 'reputation' | 'flaws' | 'deal';
+/** Each with the built-in skill that says how it is done (see skills/builtin.ts). */
+export const SHOPPING_SKILLS: Record<ShoppingCommand, string> = {
+  prices: 'compare-prices',
+  reviews: 'review-analysis',
+  reputation: 'reputation',
+  flaws: 'buying-checks',
+  deal: 'deal-check',
+};
+export const SHOPPING_COMMANDS = Object.keys(SHOPPING_SKILLS) as ShoppingCommand[];
 
 export interface SlashCommand {
   id: 'summarize' | 'translate' | 'explain' | 'extractTables' | 'research' | ShoppingCommand;
   attach: CommandAttachment;
+  /** Skills that go with the request. */
+  skills?: string[];
 }
 
 /** Labels and prompts live in the locale files under `commands.<id>`. */
@@ -19,7 +29,7 @@ export const SLASH_COMMANDS: SlashCommand[] = [
   // The question is typed after the prompt.
   { id: 'research', attach: 'none' },
   // Shopping: the product page comes along, so the assistant knows which product is meant.
-  ...SHOPPING_COMMANDS.map((id): SlashCommand => ({ id, attach: 'page' })),
+  ...SHOPPING_COMMANDS.map((id): SlashCommand => ({ id, attach: 'page', skills: [SHOPPING_SKILLS[id]] })),
 ];
 
 export function matchCommands(query: string, label: (command: SlashCommand) => string): SlashCommand[] {

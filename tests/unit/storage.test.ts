@@ -18,6 +18,7 @@ import {
   purgeConversation,
   purgeDeleted,
   restoreConversation,
+  savePicture,
   saveTask,
   searchMessages,
   truncateConversation,
@@ -267,6 +268,35 @@ describe('backups', () => {
     expect(summary).toMatchObject({ settings: true, conversations: 1, keys: 1 });
     expect(await getApiKey('a')).toBe('sk-secret');
     expect((await getMessages(conversation.id))[0]!.content).toBe('Hi');
+  });
+
+  it('keeps installed skills and the pictures of replies, and erases the pictures with their conversation', async () => {
+    const skill = { name: 'forum-check', description: 'Use when the user asks what the forum says.', instructions: 'Search the forum.' };
+    await updateSettings((s) => ({ ...s, skills: { installed: [skill], off: ['deal-check'] } }));
+    const conversation = await createConversation('Chargers');
+    await appendMessage({ conversationId: conversation.id, role: 'user', content: 'Compare', status: 'done', skills: ['compare-prices'] });
+    const picture = { id: `${conversation.id} https://cdn.shop.test/volt.jpg`, conversationId: conversation.id, url: 'https://cdn.shop.test/volt.jpg', image: 'AAAA', mediaType: 'image/webp', width: 200, height: 160, at: 1 };
+    await savePicture(picture);
+    const backup = parseBackup(JSON.stringify(await buildBackup({ includeKeys: false })));
+    expect(backup.pictures).toEqual([picture]);
+
+    await clearConversations();
+    expect(await db.pictures.count()).toBe(0);
+    fakeBrowser.reset();
+    expect((await loadSettings()).skills).toEqual({ installed: [], off: [] });
+    await restoreBackup(backup);
+    expect((await loadSettings()).skills).toEqual({ installed: [skill], off: ['deal-check'] });
+    expect(await db.pictures.toArray()).toEqual([picture]);
+    expect((await getMessages(conversation.id))[0]!.skills).toEqual(['compare-prices']);
+
+    // A file with something else where the picture should be is not a backup.
+    expect(() => parseBackup(JSON.stringify({ ...backup, pictures: [{ ...picture, image: '<svg onload=alert(1)>' }] }))).toThrow();
+    // Erasing the conversation erases its pictures, and none is stored for it afterwards.
+    await deleteConversation(conversation.id);
+    await purgeConversation(conversation.id);
+    expect(await db.pictures.count()).toBe(0);
+    await savePicture(picture);
+    expect(await db.pictures.count()).toBe(0);
   });
 
   it('never sends a stored key to an address a backup file changed', async () => {

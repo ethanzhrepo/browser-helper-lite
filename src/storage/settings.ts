@@ -1,4 +1,6 @@
 import { browser } from 'wxt/browser';
+import { DEFAULT_SOCIAL_SETTINGS } from '../agent/social';
+import { DEFAULT_SKILL_SETTINGS } from '../skills/skills';
 import type { AgentSettings, Connection, SearchProviderId, SearchSettings, Settings, VoiceSettings } from '../shared/types';
 
 const SETTINGS_KEY = 'settings:v1';
@@ -51,6 +53,8 @@ export function defaultSettings(): Settings {
     voice: DEFAULT_VOICE_SETTINGS,
     sitePolicies: {},
     commands: [],
+    skills: DEFAULT_SKILL_SETTINGS,
+    social: DEFAULT_SOCIAL_SETTINGS,
     checkUpdates: true,
     updatedAt: 0,
   };
@@ -85,6 +89,8 @@ export function withDefaults(stored: StoredSettings | undefined): Settings {
       cloudflare: { ...defaults.search.cloudflare, ...stored?.search?.cloudflare },
     },
     voice: { ...defaults.voice, ...stored?.voice },
+    skills: { ...defaults.skills, ...stored?.skills },
+    social: { ...defaults.social, ...stored?.social },
   };
 }
 

@@ -1,5 +1,37 @@
 import { createServer, type IncomingMessage, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
+import { deflateSync } from 'node:zlib';
+
+/** A PNG of one color, for the pictures of test pages. */
+export function solidPng(width: number, height: number, [red, green, blue]: [number, number, number]): Buffer {
+  const crcTable = Array.from({ length: 256 }, (_, n) => {
+    let c = n;
+    for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+    return c >>> 0;
+  });
+  const crc = (data: Buffer) => {
+    let c = 0xffffffff;
+    for (const byte of data) c = crcTable[(c ^ byte) & 0xff]! ^ (c >>> 8);
+    return (c ^ 0xffffffff) >>> 0;
+  };
+  const chunk = (type: string, data: Buffer) => {
+    const body = Buffer.concat([Buffer.from(type, 'ascii'), data]);
+    const length = Buffer.alloc(4);
+    length.writeUInt32BE(data.length);
+    const check = Buffer.alloc(4);
+    check.writeUInt32BE(crc(body));
+    return Buffer.concat([length, body, check]);
+  };
+  const header = Buffer.alloc(13);
+  header.writeUInt32BE(width, 0);
+  header.writeUInt32BE(height, 4);
+  header.set([8, 2, 0, 0, 0], 8);
+  const row = Buffer.concat([Buffer.from([0]), Buffer.alloc(width * 3, Buffer.from([red, green, blue]))]);
+  const pixels = Buffer.concat(Array.from({ length: height }, () => row));
+  return Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), chunk('IHDR', header), chunk('IDAT', deflateSync(pixels)), chunk('IEND', Buffer.alloc(0))]);
+}
+
+const PICTURE_COLORS: Record<string, [number, number, number]> = { red: [220, 30, 30], green: [30, 160, 60], blue: [30, 60, 220] };
 
 export const MOCK_MODEL = 'mock-model';
 export const MOCK_KEY = 'test-key';
@@ -344,6 +376,8 @@ export interface MockOptions {
   search?: (query: string) => Record<string, unknown>[] | undefined;
   /** Answers a page fetch (the DeepSeek fetch tool) instead of the fixed page; undefined keeps that. */
   fetchPage?: (url: string) => { title: string; content: string } | undefined;
+  /** Text files by path. */
+  files?: Record<string, string>;
 }
 
 /**
@@ -351,7 +385,7 @@ export interface MockOptions {
  * /v1/chat/completions, and a test page. No CORS headers on purpose, so the
  * extension must rely on its host permission like it does for real providers.
  */
-export async function startMockServer({ assistant = scriptedAssistant, pages = {}, extractAnswer, search, fetchPage }: MockOptions = {}) {
+export async function startMockServer({ assistant = scriptedAssistant, pages = {}, extractAnswer, search, fetchPage, files }: MockOptions = {}) {
   const chatRequests: ChatRequest[] = [];
   const extractRequests: ChatRequest[] = [];
   const lookRequests: ChatRequest[] = [];
@@ -361,6 +395,8 @@ export async function startMockServer({ assistant = scriptedAssistant, pages = {
   const watchRequests: ChatRequest[] = [];
   /** Every path requested, to prove that nothing reached an attacker endpoint. */
   const hits: string[] = [];
+  /** Requests for pictures (/pic/…), with what they carried. */
+  const pictureRequests: { url: string; cookie?: string; referer?: string }[] = [];
   const transcriptions: { bytes: number; contentType: string }[] = [];
 
   const readBody = (req: IncomingMessage) =>
@@ -385,6 +421,16 @@ export async function startMockServer({ assistant = scriptedAssistant, pages = {
     if (req.url === '/settings/security') return void html(SECURITY_HTML);
     if (req.url === '/secret.html') return void html(SECRET_HTML);
     if (req.url === '/review.html') return void html('<!doctype html><title>Guide</title><p>Braided cables last longer.</p>');
+    // Pictures: /pic/<color>-<name>.png, 200 by 160; /pic/dot-… is a single tracking pixel.
+    const picture = /^\/pic\/(red|green|blue|dot)[^?]*\.png(?:\?.*)?$/.exec(req.url ?? '');
+    if (picture) {
+      pictureRequests.push({ url: req.url!, cookie: req.headers.cookie, referer: req.headers.referer });
+      const body = picture[1] === 'dot' ? solidPng(1, 1, [0, 0, 0]) : solidPng(200, 160, PICTURE_COLORS[picture[1]!]!);
+      return void res.writeHead(200, { 'content-type': 'image/png', 'content-length': body.length }).end(body);
+    }
+    // Skill files by path, as a site would serve them.
+    const file = files?.[req.url ?? ''];
+    if (file !== undefined) return void res.writeHead(200, { 'content-type': 'text/markdown; charset=utf-8' }).end(file);
     if (req.url?.startsWith('/search')) {
       const query = new URL(req.url, 'http://x').searchParams.get('q') ?? '';
       return void html(searchHtml(`http://${req.headers.host}`, query));
@@ -505,6 +551,7 @@ export async function startMockServer({ assistant = scriptedAssistant, pages = {
     watchRequests,
     transcriptions,
     hits,
+    pictureRequests,
     close: () => new Promise<void>((resolve) => server.close(() => resolve())),
   };
 }

@@ -119,6 +119,12 @@ export const assistantTools = {
 
 export type AssistantToolName = keyof typeof assistantTools;
 
+/** Offered when there are skills to load (see skills.ts). */
+const loadSkillTool = tool({
+  description: 'Get the instructions of a skill listed under Skills. Call it before starting work that a skill is for, and follow what it returns.',
+  inputSchema: z.object({ name: z.string().describe('The skill\'s name, as listed') }),
+});
+
 /** Offered only when pages can be read through DeepSeek's Fetch API. */
 const readUrlTool = tool({
   description:
@@ -127,17 +133,21 @@ const readUrlTool = tool({
 });
 
 /** The tools for a task: the search tool described for the provider that will run it, and `read_url` when DeepSeek reads pages. */
-export function toolsFor(search: { provider: string; deepseekFetch?: boolean }) {
-  if (search.provider !== 'deepseek') return assistantTools;
-  const tools = { ...assistantTools, web_search: searchTool(SEARCH_DESCRIPTION + DEEPSEEK_SEARCH_SYNTAX) };
-  return search.deepseekFetch ? { ...tools, read_url: readUrlTool } : tools;
+export function toolsFor(search: { provider: string; deepseekFetch?: boolean }, { skills = false } = {}) {
+  const deepseek = search.provider === 'deepseek';
+  return {
+    ...assistantTools,
+    ...(deepseek ? { web_search: searchTool(SEARCH_DESCRIPTION + DEEPSEEK_SEARCH_SYNTAX) } : {}),
+    ...(deepseek && search.deepseekFetch ? { read_url: readUrlTool } : {}),
+    ...(skills ? { load_skill: loadSkillTool } : {}),
+  };
 }
 
 /** Tools that act on an element of the current page. */
 export const ELEMENT_TOOLS = new Set<string>(['click', 'type', 'hover', 'select_option']);
 
 /** Tools that only read; they never take over the tab. */
-export const READING_TOOLS = new Set<string>(['read_page', 'view_page', 'extract', 'look', 'web_search', 'read_url', 'research_pages', 'watch_page', 'ask_user']);
+export const READING_TOOLS = new Set<string>(['read_page', 'view_page', 'extract', 'look', 'web_search', 'read_url', 'research_pages', 'watch_page', 'load_skill', 'ask_user']);
 
 /** Tools after which the model gets a fresh page view. */
 export const VIEW_AFTER = new Set<string>([

@@ -21,6 +21,7 @@ import { useTranslation } from 'react-i18next';
 import type { ActiveTab } from '../../src/browser/page-context';
 import { matchCommands, type SlashCommand } from '../../src/chat/commands';
 import type { AgentMode, ContextKind, ContextSnapshot, MessageImage, SavedCommand } from '../../src/shared/types';
+import type { Skill } from '../../src/skills/skills';
 import { faviconUrl } from '../../src/ui/favicon';
 import type { PageAccess } from '../../src/ui/useActiveTab';
 import type { VoiceState } from '../../src/voice/useVoiceInput';
@@ -28,6 +29,7 @@ import type { VoiceState } from '../../src/voice/useVoiceInput';
 type MenuItem =
   | { kind: 'command'; command: SlashCommand }
   | { kind: 'saved'; saved: SavedCommand }
+  | { kind: 'skill'; skill: Skill }
   | { kind: 'mention'; target: ContextKind }
   | { kind: 'tab'; tab: ActiveTab };
 
@@ -74,6 +76,12 @@ export function Composer(props: {
   /** The saved command the request was started from. */
   command?: SavedCommand;
   onRemoveCommand: () => void;
+  /** Skills the user installed, offered after a slash. */
+  skills: Skill[];
+  onSkill: (skill: Skill) => void;
+  /** Skills that go with the request in the box. */
+  picked: { name: string; label: string }[];
+  onRemovePicked: (name: string) => void;
   onMention: (target: ContextKind) => void;
   /** Other tabs of the window, offered after @. */
   otherTabs: ActiveTab[];
@@ -124,6 +132,7 @@ export function Composer(props: {
       items = [
         ...matchCommands(commandQuery, commandLabel).map((command): MenuItem => ({ kind: 'command', command })),
         ...props.savedCommands.filter((saved) => saved.name.toLowerCase().includes(q)).map((saved): MenuItem => ({ kind: 'saved', saved })),
+        ...props.skills.filter((skill) => skill.name.includes(q)).map((skill): MenuItem => ({ kind: 'skill', skill })),
       ];
     } else if (mentionQuery !== undefined) {
       const q = mentionQuery.toLowerCase();
@@ -147,6 +156,10 @@ export function Composer(props: {
       props.onCommand(item.command);
     } else if (item.kind === 'saved') {
       props.onSavedCommand(item.saved);
+    } else if (item.kind === 'skill') {
+      // The skill goes on a chip; what to do with it is typed next.
+      props.onSkill(item.skill);
+      onTextChange('');
     } else {
       const remaining = beforeCaret.replace(/@\S*$/, '') + text.slice(caret);
       onTextChange(remaining);
@@ -195,7 +208,7 @@ export function Composer(props: {
           className="absolute bottom-full left-0 right-0 z-10 mb-2 animate-fade-in overflow-hidden rounded-xl border border-line bg-surface p-1 shadow-float"
         >
           {items.map((item, index) => (
-            <Fragment key={item.kind === 'command' ? item.command.id : item.kind === 'saved' ? `saved-${item.saved.id}` : item.kind === 'mention' ? item.target : `tab-${item.tab.id}`}>
+            <Fragment key={item.kind === 'command' ? item.command.id : item.kind === 'saved' ? `saved-${item.saved.id}` : item.kind === 'skill' ? `skill-${item.skill.name}` : item.kind === 'mention' ? item.target : `tab-${item.tab.id}`}>
               {item.kind === 'tab' && items[index - 1]?.kind !== 'tab' && (
                 <p className="px-2.5 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-faint">{t('mentions.otherTabs')}</p>
               )}
@@ -209,7 +222,7 @@ export function Composer(props: {
                 className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm ${index === activeIndex ? 'bg-hover' : ''}`}
               >
                 <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-accent-soft text-accent">
-                  {item.kind === 'command' || item.kind === 'saved' ? (
+                  {item.kind === 'command' || item.kind === 'saved' || item.kind === 'skill' ? (
                     <span className="font-mono text-xs font-semibold">/</span>
                   ) : item.kind === 'tab' ? (
                     <img src={faviconUrl(item.tab.url)} alt="" className="h-3.5 w-3.5 rounded-sm" />
@@ -223,6 +236,11 @@ export function Composer(props: {
                   <span className="min-w-0">
                     <span className="block font-medium">{commandLabel(item.command)}</span>
                     <span className="block truncate text-xs text-muted">{t(`commands.${item.command.id}.description`)}</span>
+                  </span>
+                ) : item.kind === 'skill' ? (
+                  <span className="min-w-0" data-testid="skill-option">
+                    <span className="block font-medium">{item.skill.name}</span>
+                    <span className="block truncate text-xs text-muted">{item.skill.description}</span>
                   </span>
                 ) : item.kind === 'saved' ? (
                   <span className="min-w-0" data-testid="saved-command">
@@ -277,6 +295,14 @@ export function Composer(props: {
                 </button>
               </span>
             )}
+            {props.picked.map((skill) => (
+              <span key={skill.name} data-testid="skill-chip" className="flex max-w-full animate-fade-in items-center gap-1 rounded-full border border-accent/25 bg-accent-soft py-1 pl-2.5 pr-1.5 text-xs text-accent">
+                <span className="truncate font-medium">/{skill.label}</span>
+                <button type="button" aria-label={t('composer.removeSkill')} onClick={() => props.onRemovePicked(skill.name)} className="rounded-full p-0.5 hover:bg-accent-soft-strong">
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+            ))}
             {props.images.map((image, index) => (
               <span key={`${index}-${image.data.length}`} data-testid="image-chip" className="relative animate-fade-in">
                 <img

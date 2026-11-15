@@ -98,6 +98,8 @@ export type RiskReason =
   | 'unseen'
   /** Starts a watch: the page will be read again and again in the background until the condition holds. */
   | 'watch'
+  /** Acts in the user's name on a forum or social site: a like, a vote, a follow, a post. */
+  | 'social'
   /** Downloads a file (a program is high risk). */
   | 'download'
   /** Account security, credentials, payments or a cloud console: every change is confirmed. */

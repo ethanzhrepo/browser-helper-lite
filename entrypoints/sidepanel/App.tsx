@@ -13,6 +13,7 @@ import { useConversation } from '../../src/chat/useConversation';
 import { useTabConversation } from '../../src/chat/useTabConversation';
 import { isRestrictedUrl, requestHostAccess } from '../../src/permissions/hosts';
 import type { AgentMode, ContextKind, ContextSnapshot, ErrorInfo, Locale, MessageImage, MessageRecord, SavedCommand } from '../../src/shared/types';
+import { enabledSkills, type Skill } from '../../src/skills/skills';
 import { deriveTitle, newId, renameConversation, truncateConversation } from '../../src/storage/db';
 import { DEFAULT_VOICE_SETTINGS, updateSettings } from '../../src/storage/settings';
 import { linkTab, unlinkTab } from '../../src/storage/tab-conversations';
@@ -64,6 +65,8 @@ export function App() {
   const [tabContexts, setTabContexts] = useState<ContextSnapshot[]>([]);
   /** Parts of the page marked to ask about. */
   const [images, setImages] = useState<MessageImage[]>([]);
+  /** Skills chosen for the request in the box, with what to call them on the chip. */
+  const [picked, setPicked] = useState<{ name: string; label: string }[]>([]);
   /** The saved command the request in the box was started from. */
   const [command, setCommand] = useState<SavedCommand>();
   const windowTabs = useWindowTabs();
@@ -118,6 +121,7 @@ export function App() {
     setTabContexts([]);
     setImages([]);
     setCommand(undefined);
+    setPicked([]);
   }, [tab?.id]);
 
   // On a product page, what people ask when shopping is offered first.
@@ -191,6 +195,8 @@ export function App() {
 
   const applyCommand = (command: SlashCommand) => {
     setText(commandPrompt(command.id));
+    // The skill that says how this is done goes with the request.
+    setPicked((command.skills ?? []).map((name) => ({ name, label: t(`commands.${command.id}.label`) })));
     if (command.attach === 'none') return;
     if (command.attach === 'page') void attachPage();
     else void attachSelection(command.attach === 'selectionOrPage');
@@ -224,7 +230,7 @@ export function App() {
   const send = async (
     prompt: string,
     contexts: ContextSnapshot[],
-    { keepDraft = false, byVoice = false, images: pictures, command: from }: { keepDraft?: boolean; byVoice?: boolean } & Pick<MessageRecord, 'images' | 'command'> = {},
+    { keepDraft = false, byVoice = false, images: pictures, command: from, skills }: { keepDraft?: boolean; byVoice?: boolean } & Pick<MessageRecord, 'images' | 'command' | 'skills'> = {},
   ) => {
     setNotice(undefined);
     speech.stop();
@@ -235,11 +241,12 @@ export function App() {
       setTabContexts([]);
       setImages([]);
       setCommand(undefined);
+      setPicked([]);
     }
     const taskId = newId();
     setPendingTaskId(taskId);
     toSpeak.current = settings?.voice.speakReplies ? { taskId, byVoice } : undefined;
-    const { conversationId, message } = await conversation.appendUser({ text: prompt, contexts, images: pictures, command: from, tab: tab && { title: tab.title, url: tab.url }, taskId });
+    const { conversationId, message } = await conversation.appendUser({ text: prompt, contexts, images: pictures, command: from, skills, tab: tab && { title: tab.title, url: tab.url }, taskId });
     // This tab shows the conversation from now on (the service links it too).
     if (tab) await linkTab(tab.id, conversationId);
     agent.send({ type: 'start', taskId, conversationId, anchorMessageId: message.id, tabId: tab?.id });
@@ -276,6 +283,7 @@ export function App() {
       byVoice,
       images,
       command: command && { name: command.name, steps: command.steps, startUrl: command.startUrl },
+      skills: picked.map((skill) => skill.name),
     });
   };
 
@@ -316,7 +324,7 @@ export function App() {
     const first = conversation.messages[0]?.id === message.id;
     await replaceFrom(current.id, message.id, false);
     if (first) await renameConversation(current.id, deriveTitle(edited));
-    await send(edited, message.contexts ?? [], { keepDraft: true, images: message.images, command: message.command });
+    await send(edited, message.contexts ?? [], { keepDraft: true, images: message.images, command: message.command, skills: message.skills });
   };
 
   /** Empty-state shortcuts: attach what the command needs and send at once. */
@@ -331,7 +339,7 @@ export function App() {
         else if (command.attach === 'selection') return setNotice(t('context.noSelection'));
       }
       if (contexts.length === 0) contexts.push(await capturePage(tab.id));
-      await send(commandPrompt(id), contexts);
+      await send(commandPrompt(id), contexts, { skills: command.skills });
     } catch (error) {
       console.error(error);
       setNotice(t('context.captureFailed'));
@@ -570,6 +578,10 @@ export function App() {
               }}
               command={command}
               onRemoveCommand={() => setCommand(undefined)}
+              skills={enabledSkills(settings).filter((skill) => !skill.builtin)}
+              onSkill={(skill: Skill) => setPicked((previous) => [...previous.filter((p) => p.name !== skill.name), { name: skill.name, label: skill.name }])}
+              picked={picked}
+              onRemovePicked={(name) => setPicked((previous) => previous.filter((p) => p.name !== name))}
               onMention={applyMention}
               otherTabs={windowTabs}
               onMentionTab={attachTab}

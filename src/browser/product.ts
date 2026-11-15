@@ -14,6 +14,8 @@ export interface ProductData {
   /** "4.4 of 5 (1286 reviews)". */
   rating?: string;
   sku?: string;
+  /** The address of its picture. */
+  image?: string;
 }
 
 type Json = Record<string, unknown>;
@@ -36,8 +38,21 @@ function nodes(value: unknown, depth = 0): Json[] {
   return [node, ...nodes(node['@graph'], depth + 1), ...nodes(node.mainEntity, depth + 1)];
 }
 
-/** The first product described in the given JSON-LD documents (the text of the page's ld+json scripts). */
-export function productFromJsonLd(documents: string[]): ProductData | undefined {
+/** A picture's address as a page gives it: a string, a list of them, or an ImageObject. Relative ones are resolved against `base`. */
+export function pictureAddress(value: unknown, base?: string): string | undefined {
+  const first = list(value)[0];
+  const raw = typeof first === 'string' ? first : typeof first === 'object' && first !== null ? ((first as Json).url ?? (first as Json).contentUrl) : undefined;
+  if (typeof raw !== 'string' || !raw.trim() || raw.length > 400) return undefined;
+  try {
+    const url = new URL(raw.trim(), base);
+    return /^https?:$/.test(url.protocol) && url.href.length <= 400 ? url.href : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** The first product described in the given JSON-LD documents (the text of the page's ld+json scripts). `base` is the page's address. */
+export function productFromJsonLd(documents: string[], base?: string): ProductData | undefined {
   for (const source of documents) {
     let parsed: unknown;
     try {
@@ -70,6 +85,7 @@ export function productFromJsonLd(documents: string[]): ProductData | undefined 
       seller: named(offer?.seller),
       rating: value ? `${value} of ${amount(rating?.bestRating) ?? '5'}${count ? ` (${count} reviews)` : ''}` : undefined,
       sku: text(product.sku ?? product.gtin13 ?? product.gtin ?? product.mpn, 40),
+      image: pictureAddress(product.image, base),
     };
     if (data.name || data.price) return data;
   }
@@ -86,6 +102,7 @@ export function describeProduct(data: ProductData): string {
     data.seller && `- Seller: ${data.seller}`,
     data.rating && `- Rating: ${data.rating}`,
     data.sku && `- SKU: ${data.sku}`,
+    data.image && `- Picture: ${data.image}`,
   ].filter(Boolean);
   return `Product data from the page's metadata (the shop's own figures, before any choice of variant, shipping or coupon):\n${lines.join('\n')}`;
 }

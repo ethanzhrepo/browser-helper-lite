@@ -1,6 +1,7 @@
 import 'katex/dist/katex.min.css';
+import { liveQuery } from 'dexie';
 import { ArrowDown, ArrowUp, Check, Copy, Download, ImageOff } from 'lucide-react';
-import { Children, createContext, isValidElement, lazy, memo, Suspense, useContext, useState, type AnchorHTMLAttributes, type ReactNode } from 'react';
+import { Children, createContext, isValidElement, lazy, memo, Suspense, useContext, useEffect, useState, type AnchorHTMLAttributes, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import ReactMarkdown from 'react-markdown';
 import rehypeHighlight from 'rehype-highlight';
@@ -8,6 +9,8 @@ import rehypeKatex from 'rehype-katex';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import { urlDataLeak } from '../agent/injection';
+import { pictureKey, type ReplyPicture } from '../agent/pictures';
+import { db } from '../storage/db';
 import { normalizeMath } from './math';
 import { sortOrder, toCsv } from './table';
 
@@ -61,6 +64,44 @@ function hostOf(url: string): string {
   } catch {
     return url;
   }
+}
+
+/** The pictures kept for the conversation on screen, by address (see `usePictures`). */
+export const PicturesContext = createContext<ReadonlyMap<string, ReplyPicture>>(new Map());
+
+/** The small copies of the pictures in a conversation's replies, as they are stored (also by the background, while a reply is written). */
+export function usePictures(conversationId: string | undefined): ReadonlyMap<string, ReplyPicture> {
+  const [pictures, setPictures] = useState<ReadonlyMap<string, ReplyPicture>>(new Map());
+  useEffect(() => {
+    if (!conversationId) return setPictures(new Map());
+    const subscription = liveQuery(() => db.pictures.where('conversationId').equals(conversationId).toArray()).subscribe({
+      next: (stored) => setPictures(new Map(stored.map((picture) => [picture.url, picture]))),
+      error: () => undefined,
+    });
+    return () => subscription.unsubscribe();
+  }, [conversationId]);
+  return pictures;
+}
+
+/**
+ * A picture in a reply. The panel loads nothing from the network: it shows
+ * the small copy the extension fetched for an address the assistant had read
+ * (see pictures.ts), and for any other address a link you can open yourself.
+ */
+function ReplyImage({ src, alt }: { src?: string; alt?: string }) {
+  const stored = useContext(PicturesContext).get(src ? pictureKey(src) : '');
+  if (!stored) return <BlockedImage src={src} alt={alt} />;
+  return (
+    <img
+      src={`data:${stored.mediaType};base64,${stored.image}`}
+      alt={alt ?? ''}
+      title={alt?.trim() || hostOf(stored.url)}
+      width={stored.width}
+      height={stored.height}
+      data-testid="reply-picture"
+      className="my-1 inline-block h-auto max-h-40 w-auto max-w-full rounded-lg border border-line bg-white object-contain align-middle"
+    />
+  );
 }
 
 /**
@@ -273,7 +314,7 @@ export const Markdown = memo(function Markdown({ text, streaming = false }: { te
         ]}
         components={{
           a: ({ node: _node, ...props }) => <ReplyLink {...props} />,
-          img: ({ src, alt }) => <BlockedImage src={typeof src === 'string' ? src : undefined} alt={alt} />,
+          img: ({ src, alt }) => <ReplyImage src={typeof src === 'string' ? src : undefined} alt={alt} />,
           table: ({ node, children }) => (
             <DataTable node={node as HastNode | undefined} streaming={streaming}>
               {children}

@@ -55,6 +55,7 @@ export function actionLabel(t: TFunction, action: AgentAction): string {
     tab: String(a.tab_id ?? ''),
     seconds: String(a.seconds ?? ''),
     condition: clip(String(a.condition ?? ''), 120),
+    name: String(a.name ?? ''),
     site: hostOf(a.url),
     x: String(Math.round(Number(a.x ?? 0))),
     y: String(Math.round(Number(a.y ?? 0))),
@@ -455,7 +456,7 @@ function WaitingCard({ task, waiting, onSend }: {
     // Site-wide trust makes no sense for these; high-risk steps are approved one at a time (§8.1).
     const oneByOne = waiting.reason === 'exfiltration' || waiting.reason === 'secret' || waiting.reason === 'sensitivePage';
     // Nor for clicks on drawn content: each task's are judged by eye.
-    const canAllowSite = waiting.risk < 3 && !suspicious && !oneByOne && !['newSite', 'download', 'unseen', 'watch'].includes(waiting.reason);
+    const canAllowSite = waiting.risk < 3 && !suspicious && !oneByOne && !['newSite', 'download', 'unseen', 'watch', 'social'].includes(waiting.reason);
     const canAllowTask = waiting.risk < 3 && !oneByOne && waiting.reason !== 'watch';
     const typed = action?.tool === 'type' ? String(action.args.text ?? '') : '';
     const fullUrl = action?.tool === 'navigate' || action?.tool === 'open_tab' ? String(action.args.url ?? '') : '';

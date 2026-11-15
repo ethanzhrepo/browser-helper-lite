@@ -5,7 +5,7 @@ import { ACTIVE_STATUSES, type AgentClientMessage, type AgentTask } from '../../
 import type { ContextSnapshot, ErrorInfo, MessageRecord, Usage } from '../../src/shared/types';
 import { Button, IconButton } from '../../src/ui/Button';
 import { errorSummary, isSettingsError } from '../../src/ui/errors';
-import { Markdown } from '../../src/ui/Markdown';
+import { Markdown, PicturesContext, usePictures } from '../../src/ui/Markdown';
 import { openOptions } from '../../src/ui/navigation';
 import { AgentRunView } from './AgentRunView';
 
@@ -66,6 +66,7 @@ export function MessageList({ messages, tasks, pendingTaskId, canChange, speech,
   };
 
   const conversationId = messages[0]?.conversationId;
+  const pictures = usePictures(conversationId);
   const conversationTasks = Object.values(tasks).filter((task) => task.conversationId === conversationId);
   const active = conversationTasks.some((task) => ACTIVE_STATUSES.includes(task.status));
   const last = messages.at(-1);
@@ -74,6 +75,7 @@ export function MessageList({ messages, tasks, pendingTaskId, canChange, speech,
   const replied = new Set(messages.filter((m) => m.role === 'assistant' && m.taskId).map((m) => m.taskId));
 
   return (
+    <PicturesContext.Provider value={pictures}>
     <div className="relative flex min-h-0 flex-1 flex-col">
       <div ref={scrollRef} onScroll={onScroll} className="flex-1 overflow-y-auto px-3.5 pb-2 pt-5" data-testid="message-list">
         <div className="mx-auto flex max-w-3xl flex-col gap-6">
@@ -121,6 +123,7 @@ export function MessageList({ messages, tasks, pendingTaskId, canChange, speech,
         </button>
       )}
     </div>
+    </PicturesContext.Provider>
   );
 }
 

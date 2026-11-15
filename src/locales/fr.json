@@ -54,7 +54,8 @@
       "prices": "Comparer les prix ailleurs",
       "reviews": "Résumer les avis",
       "flaws": "À quoi faire attention avant d'acheter",
-      "deal": "Est-ce une bonne affaire ?"
+      "deal": "Est-ce une bonne affaire ?",
+      "reputation": "Ce qu'on en dit"
     },
     "tip": "/ pour les commandes · @ pour joindre une page, une sélection ou un onglet",
     "body": "Posez une question sur cette page, ou confiez-moi une tâche dans vos onglets.",
@@ -89,7 +90,8 @@
     "regionFailed": "La capture a échoué. Faites un clic droit sur la page et choisissez « Poser une question sur une partie de la page ».",
     "removeImage": "Retirer l'image",
     "imageAlt": "Partie de {{site}}",
-    "removeCommand": "Retirer la commande"
+    "removeCommand": "Retirer la commande",
+    "removeSkill": "Retirer la compétence"
   },
   "context": {
     "unavailable": "Cette page ne peut pas être lue",
@@ -149,6 +151,11 @@
       "label": "Bonne affaire ?",
       "description": "La remise est-elle réelle",
       "prompt": "Ce prix est-il une bonne affaire ? Vérifie si la remise est réelle (le prix des derniers mois, le prix ailleurs), compare avec des produits similaires, et dis-moi : acheter maintenant, attendre ou passer, et pourquoi."
+    },
+    "reputation": {
+      "label": "Réputation",
+      "description": "Tests et avis des utilisateurs",
+      "prompt": "Que dit-on de ce produit ? Regarde les tests et ce que rapportent les utilisateurs sur les forums et les réseaux sociaux. Dis-moi ce qui plaît et ce qui est reproché, avec les liens vers les sources."
     }
   },
   "message": {
@@ -209,7 +216,8 @@
       "about": "À propos",
       "agent": "Agent",
       "search": "Recherche",
-      "voice": "Voix"
+      "voice": "Voix",
+      "skills": "Compétences"
     }
   },
   "connections": {
@@ -301,6 +309,13 @@
       "confirmEach": "Demander à chaque fois",
       "confirmRisky": "Demander si risqué",
       "auto": "Automatique (sauf haut risque)"
+    },
+    "social": {
+      "title": "Forums et réseaux sociaux",
+      "description": "Ici, l'assistant se contente de lire, dans l'onglet, connecté comme vous. Un j'aime, un vote, un abonnement ou une publication vous est toujours demandé d'abord. Un site de la liste couvre ses sous-domaines.",
+      "pages": "Pages d'un tel site consultées par demande",
+      "none": "Aucun site : ces règles ne s'appliquent nulle part.",
+      "restore": "Rétablir"
     }
   },
   "language": {
@@ -414,7 +429,8 @@
       "view_page": "Regarder la page",
       "click_at": "Cliquer sur {{target}} en {{x}}, {{y}}",
       "research_pages": "Recherche approfondie : {{question}}",
-      "watch_page": "Surveiller {{site}} : {{condition}}"
+      "watch_page": "Surveiller {{site}} : {{condition}}",
+      "load_skill": "Utiliser la compétence : {{name}}"
     },
     "directions": {
       "up": "le haut",
@@ -443,7 +459,8 @@
         "download": "Télécharge un fichier. N'autorisez que les fichiers attendus.",
         "sensitivePage": "Cette page gère la sécurité du compte, des clés ou des paiements : chaque modification est demandée.",
         "unseen": "L'assistant ne peut pas lire ce qui est dessiné ici. Vérifiez l'image.",
-        "watch": "La page est relue en arrière-plan, sans y toucher, pendant 30 jours au plus. Votre modèle n'est interrogé que lorsque ce qui est surveillé change."
+        "watch": "La page est relue en arrière-plan, sans y toucher, pendant 30 jours au plus. Votre modèle n'est interrogé que lorsque ce qui est surveillé change.",
+        "social": "Ceci agit en votre nom sur un réseau social (un j'aime, un abonnement, une publication)."
       },
       "allowOnce": "Autoriser une fois",
       "allowTask": "Autoriser pour cette tâche",
@@ -749,5 +766,49 @@
       "confirm": "Pendant les {{minutes}} prochaines minutes, cette page est rechargée toutes les {{seconds}} secondes. Le site peut répondre par un CAPTCHA ou vous bloquer. Commencer ?"
     },
     "retry": "ralentie, prochain essai à {{time}}"
+  },
+  "skills": {
+    "title": "Compétences",
+    "description": "Comment l'assistant s'y prend pour un type de travail, et à quoi ressemble sa réponse. Il charge une compétence quand le travail se présente.",
+    "builtin": "Intégrées",
+    "builtinHint": "Fournies avec l'extension. Désactivez celles dont vous ne voulez pas.",
+    "installed": "Installées",
+    "installedHint": "Les compétences que vous avez écrites ou installées. Tapez une barre oblique et le nom pour en utiliser une.",
+    "show": "Afficher les instructions",
+    "export": "Télécharger en fichier",
+    "add": {
+      "file": "Depuis un fichier",
+      "write": "En écrire une",
+      "address": "Adresse d'un fichier de compétence",
+      "addressPlaceholder": "https://… (un fichier de compétence, p. ex. sur GitHub)",
+      "fetch": "Récupérer"
+    },
+    "form": {
+      "review": "À lire avant d'installer",
+      "write": "Nouvelle compétence",
+      "change": "Modifier la compétence",
+      "note": "Une compétence, ce sont des instructions que l'assistant suit comme si elles venaient de vous. N'installez que ce que vous avez lu. C'est du texte, pas du code, et elle ne peut pas désactiver les approbations.",
+      "name": "Nom",
+      "nameHint": "Lettres, chiffres et traits d'union.",
+      "description": "Quand l'utiliser",
+      "descriptionHint": "Une ligne. L'assistant la voit toujours et décide d'après elle.",
+      "instructions": "Instructions",
+      "instructionsHint": "{{used}} caractères sur {{max}}",
+      "sites": "Sites cités : {{sites}}",
+      "install": "Installer"
+    },
+    "errors": {
+      "header": "Ce n'est pas un fichier de compétence : il doit commencer par un en-tête (name, description) entre deux lignes « --- ».",
+      "name": "Donnez un nom à la compétence.",
+      "builtinName": "Une compétence intégrée porte ce nom. Choisissez-en un autre.",
+      "taken": "Une compétence de ce nom est déjà installée.",
+      "description": "Dites en une ligne quand l'utiliser.",
+      "descriptionLong": "La description est trop longue.",
+      "instructions": "La compétence n'a pas d'instructions.",
+      "instructionsLong": "Les instructions sont trop longues.",
+      "tooMany": "{{max}} compétences installées au maximum.",
+      "address": "Saisissez une adresse qui commence par https://.",
+      "fetch": "Le fichier n'a pas pu être récupéré. Téléchargez-le et utilisez « Depuis un fichier »."
+    }
   }
 }

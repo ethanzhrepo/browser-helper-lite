@@ -1,8 +1,11 @@
 import { browser } from 'wxt/browser';
 import { z } from 'zod';
+import type { ReplyPicture } from '../agent/pictures';
+import { MAX_SOCIAL_PAGES, MAX_SOCIAL_SITES } from '../agent/social';
 import { ACTIVE_STATUSES, type AgentTask, type StepShot } from '../agent/types';
 import { normalizeBaseURL } from '../providers/vendors';
 import type { ConversationRecord, MessageRecord, Settings } from '../shared/types';
+import { MAX_INSTALLED_SKILLS, SKILL_DESCRIPTION_CHARS, SKILL_INSTRUCTION_CHARS, SKILL_NAME_CHARS } from '../skills/skills';
 import { MAX_KDF_ITERATIONS, MIN_KDF_ITERATIONS, seal, unseal, type Sealed } from './backup-crypto';
 import { db } from './db';
 import { loadSecrets, loadSettings, replaceSettings, withDefaults } from './settings';
@@ -50,6 +53,19 @@ const settingsSchema = z.looseObject({
     })
     .optional(),
   sitePolicies: z.record(z.string(), z.enum(['blocked', 'readOnly', 'confirmEach', 'confirmRisky', 'auto'])).optional(),
+  skills: z
+    .object({
+      installed: z.array(z.object({ name: z.string().min(1).max(SKILL_NAME_CHARS), description: z.string().max(SKILL_DESCRIPTION_CHARS), instructions: z.string().max(SKILL_INSTRUCTION_CHARS) })).max(MAX_INSTALLED_SKILLS),
+      off: z.array(z.string().max(SKILL_NAME_CHARS)).max(200),
+    })
+    .optional(),
+  social: z
+    .object({
+      added: z.array(z.string().max(253)).max(MAX_SOCIAL_SITES),
+      removed: z.array(z.string().max(253)).max(MAX_SOCIAL_SITES),
+      pages: z.number().int().min(1).max(MAX_SOCIAL_PAGES),
+    })
+    .optional(),
   commands: z.array(savedCommand.extend({ id: z.string().min(1), prompt: z.string(), createdAt: z.number() })).optional(),
   checkUpdates: z.boolean().optional(),
 });
@@ -93,6 +109,7 @@ const messageSchema = z.object({
     )
     .optional(),
   command: savedCommand.optional(),
+  skills: z.array(z.string().max(SKILL_NAME_CHARS)).max(10).optional(),
   tab: z.object({ title: z.string(), url: z.string() }).optional(),
   status: z.enum(['done', 'error', 'aborted']),
   error: errorInfo.optional(),
@@ -133,6 +150,18 @@ const taskSchema = z.looseObject({
   updatedAt: z.number(),
 });
 
+const pictureSchema = z.object({
+  id: z.string().min(1),
+  conversationId: z.string().min(1),
+  url: z.string().max(2000),
+  // Shown as an image: nothing else may be in it.
+  image: z.string().regex(/^[A-Za-z0-9+/]+={0,2}$/),
+  mediaType: z.enum(['image/webp', 'image/jpeg', 'image/png']),
+  width: z.number(),
+  height: z.number(),
+  at: z.number(),
+});
+
 const shotSchema = z.object({
   id: z.string().min(1),
   taskId: z.string().min(1),
@@ -157,6 +186,7 @@ const backupSchema = z.object({
   messages: z.array(messageSchema).optional(),
   tasks: z.array(taskSchema).optional(),
   shots: z.array(shotSchema).optional(),
+  pictures: z.array(pictureSchema).optional(),
 });
 
 const encryptedSchema = z.object({
@@ -193,6 +223,8 @@ export interface Backup {
   tasks?: AgentTask[];
   /** Replay pictures of the tasks. */
   shots?: StepShot[];
+  /** The pictures shown in replies. */
+  pictures?: ReplyPicture[];
 }
 
 export async function buildBackup({ includeKeys, includeConversations = true }: { includeKeys: boolean; includeConversations?: boolean }): Promise<Backup> {
@@ -210,7 +242,8 @@ export async function buildBackup({ includeKeys, includeConversations = true }: 
   const tasks = (await db.tasks.toArray()).filter((task) => !task.discardedAt && kept.has(task.conversationId));
   const taskIds = new Set(tasks.map((task) => task.id));
   const shots = (await db.shots.toArray()).filter((shot) => taskIds.has(shot.taskId));
-  return { ...backup, conversations, messages, tasks, ...(shots.length ? { shots } : {}) };
+  const pictures = (await db.pictures.toArray()).filter((picture) => kept.has(picture.conversationId));
+  return { ...backup, conversations, messages, tasks, ...(shots.length ? { shots } : {}), ...(pictures.length ? { pictures } : {}) };
 }
 
 /**
@@ -301,8 +334,9 @@ export async function restoreBackup(backup: Backup): Promise<RestoreSummary> {
   if (conversations.length > 0) {
     const ids = new Set(conversations.map((c) => c.id));
     const now = Date.now();
-    await db.transaction('rw', db.conversations, db.messages, db.tasks, db.shots, async () => {
+    await db.transaction('rw', db.conversations, db.messages, db.tasks, db.shots, db.pictures, async () => {
       await db.shots.bulkPut((backup.shots ?? []).filter((shot) => ids.has(shot.conversationId)));
+      await db.pictures.bulkPut((backup.pictures ?? []).filter((picture) => ids.has(picture.conversationId)));
       await db.conversations.bulkPut(conversations);
       await db.messages.bulkPut((backup.messages ?? []).filter((m) => ids.has(m.conversationId)));
       await db.tasks.bulkPut(

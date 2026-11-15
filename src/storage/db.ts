@@ -1,5 +1,6 @@
 import Dexie, { type Table } from 'dexie';
 import { monotonicFactory } from 'ulid';
+import type { ReplyPicture } from '../agent/pictures';
 import { ACTIVE_STATUSES, type AgentTask, type StepShot } from '../agent/types';
 import type { ConversationRecord, MessageRecord } from '../shared/types';
 import type { Watch } from '../watch/watch';
@@ -12,6 +13,8 @@ class HelperDatabase extends Dexie {
   shots!: Table<StepShot, string>;
   /** Pages the assistant looks at again and again for the user (see watch.ts). */
   watches!: Table<Watch, string>;
+  /** Small copies of the pictures shown in replies (see pictures.ts). */
+  pictures!: Table<ReplyPicture, string>;
 
   constructor() {
     super('browser-helper');
@@ -25,6 +28,9 @@ class HelperDatabase extends Dexie {
     this.version(3).stores({
       shots: 'id, taskId, conversationId',
       watches: 'id, status',
+    });
+    this.version(4).stores({
+      pictures: 'id, conversationId',
     });
   }
 }
@@ -135,12 +141,13 @@ export async function restoreConversation(id: string): Promise<boolean> {
  * deleted, so a later sync can pass the deletion on.
  */
 export async function purgeConversation(id: string): Promise<void> {
-  await db.transaction('rw', db.conversations, db.messages, db.tasks, db.shots, async () => {
+  await db.transaction('rw', db.conversations, db.messages, db.tasks, db.shots, db.pictures, async () => {
     const conversation = await db.conversations.get(id);
     if (!conversation?.deletedAt || conversation.purgedAt) return;
     await db.messages.where('conversationId').equals(id).delete();
     await db.tasks.where('conversationId').equals(id).delete();
     await db.shots.where('conversationId').equals(id).delete();
+    await db.pictures.where('conversationId').equals(id).delete();
     await db.conversations.update(id, { title: '', purgedAt: Date.now() });
   });
 }
@@ -163,7 +170,7 @@ export async function purgeDeleted(now = Date.now()): Promise<number> {
  */
 export async function truncateConversation(conversationId: string, fromMessageId: string, { keepFirst = false } = {}): Promise<void> {
   const now = Date.now();
-  await db.transaction('rw', db.conversations, db.messages, db.tasks, db.shots, async () => {
+  await db.transaction('rw', db.conversations, db.messages, db.tasks, db.shots, db.pictures, async () => {
     await db.messages
       .where('conversationId')
       .equals(conversationId)
@@ -176,6 +183,7 @@ export async function truncateConversation(conversationId: string, fromMessageId
         delete m.contexts;
         delete m.images;
         delete m.command;
+        delete m.skills;
         delete m.tab;
         delete m.error;
         delete m.usage;
@@ -203,8 +211,8 @@ export async function truncateConversation(conversationId: string, fromMessageId
 
 /** Erases every conversation, message and task record. */
 export async function clearConversations(): Promise<void> {
-  await db.transaction('rw', db.conversations, db.messages, db.tasks, db.shots, async () => {
-    await Promise.all([db.conversations.clear(), db.messages.clear(), db.tasks.clear(), db.shots.clear()]);
+  await db.transaction('rw', db.conversations, db.messages, db.tasks, db.shots, db.pictures, async () => {
+    await Promise.all([db.conversations.clear(), db.messages.clear(), db.tasks.clear(), db.shots.clear(), db.pictures.clear()]);
   });
 }
 
@@ -222,6 +230,14 @@ export async function saveShot(shot: StepShot): Promise<void> {
   await db.transaction('rw', db.conversations, db.shots, async () => {
     if ((await db.conversations.get(shot.conversationId))?.purgedAt) return;
     await db.shots.put(shot);
+  });
+}
+
+/** Stores a reply's picture, unless its conversation was erased meanwhile. */
+export async function savePicture(picture: ReplyPicture): Promise<void> {
+  await db.transaction('rw', db.conversations, db.pictures, async () => {
+    if ((await db.conversations.get(picture.conversationId))?.purgedAt) return;
+    await db.pictures.put(picture);
   });
 }
 

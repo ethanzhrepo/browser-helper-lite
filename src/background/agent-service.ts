@@ -17,7 +17,7 @@ import { pickSlot } from '../providers/resolve';
 import type { Locale, Settings } from '../shared/types';
 import { appendMessage, db, getMessages, getTasks, markInterruptedTasks, purgeDeleted, saveTask } from '../storage/db';
 import { loadSettings, updateSettings, watchSettings } from '../storage/settings';
-import { linkTab, unlinkTab } from '../storage/tab-conversations';
+import { conversationForTab, linkTab, unlinkTab } from '../storage/tab-conversations';
 import { isExtensionPage } from './trust';
 import { createWatch } from './watch-service';
 
@@ -201,6 +201,30 @@ async function startTask(message: Extract<AgentClientMessage, { type: 'start' }>
 /** Titles our tab groups may have, in every UI language. */
 const GROUP_TITLES = new Set(LOCALES.map((locale) => resources[locale].translation.agent.groupTitle));
 
+/**
+ * The tabs of one of the assistant's groups show one conversation. A tab
+ * that comes into such a group (opened in it by the user, or dragged in) is
+ * linked to the conversation that the group's other tabs show, so the panel
+ * shows it there too.
+ */
+async function adoptIntoGroup(tabId: number, groupId: number | undefined) {
+  if (groupId === undefined || groupId < 0) return;
+  const group = await browser.tabGroups.get(groupId).catch(() => undefined);
+  if (!group?.title || !GROUP_TITLES.has(group.title)) return;
+  const others = (await browser.tabs.query({ groupId }).catch(() => [])).filter((tab) => tab.id !== undefined && tab.id !== tabId);
+  // Most of the group's tabs decide, should they ever disagree.
+  const counts = new Map<string, number>();
+  for (const tab of others) {
+    const linked = await conversationForTab(tab.id!);
+    if (linked) counts.set(linked, (counts.get(linked) ?? 0) + 1);
+  }
+  const conversationId = [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
+  if (!conversationId || (await conversationForTab(tabId)) === conversationId) return;
+  // Still in the group: it may have been moved on while this looked.
+  if ((await browser.tabs.get(tabId).catch(() => undefined))?.groupId !== groupId) return;
+  await linkTab(tabId, conversationId);
+}
+
 /** A new chat puts the tabs grouped by this conversation back as they were (M1.5 A4). */
 async function releaseTabs(conversationId: string) {
   const tasks = await getTasks(conversationId, { discarded: true });
@@ -305,6 +329,14 @@ export function registerAgentService(): void {
 
   // A closed tab's conversation stays in the history; only the link goes.
   browser.tabs.onRemoved.addListener((tabId) => void unlinkTab(tabId));
+
+  // A tab that enters one of the assistant's groups shows the group's conversation.
+  browser.tabs.onCreated.addListener((tab) => {
+    if (tab.id !== undefined) void adoptIntoGroup(tab.id, tab.groupId);
+  });
+  browser.tabs.onUpdated.addListener((tabId, change) => {
+    if (change.groupId !== undefined) void adoptIntoGroup(tabId, change.groupId);
+  });
 
   // Switching the mode (or a site policy) applies to running turns at once.
   watchSettings((settings) => {

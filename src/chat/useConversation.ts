@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 import type { ContextSnapshot, ConversationRecord, MessageRecord } from '../shared/types';
 
-type Extras = Pick<MessageRecord, 'images' | 'command' | 'tab'>;
+type Extras = Pick<MessageRecord, 'images' | 'command' | 'tab' | 'skills'>;
 import { appendMessage, createConversation, deriveTitle, getConversation, getMessages } from '../storage/db';
 
 /**
@@ -15,10 +15,10 @@ export function useConversation() {
 
   /** Appends a user message, creating the conversation on the first one. */
   const appendUser = useCallback(
-    async ({ text, contexts, images, command, tab, taskId }: { text: string; contexts?: ContextSnapshot[]; taskId: string } & Extras) => {
+    async ({ text, contexts, images, command, tab, skills, taskId }: { text: string; contexts?: ContextSnapshot[]; taskId: string } & Extras) => {
       const current = conversation ?? (await createConversation(deriveTitle(text)));
       setConversation(current);
-      const message = await appendMessage({ conversationId: current.id, role: 'user', content: text, contexts, ...(images?.length ? { images } : {}), ...(command ? { command } : {}), ...(tab ? { tab } : {}), status: 'done', taskId });
+      const message = await appendMessage({ conversationId: current.id, role: 'user', content: text, contexts, ...(images?.length ? { images } : {}), ...(command ? { command } : {}), ...(tab ? { tab } : {}), ...(skills?.length ? { skills } : {}), status: 'done', taskId });
       setMessages((previous) => [...previous, message]);
       return { conversationId: current.id, message };
     },

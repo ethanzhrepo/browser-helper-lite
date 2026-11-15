@@ -13,13 +13,16 @@ import { searchApiKey } from '../search/keys';
 import { apiSearch, buildSearchUrl, deepseekFetch, fetchEndpoint, formatSearchResults, readsThroughDeepSeek, searchEndpoint } from '../search/search';
 import type { Locale, MessageImage, MessageRecord, SearchProviderId, Settings, SitePolicy } from '../shared/types';
 import { ActionError, AgentBrowser, sleep, unwrap, type GroupStatus, type Screen } from './browser-controller';
+import { addressesIn, allowedPictures, fetchPicture, pictureId, pictureKey, picturesIn, replyPictures } from './pictures';
+import { isSocialAct, SOCIAL_IN_TAB, socialLimitNote, socialPages, socialSite, socialSites } from './social';
 import { containsCardNumber, containsSecret, findInjection, newBoundary, siteOf, urlDataLeak, wrapUntrusted } from './injection';
 import { decide, modeDecision, policyFor, type ActionKind } from './policy';
 import { buildAssistantSystemPrompt, currentTabNote, formatView, newTextNote, OUTDATED_VIEW, viewText, type ObservedState } from './prompt';
 import type { TargetInfo } from './page/types';
 import { actionKind, classifyAction, downloadRisk, formSubmission } from './risk';
 import { cachedInstructions, cacheOptions, withBreakpoint } from '../providers/caching';
-import { saveShot } from '../storage/db';
+import { enabledSkills, findSkill, renderSkill } from '../skills/skills';
+import { db, savePicture, saveShot } from '../storage/db';
 import { clampSeconds, WATCH_DAYS, type Watch } from '../watch/watch';
 import { cropPreview, thumbnail } from './screenshot';
 import { isSensitivePage } from './sensitive';
@@ -196,6 +199,10 @@ export class AgentRunner {
   private imagesRejected = false;
   /** The text of the page in the last view, to tell the model what an action changed. */
   private lastView: { page: string; text: string[] } | undefined;
+  /** The pages looked at on each forum or social site in this turn (see social.ts). */
+  private readonly socialPages = new Map<string, Set<string>>();
+  /** Skills whose instructions are in this turn's conversation already. */
+  private readonly loadedSkills = new Set<string>();
   /** A click held back because it repeated the one before on a button that adds or sends something (see elementAction). */
   private heldRepeat: string | undefined;
   /** How often this turn has come to each page, to notice going back and forth. */
@@ -450,12 +457,24 @@ export class AgentRunner {
 
   // ---- Conversation ----
 
+  /** The instructions of the skills a request was sent with, as they go with the request; nothing when there are none (any more). */
+  private chosenSkills(names: string[] | undefined): string {
+    const chosen = (names ?? []).map((name) => findSkill(this.settings, name)).filter((skill) => skill !== undefined);
+    if (chosen.length === 0) return '';
+    // Their text is in the conversation: load_skill need not bring it again.
+    for (const skill of chosen) this.loadedSkills.add(skill.name);
+    return `The user chose ${chosen.length > 1 ? 'these skills' : 'this skill'} for the request:\n${chosen.map(renderSkill).join('\n')}`;
+  }
+
   /** Stored history plus a note about the tab the user is looking at. */
   private async initialMessages(): Promise<ModelMessage[]> {
     // Earlier requests keep the note of the tab they were sent from, so they read the same in every call.
-    const turns = buildHistory(this.history, (message, latest) =>
-      latest || !message.tab ? undefined : currentTabNote(message.tab, Boolean(message.tab.url) && !isRestrictedUrl(message.tab.url)),
-    );
+    // So do the skills chosen for them: a follow-up question is answered with the same instructions at hand.
+    const turns = buildHistory(this.history, (message, latest) => {
+      if (latest) return undefined;
+      const notes = [message.tab && currentTabNote(message.tab, Boolean(message.tab.url) && !isRestrictedUrl(message.tab.url)), this.chosenSkills(message.skills)];
+      return notes.filter(Boolean).join('\n\n') || undefined;
+    });
     const last = turns.at(-1);
     if (!last || last.role !== 'user') throw new Error('There is no message to reply to.');
     const tab = await browser.tabs.get(this.task.startTabId).catch(() => undefined);
@@ -478,6 +497,9 @@ export class AgentRunner {
       if (command.startUrl) this.rememberHost(command.startUrl);
       last.content += `\n\nThe user ran a saved command. Last time this request was done with the steps below. Pages change: take them as a hint for where to go and what to press, and decide every step from what the page shows now.\n${this.untrusted('previous_steps', attributes, command.steps.join('\n'), 'attachment')}`;
     }
+    // Skills the user chose for this request (a slash command, a quick action) come with it: no call is needed to load them.
+    const chosen = this.chosenSkills(request?.skills);
+    if (chosen) last.content += `\n\n${chosen}`;
     const messages: ModelMessage[] = turns.map((turn) => ({ role: turn.role, content: turn.content }));
     const images = request?.images ?? [];
     if (images.length > 0) {
@@ -553,6 +575,54 @@ export class AgentRunner {
       rendered.push({ role: 'user', content: [{ type: 'text', text: screenNote(shot) }, { type: 'image', image: shot.image, mediaType: 'image/jpeg' }] });
     }
     return withBreakpoint(rendered, repeats ?? rendered.length - 1);
+  }
+
+  // ---- Pictures in the reply ----
+
+  /** Every address in what the assistant was given to read in this turn: what the user sent, and what tools returned. Not what the model wrote. */
+  private seenAddresses(): Set<string> {
+    const seen = new Set<string>();
+    const add = (text: string) => {
+      for (const address of addressesIn(text)) seen.add(pictureKey(address));
+    };
+    for (const message of this.messages) {
+      if (message.role === 'user') {
+        if (typeof message.content === 'string') add(message.content);
+        else for (const part of message.content) if (part.type === 'text') add(part.text);
+      } else if (message.role === 'tool') {
+        for (const part of message.content) {
+          if (part.type !== 'tool-result') continue;
+          if (part.output.type === 'text') add(part.output.value);
+          else if (part.output.type === 'json') add(JSON.stringify(part.output.value));
+        }
+      }
+    }
+    for (const view of this.views.values()) add(view);
+    return seen;
+  }
+
+  /**
+   * Fetches the pictures the reply shows and keeps small copies with the
+   * conversation, for the panel to show (see pictures.ts). Only addresses
+   * that the assistant read; never one on a site the user blocked.
+   */
+  private async keepPictures(reply: string): Promise<void> {
+    if (replyPictures(reply).length === 0) return;
+    const conversationId = this.task.conversationId;
+    await Promise.all(
+      allowedPictures(reply, this.seenAddresses()).map(async (url) => {
+        try {
+          if (policyFor(hostOf(url), this.settings.sitePolicies) === 'blocked') return;
+          const id = pictureId(conversationId, url);
+          if (await db.pictures.get(id)) return;
+          const picture = await fetchPicture(url, this.abort.signal);
+          if (picture) await savePicture({ id, conversationId, url: pictureKey(url), ...picture, at: Date.now() });
+        } catch (error) {
+          // A reply without its picture is still the reply: the panel shows a link instead.
+          console.debug('No picture', url, error);
+        }
+      }),
+    );
   }
 
   // ---- Screenshots ----
@@ -782,6 +852,7 @@ export class AgentRunner {
       if (toolCalls.length === 0 || atLimit || this.task.chatOnly) {
         // The replay ends on what the task left behind; taken before the task reports that it is done.
         if (this.frames > 0) await this.recordFrame(this.task.steps.length + 1);
+        await this.keepPictures(text);
         this.task.status = 'done';
         this.task.result = { success: true, summary: text.trim() || this.deps.t('agent.emptyAnswer') };
         return;
@@ -854,10 +925,11 @@ export class AgentRunner {
           mode: this.settings.agent.mode,
           chatOnly,
           readUrl: readsThroughDeepSeek(this.settings.search),
+          skills: enabledSkills(this.settings),
         }),
       ),
       messages,
-      ...(chatOnly ? {} : { tools: toolsFor(this.settings.search), toolChoice: atLimit ? ('none' as const) : ('auto' as const) }),
+      ...(chatOnly ? {} : { tools: toolsFor(this.settings.search, { skills: enabledSkills(this.settings).length > 0 }), toolChoice: atLimit ? ('none' as const) : ('auto' as const) }),
       temperature: this.settings.slots.chat?.temperature,
       providerOptions: cacheOptions(this.main.providerOptions, this.main.connection.vendor, this.task.conversationId),
       abortSignal: this.abort.signal,
@@ -941,6 +1013,13 @@ export class AgentRunner {
         const count = (this.visits.get(page) ?? 0) + 1;
         this.visits.set(page, count);
         if (count >= REVISIT_NOTE_AT) again = `\n\nNote from the extension: this is visit number ${count} to this page in this request. Going back and forth reads nothing new. Take in what you need with read_page or research_pages, then move on or answer.`;
+        // A forum or social site: a request looks at a few pages there, as a person would.
+        const site = this.social(state.tab.url);
+        if (site) {
+          const seen = this.socialPages.get(site) ?? new Set<string>();
+          this.socialPages.set(site, seen.add(withoutHash(state.tab.url)));
+          if (seen.size >= socialPages(this.settings.social)) again += `\n\nNote from the extension: ${socialLimitNote(site, seen.size)}`;
+        }
       }
       this.lastView = state.page.kind === 'page' ? { page, text } : undefined;
       const view = formatView(state, this.boundary, changes);
@@ -1134,10 +1213,20 @@ export class AgentRunner {
           action.result = `The user blocked ${host} for the assistant.`;
           return 'continue';
         }
+        if (this.social(url)) throw new ActionError(`${host} is ${SOCIAL_IN_TAB}.`);
         action.target = SEARCH_LABELS.deepseek;
         // The address goes to DeepSeek and from there to the site: the same checks as for opening it.
         if (!(await this.allowNavigation(action, url))) return 'continue';
         action.result = await this.readUrl(url);
+        return 'continue';
+      }
+      case 'load_skill': {
+        const skill = findSkill(this.settings, str('name'));
+        if (!skill) throw new ActionError(`There is no skill called "${str('name')}". The skills are: ${enabledSkills(this.settings).map((s) => s.name).join(', ') || 'none'}.`);
+        action.target = skill.name;
+        // Loaded once: its text stays in the conversation.
+        action.result = this.loadedSkills.has(skill.name) ? `The skill "${skill.name}" is loaded already; its instructions are above.` : renderSkill(skill);
+        this.loadedSkills.add(skill.name);
         return 'continue';
       }
       case 'watch_page':
@@ -1175,6 +1264,11 @@ export class AgentRunner {
           return 'continue';
         }
         action.risk = 1;
+        if (this.socialLimit(url)) {
+          action.status = 'rejected';
+          action.result = this.socialLimit(url);
+          return 'continue';
+        }
         if (!(await this.allowNavigation(action, url))) return 'continue';
         if (action.tool === 'navigate') await this.ctl.navigate(url);
         else {
@@ -1345,6 +1439,19 @@ export class AgentRunner {
     let reason: RiskReason | undefined = classification.reason;
     // Some steps no rule can judge (a click on drawn content): the user does, whatever the mode.
     if (decision === 'allow' && classification.confirm) decision = 'confirm';
+    // On a forum or social site the assistant reads. What acts in the user's name there (a like, a vote, a follow, a post) waits for the user.
+    if (decision === 'allow' && this.social(tab.url ?? '') && target && kind === 'change' && (classification.risk >= 2 || isSocialAct(target))) {
+      decision = 'confirm';
+      reason = 'social';
+      action.risk = Math.max(classification.risk, 2) as typeof action.risk;
+    }
+    // A link to one more page of a social site whose limit for this request is reached.
+    const limit = kind === 'browse' && target?.href ? this.socialLimit(target.href) : undefined;
+    if (limit) {
+      action.status = 'rejected';
+      action.result = limit;
+      return 'continue';
+    }
     // Account security, keys, consoles and payments: every change waits for the user, whatever the mode or policy.
     if (decision === 'allow' && classification.risk >= 1 && kind !== 'browse' && isSensitivePage(tab.url ?? '')) {
       decision = 'confirm';
@@ -1368,7 +1475,7 @@ export class AgentRunner {
     }
     // Steps on sensitive pages are approved one at a time.
     // Allowing ordinary steps for the task does not cover clicks on drawn content, nor the other way round.
-    const allowScope = reason === 'injection' || reason === 'unseen' ? reason : classification.risk;
+    const allowScope = reason === 'injection' || reason === 'unseen' || reason === 'social' ? reason : classification.risk;
     const allowKey = reason === 'sensitivePage' ? undefined : `${allowScope}|${host}`;
     if (decision === 'confirm' && !(allowKey && this.allowedThisTask.has(allowKey))) {
       const before = { tabId: tab.id, url: withoutHash(tab.url ?? '') };
@@ -1376,7 +1483,7 @@ export class AgentRunner {
       const response = await this.waitFor({
         kind: 'approval',
         actionId: action.id,
-        risk: classification.risk,
+        risk: reason === 'social' ? (Math.max(classification.risk, 2) as typeof classification.risk) : classification.risk,
         reason: reason ?? (mode === 'manual' ? 'manualMode' : 'confirmEach'),
         site: host,
         target: action.target ?? action.tool,
@@ -1405,7 +1512,7 @@ export class AgentRunner {
       // High-risk steps are approved one at a time (§8.1).
       if (choice === 'allowTask' && classification.risk < 3 && allowKey) this.allowedThisTask.add(allowKey);
       if (kind === 'browse' && target?.href) this.trustedSites?.add(siteOf(hostOf(target.href)));
-      if (choice === 'allowSite' && classification.risk < 3 && reason !== 'injection' && reason !== 'sensitivePage' && reason !== 'unseen') {
+      if (choice === 'allowSite' && classification.risk < 3 && reason !== 'injection' && reason !== 'sensitivePage' && reason !== 'unseen' && reason !== 'social') {
         await this.deps.saveSitePolicy(host, 'auto');
         this.settings = { ...this.settings, sitePolicies: { ...this.settings.sitePolicies, [host]: 'auto' } };
       }
@@ -1631,8 +1738,22 @@ export class AgentRunner {
     if (!host || !/^https?:\/\//i.test(url)) return 'not a web address';
     if (policyFor(host, this.settings.sitePolicies) === 'blocked') return `the user blocked ${host}`;
     if (urlDataLeak(url)) return 'the address carries data; open it by itself so the user can confirm';
+    if (this.social(url)) return SOCIAL_IN_TAB;
     if (!this.isTrustedHost(host) || !this.isKnownSite(host)) return 'this site has not come up in the task; open it by itself so the user can confirm';
     return undefined;
+  }
+
+  /** The forum or social site an address belongs to, by the user's list (Settings, Site access). */
+  private social(url: string): string | undefined {
+    return socialSite(hostOf(url), socialSites(this.settings.social));
+  }
+
+  /** Why no further page of a forum or social site may be opened in this turn, when its limit is reached and the page is not one already seen. */
+  private socialLimit(url: string): string | undefined {
+    const site = this.social(url);
+    const seen = site ? this.socialPages.get(site) : undefined;
+    if (!site || !seen || seen.size < socialPages(this.settings.social) || seen.has(withoutHash(url))) return undefined;
+    return socialLimitNote(site, seen.size);
   }
 
   /**
@@ -1677,7 +1798,10 @@ export class AgentRunner {
           maxRetries: 1,
         });
         this.addUsage(result.usage);
-        return notices + wrapUntrusted('source', this.boundary, { title: clip(page.title, 200), url }, clip(result.text.trim() || 'Nothing relevant.', RESEARCH_NOTE_CHARS));
+        // Notes leave the page's pictures out; the product's goes along, so the reply can show it.
+        const pictures = picturesIn(page.content);
+        const shown = pictures.length > 0 ? `\nPictures on the page: ${pictures.join(' ')}` : '';
+        return notices + wrapUntrusted('source', this.boundary, { title: clip(page.title, 200), url }, clip(result.text.trim() || 'Nothing relevant.', RESEARCH_NOTE_CHARS) + shown);
       } catch (error) {
         if (error instanceof StopError || this.stopped) throw new StopError();
         return `- ${url}: not read (${clip(error instanceof Error ? error.message : String(error), 160)}).`;

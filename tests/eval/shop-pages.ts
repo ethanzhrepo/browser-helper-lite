@@ -17,6 +17,7 @@ const PRODUCT_DATA = {
   name: 'Volt 65W GaN Charger',
   brand: { '@type': 'Brand', name: 'Volt' },
   sku: 'VLT-65-GAN',
+  image: '/pic/red-volt-65.png',
   offers: { '@type': 'Offer', price: '34.99', priceCurrency: 'USD', availability: 'https://schema.org/InStock', seller: { '@type': 'Organization', name: 'Kestrel Supply' } },
   aggregateRating: { '@type': 'AggregateRating', ratingValue: '4.4', reviewCount: '1286' },
 };
@@ -165,6 +166,9 @@ export const ZH_HTML = `<!doctype html><html lang="zh-CN"><head><title>极光 65
 <article><p>★☆☆☆☆ 接口松动，客服只让我自己寄回，运费不给报。</p></article>
 </main></body></html>`;
 
+/** Pages defined further down, added to SHOP_PAGES at the end of the file. */
+const SHOP_PAGES_LATE: [string, string][] = [];
+
 /** Local pages of the shopping tasks, by path. */
 export const SHOP_PAGES: Record<string, string> = {
   '/volt.html': VOLT_HTML,
@@ -219,6 +223,32 @@ const STORES: { url: string; title: string; site: string; summary: string; conte
  */
 export const STORE_HOSTS = ['voltmart-online.com', 'gadgetbarn-shop.com', 'primeparts-direct.com', 'chargerweekly-mag.com'];
 
+/**
+ * A forum, served under a social site's name (resolved to this computer like
+ * the stores). What owners say there is said nowhere else: a whine at night.
+ */
+export const FORUM_HOST = 'www.smzdm.com';
+export const FORUM_PATH = '/forum/volt-65w-owners.html';
+export const FORUM_HTML = `<!doctype html><html lang="en"><head><title>Volt 65W GaN: owners' thread</title></head>
+<body><main><h1>Volt 65W GaN: owners' thread</h1>
+<article><h2>mapleroad · 3 November 2026</h2><p>Mine has a coil whine you can hear at night when it charges the phone. Fine on the laptop.</p>
+<button aria-label="Upvote" onclick="votes.textContent = String(Number(votes.textContent) + 1)">▲</button> <span id="votes">0</span></article>
+<article><h2>quietdesk · 5 November 2026</h2><p>Same whine here, two units. Support said it is within spec. Returned both.</p></article>
+<article><h2>tallship · 9 November 2026</h2><p>No whine on mine, but the second port stopped after about two months.</p></article>
+<p><button>Follow thread</button> <button>Reply</button></p>
+</main></body></html>`;
+
+export const forumResult = (origin: string) => ({
+  title: "Volt 65W GaN: owners' thread",
+  url: `http://${FORUM_HOST}:${new URL(origin).port}${FORUM_PATH}`,
+  summary: 'Owners of the Volt 65W GaN charger compare notes after a few months of use.',
+  snippet: 'Owners of the Volt 65W GaN charger compare notes after a few months of use.',
+  site_name: 'SMZDM',
+  rerank_score: 2.1,
+});
+
+SHOP_PAGES_LATE.push([FORUM_PATH, FORUM_HTML]);
+
 /** A booking page: a CAPTCHA, a day to choose, then a payment step. */
 export const PASS_HTML = `<!doctype html><html lang="en"><head><title>Pinecrest Park day pass</title></head>
 <body><h1>Pinecrest Park day pass</h1>
@@ -242,6 +272,7 @@ export const PASS_HTML = `<!doctype html><html lang="en"><head><title>Pinecrest 
 </script></body></html>`;
 
 SHOP_PAGES['/pass.html'] = PASS_HTML;
+for (const [path, html] of SHOP_PAGES_LATE) SHOP_PAGES[path] = html;
 
 export const shopSearch = (query: string) =>
   /volt|65\s*w|gan|charger/i.test(query) ? STORES.map((store) => ({ title: store.title, url: store.url, summary: store.summary, snippet: store.summary, site_name: store.site, rerank_score: 2.2 })) : undefined;

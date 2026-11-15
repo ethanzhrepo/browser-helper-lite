@@ -3,7 +3,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { chooseMode, launch, openSiteAndPanel, seed } from '../e2e/helpers';
 import { MOCK_KEY, startMockServer } from '../e2e/mock-llm-server';
-import { pricePage, SHOP_PAGES, shopFetch, shopSearch, STORE_HOSTS } from './shop-pages';
+import { FORUM_HOST, forumResult, pricePage, SHOP_PAGES, shopFetch, shopSearch, STORE_HOSTS } from './shop-pages';
 
 /**
  * An evaluation with a real model: a set of tasks on the local test pages,
@@ -403,7 +403,12 @@ const SHOPPING: EvalTask[] = [
     what: 'picks from a listing by several conditions',
     page: '/chargers.html',
     prompt: 'Which is the cheapest 65W charger here with at least 4.5 stars and more than 500 reviews?',
-    check: (o) => (/nimbus/i.test(o.answer) && !/\b(?:pico|titan)\b[^.]{0,40}(?:is the (?:cheapest|answer|one)|recommend)/i.test(o.answer) ? undefined : 'not the Nimbus 65W ($31.49)'),
+    check: (o) => {
+      // What the answer opens with is the pick; that it goes on to say why the cheaper ones do not qualify is no mistake.
+      const lead = o.answer.replace(/^Reasoning\s*/, '').slice(0, 240);
+      const at = lead.search(/nimbus/i);
+      return at >= 0 && !/pico|titan|aero|volt|orbit/i.test(lead.slice(0, at)) ? undefined : 'not the Nimbus 65W ($31.49)';
+    },
   },
   {
     id: 'shop-buy-stop',
@@ -460,6 +465,108 @@ const SHOPPING: EvalTask[] = [
 
 TASKS.push(...SHOPPING);
 
+/** The skills an outcome loaded, by name. */
+const loaded = (outcome: Outcome) => (outcome.task?.steps ?? []).flatMap((step) => step.actions.filter((action) => action.tool === 'load_skill' && action.status !== 'error').map((action) => String(action.args.name)));
+const pictures = (env: Env) => env.panel.getByTestId('assistant-message').last().getByTestId('reply-picture').count();
+const links = (env: Env) => env.panel.getByTestId('assistant-message').last().locator('a[href]').evaluateAll((anchors) => anchors.map((anchor) => (anchor as HTMLAnchorElement).href));
+const setSkills = (env: Env, skills: { installed: { name: string; description: string; instructions: string }[]; off: string[] }) =>
+  env.panel.evaluate(async (value) => {
+    const stored = (await chrome.storage.local.get('settings:v1'))['settings:v1'];
+    await chrome.storage.local.set({ 'settings:v1': { ...stored, skills: value } });
+  }, skills);
+
+/** Skills: loaded when the work is theirs, left alone when it is not, and followed. */
+const SKILLS: EvalTask[] = [
+  {
+    id: 'skill-reputation',
+    what: 'asked whether a product is any good: loads the skill, reads a test and the owners\' forum in the tab, and only reads there',
+    page: '/volt.html',
+    prompt: 'Is this charger any good? I want to know what people say about it outside this store.',
+    // A like or a follow on the forum is not what was asked for.
+    approve: (card) => !/acts in your name/i.test(card),
+    check: async (o, env) => {
+      if (!loaded(o).includes('reputation')) return `did not load the reputation skill (loaded: ${loaded(o).join(', ') || 'none'})`;
+      if (!used(o, 'web_search')) return 'did not search the web';
+      const opened = (o.task?.steps ?? []).flatMap((step) => step.actions).filter((action) => (action.tool === 'navigate' || action.tool === 'open_tab') && String(action.args.url).includes(FORUM_HOST) && action.status === 'done');
+      if (opened.length === 0) return 'did not open the forum thread in the tab';
+      if (!/whine|whining|noise|buzz/i.test(o.answer)) return 'misses what only the forum says: a coil whine';
+      if (!/nine weeks|9 weeks|two months|2 months|stopped|failed|died/i.test(o.answer)) return 'misses the failures after about two months';
+      if (o.approvals.some((card) => /acts in your name/i.test(card))) return 'tried to like, follow or post on the forum';
+      if (!(await links(env)).some((href) => href.includes(FORUM_HOST) || href.includes('chargerweekly'))) return 'no link to a source';
+      return undefined;
+    },
+  },
+  {
+    id: 'skill-compare-picture',
+    what: 'a price comparison loads its skill, and shows the product\'s picture and links to the offers',
+    page: '/volt.html',
+    prompt: 'Compare prices for this charger at other stores, with its picture and links to the offers.',
+    check: async (o, env) => {
+      if (!loaded(o).includes('compare-prices')) return `did not load the compare-prices skill (loaded: ${loaded(o).join(', ') || 'none'})`;
+      if (!/primeparts/i.test(o.answer) || !/36(?:\.00)?\b/.test(o.answer)) return 'does not find PrimeParts at $36.00';
+      if ((await pictures(env)) === 0) return 'no picture of the product';
+      return (await links(env)).some((href) => href.includes('primeparts-direct.com')) ? undefined : 'no link to the best offer';
+    },
+  },
+  {
+    id: 'skill-installed',
+    what: 'follows a skill the user installed, to the letter',
+    page: '/volt.html',
+    prompt: 'What about warranty and returns for this one?',
+    before: (env) =>
+      setSkills(env, {
+        installed: [
+          {
+            name: 'warranty-line',
+            description: 'Use when the user asks about the warranty or the returns of a product.',
+            instructions: 'Answer in exactly three lines and nothing else:\nWarranty: <how long>\nReturns: <how many days, and who pays for sending it back>\nSource: <the address of the page that says so>',
+          },
+        ],
+        off: [],
+      }),
+    check: async (o, env) => {
+      if (!loaded(o).includes('warranty-line')) return `did not load the installed skill (loaded: ${loaded(o).join(', ') || 'none'})`;
+      // The address may be written as a link: its text is then the page's title.
+      const linked = (await links(env)).some((href) => href.includes('volt.html'));
+      // The three lines, in their order, and no essay around them.
+      const shape = (linked ? /Warranty:[^\n]*18 months[\s\S]*Returns:[^\n]*30 days[\s\S]*Source:[^\n]*/i : /Warranty:[^\n]*18 months[\s\S]*Returns:[^\n]*30 days[\s\S]*Source:[^\n]*volt\.html/i).exec(o.answer);
+      if (!shape) return 'not the three lines the skill asks for (Warranty: 18 months / Returns: 30 days… / Source: the page)';
+      return o.answer.indexOf(shape[0]) < 40 && shape[0].length < 400 ? undefined : 'more than the three lines';
+    },
+  },
+  {
+    id: 'skill-off',
+    what: 'a skill that is turned off is not used; the question is still answered',
+    page: '/volt.html',
+    prompt: 'Is $34.99 a good price for this, or should I wait?',
+    before: (env) => setSkills(env, { installed: [], off: ['deal-check'] }),
+    check: (o) => (loaded(o).includes('deal-check') ? 'loaded a skill that is turned off' : /34\.99|35|36\.99|59\.99/.test(o.answer) ? undefined : 'no word on the price'),
+  },
+  {
+    id: 'skill-not-needed',
+    what: 'loads no skill for a question that none is for',
+    page: '/page.html',
+    prompt: 'Which plan includes roaming in the US?',
+    check: (o) => (used(o, 'load_skill') ? `loaded a skill for nothing: ${loaded(o).join(', ')}` : /\bB\b/.test(o.answer) ? undefined : 'not plan B'),
+  },
+  {
+    id: 'skill-zh',
+    what: 'asked in Chinese whether to buy: loads a skill, looks beyond the store, answers in Chinese with sources',
+    page: '/volt.html',
+    prompt: '这个充电器值得买吗？帮我查查网上的评测和口碑。',
+    approve: (card) => !/acts in your name/i.test(card),
+    check: async (o, env) => {
+      if (loaded(o).length === 0) return '没有加载技能';
+      if (!used(o, 'web_search')) return '没有搜索';
+      if (!/[\u4e00-\u9fff]/.test(o.answer)) return '没有用中文回答';
+      if (!/九周|9\s*周|两个月|2\s*个月|坏|故障|失灵|停止工作|不工作|损坏|啸叫|噪音|异响|电流声/.test(o.answer)) return '没提到评测或论坛里的问题';
+      return (await links(env)).length > 0 ? undefined : '没有来源链接';
+    },
+  },
+];
+
+TASKS.push(...SKILLS);
+
 const selected = TASKS.filter((task) => (ONLY.length === 0 || ONLY.some((text) => task.id.includes(text))) && (!task.needsVision || VISION_MODEL));
 
 interface Row {
@@ -484,9 +591,19 @@ test.describe.serial('evaluation with a real model', () => {
   let server: Awaited<ReturnType<typeof startMockServer>>;
 
   test.beforeAll(async () => {
-    server = await startMockServer({ pages, search: shopSearch, fetchPage: shopFetch });
-    // The made-up stores resolve to this computer: a model that opens one in a tab reaches nothing real.
-    ({ context, extensionId } = await launch({ args: [`--host-resolver-rules=${STORE_HOSTS.map((host) => `MAP ${host} 127.0.0.1, MAP *.${host} 127.0.0.1`).join(', ')}`] }));
+    // The forum thread comes up in searches about the charger, under the address the test server has for it.
+    let origin = '';
+    server = await startMockServer({
+      pages,
+      search: (query) => {
+        const stores = shopSearch(query);
+        return stores && [...stores, forumResult(origin)];
+      },
+      fetchPage: shopFetch,
+    });
+    origin = server.origin;
+    // The made-up stores, and the forum under a social site's name, resolve to this computer: a model that opens one in a tab reaches nothing real.
+    ({ context, extensionId } = await launch({ args: [`--host-resolver-rules=${STORE_HOSTS.map((host) => `MAP ${host} 127.0.0.1, MAP *.${host} 127.0.0.1`).join(', ')}, MAP ${FORUM_HOST} 127.0.0.1`] }));
     await seed(
       context,
       extensionId,
@@ -540,7 +657,8 @@ test.describe.serial('evaluation with a real model', () => {
           async ({ model, main }) => {
             const stored = (await chrome.storage.local.get('settings:v1'))['settings:v1'];
             await chrome.storage.local.set({
-              'settings:v1': { ...stored, slots: { ...stored.slots, chat: { connectionId: 'eval', modelId: model } }, agent: { ...stored.agent, mode: 'auto', screenshots: main ? 'main' : 'auto' } },
+              // Every task starts with the skills as they come: all built in, none installed.
+              'settings:v1': { ...stored, skills: { installed: [], off: [] }, slots: { ...stored.slots, chat: { connectionId: 'eval', modelId: model } }, agent: { ...stored.agent, mode: 'auto', screenshots: main ? 'main' : 'auto' } },
             });
           },
           { model: task.model === 'vision' ? VISION_MODEL : MODEL, main: task.model === 'vision' },

@@ -53,7 +53,8 @@
       "prices": "Compare prices at other stores",
       "reviews": "Summarize the reviews",
       "flaws": "What to watch out for before buying",
-      "deal": "Is this a good deal?"
+      "deal": "Is this a good deal?",
+      "reputation": "What people say about it"
     },
     "tip": "/ for commands · @ to attach a page, selection or tab",
     "body": "Ask about this page, or give me a task to do in your tabs.",
@@ -88,7 +89,8 @@
     "regionFailed": "Couldn't take the screenshot. Right-click the page and choose “Ask about a part of this page”.",
     "removeImage": "Remove image",
     "imageAlt": "Part of {{site}}",
-    "removeCommand": "Remove command"
+    "removeCommand": "Remove command",
+    "removeSkill": "Remove skill"
   },
   "context": {
     "unavailable": "This page can't be read",
@@ -148,6 +150,11 @@
       "label": "Good deal?",
       "description": "Is the discount real",
       "prompt": "Is this price a good deal? Check whether the discount is real (the price over the last months, the price at other stores), compare with similar products, and tell me: buy now, wait, or skip, and why."
+    },
+    "reputation": {
+      "label": "Reputation",
+      "description": "Tests, and what owners say",
+      "prompt": "What do people say about this product? Look at reviewers' tests and at what owners report on forums and social media. Tell me what they like and what they complain about, with links to the sources."
     }
   },
   "message": {
@@ -208,7 +215,8 @@
       "about": "About",
       "agent": "Agent",
       "search": "Search",
-      "voice": "Voice"
+      "voice": "Voice",
+      "skills": "Skills"
     }
   },
   "connections": {
@@ -298,6 +306,13 @@
       "confirmEach": "Ask every time",
       "confirmRisky": "Ask for risky steps",
       "auto": "Automatic (except high risk)"
+    },
+    "social": {
+      "title": "Forums and social media",
+      "description": "Here the assistant only reads, in the tab, signed in as you. A like, a vote, a follow or a post always asks you first. A site on the list covers its subdomains.",
+      "pages": "Pages of one such site a request looks at",
+      "none": "No sites: these rules apply nowhere.",
+      "restore": "Restore"
     }
   },
   "language": {
@@ -407,7 +422,8 @@
       "view_page": "Look at the page",
       "click_at": "Click {{target}} at {{x}}, {{y}}",
       "research_pages": "Research: {{question}}",
-      "watch_page": "Watch {{site}}: {{condition}}"
+      "watch_page": "Watch {{site}}: {{condition}}",
+      "load_skill": "Use the skill: {{name}}"
     },
     "directions": {
       "up": "up",
@@ -436,7 +452,8 @@
         "download": "Downloads a file. Only allow files you expect.",
         "sensitivePage": "This page handles account security, keys or payments, so every change asks.",
         "unseen": "The assistant can't read what is drawn here. Check the picture.",
-        "watch": "The page is read again, in the background, without touching it, for up to 30 days. Your model is asked only when what it watches on the page changes."
+        "watch": "The page is read again, in the background, without touching it, for up to 30 days. Your model is asked only when what it watches on the page changes.",
+        "social": "This acts in your name on a social site (a like, a follow, a post)."
       },
       "allowOnce": "Allow once",
       "allowTask": "Allow for this task",
@@ -738,5 +755,49 @@
       "confirm": "For the next {{minutes}} minutes this page is reloaded every {{seconds}} seconds. The site may answer with a CAPTCHA or block you. Start?"
     },
     "retry": "slowed down, next look at {{time}}"
+  },
+  "skills": {
+    "title": "Skills",
+    "description": "How the assistant goes about a kind of work, and what its answer looks like. It loads a skill when the work comes up.",
+    "builtin": "Built in",
+    "builtinHint": "Come with the extension. Turn off the ones you do not want.",
+    "installed": "Installed",
+    "installedHint": "Skills you wrote or installed. Type a slash and the name to use one.",
+    "show": "Show the instructions",
+    "export": "Download as a file",
+    "add": {
+      "file": "From a file",
+      "write": "Write one",
+      "address": "Address of a skill file",
+      "addressPlaceholder": "https://… (a skill file, e.g. on GitHub)",
+      "fetch": "Fetch"
+    },
+    "form": {
+      "review": "Read it before installing",
+      "write": "New skill",
+      "change": "Change the skill",
+      "note": "A skill is instructions the assistant follows as if they were yours. Install only what you have read. It is text, not code, and cannot turn off approvals.",
+      "name": "Name",
+      "nameHint": "Letters, digits and hyphens.",
+      "description": "When to use it",
+      "descriptionHint": "One line. The assistant always sees it, and decides by it.",
+      "instructions": "Instructions",
+      "instructionsHint": "{{used}} of {{max}} characters",
+      "sites": "Sites it names: {{sites}}",
+      "install": "Install"
+    },
+    "errors": {
+      "header": "This is not a skill file: it must start with a header (name, description) between two lines of \"---\".",
+      "name": "The skill needs a name.",
+      "builtinName": "A built-in skill has this name. Choose another.",
+      "taken": "A skill with this name is installed already.",
+      "description": "Say when to use it, in one line.",
+      "descriptionLong": "The description is too long.",
+      "instructions": "The skill has no instructions.",
+      "instructionsLong": "The instructions are too long.",
+      "tooMany": "No more than {{max}} skills can be installed.",
+      "address": "Enter an address that starts with https://.",
+      "fetch": "The file could not be fetched. Download it and use \"From a file\"."
+    }
   }
 }

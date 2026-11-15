@@ -1,4 +1,4 @@
-import { Globe, Plus, Shield, Trash2 } from 'lucide-react';
+import { Globe, MessagesSquare, Plus, RotateCcw, Shield, Trash2, X } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { browser } from 'wxt/browser';
@@ -9,6 +9,7 @@ import {
   requestHostAccess,
   revokeOrigin,
 } from '../../src/permissions/hosts';
+import { DEFAULT_SOCIAL_SETTINGS, MAX_SOCIAL_PAGES, socialHost, socialPages, socialSites, withoutSocialSite, withSocialSite, type SocialSettings } from '../../src/agent/social';
 import type { Settings, SitePolicy } from '../../src/shared/types';
 import { updateSettings } from '../../src/storage/settings';
 import { Button, IconButton } from '../../src/ui/Button';
@@ -99,6 +100,92 @@ function SitePolicies({ settings }: { settings: Settings }) {
   );
 }
 
+function saveSocial(change: (social: SocialSettings) => SocialSettings) {
+  void updateSettings((s) => ({ ...s, social: change(s.social) }));
+}
+
+/** Forums and social media: which sites they are, and how many of their pages a request looks at (see social.ts). */
+function SocialSites({ settings }: { settings: Settings }) {
+  const { t } = useTranslation();
+  const social = settings.social;
+  const sites = socialSites(social);
+  const [site, setSite] = useState('');
+  const [pages, setPages] = useState(String(socialPages(social)));
+  useEffect(() => setPages(String(socialPages(social))), [social]);
+  const changed = social.added.length > 0 || social.removed.length > 0 || socialPages(social) !== DEFAULT_SOCIAL_SETTINGS.pages;
+
+  const add = () => {
+    if (!socialHost(site)) return;
+    saveSocial((current) => withSocialSite(current, site));
+    setSite('');
+  };
+  const commitPages = () => {
+    const value = socialPages({ ...social, pages: Number(pages) });
+    setPages(String(value));
+    if (value !== social.pages) saveSocial((current) => ({ ...current, pages: value }));
+  };
+
+  return (
+    <div className="space-y-3 pt-6" data-testid="social-sites">
+      <div className="flex items-start gap-3">
+        <IconBadge icon={MessagesSquare} />
+        <div className="min-w-0 flex-1">
+          <h3 className="text-[15px] font-semibold tracking-tight">{t('sites.social.title')}</h3>
+          <p className="mt-0.5 text-sm leading-relaxed text-muted">{t('sites.social.description')}</p>
+        </div>
+        {changed && (
+          <Button size="sm" onClick={() => saveSocial(() => DEFAULT_SOCIAL_SETTINGS)} data-testid="social-restore">
+            <RotateCcw className="h-3.5 w-3.5" />
+            {t('sites.social.restore')}
+          </Button>
+        )}
+      </div>
+      <Card className="divide-y divide-line p-0">
+        <label className="flex flex-wrap items-center gap-3 px-4 py-3 text-sm" htmlFor="social-pages">
+          <span className="min-w-0 flex-1">{t('sites.social.pages')}</span>
+          <input
+            id="social-pages"
+            type="number"
+            min={1}
+            max={MAX_SOCIAL_PAGES}
+            className={`${inputClass} w-24`}
+            value={pages}
+            onChange={(e) => setPages(e.target.value)}
+            onBlur={commitPages}
+            onKeyDown={(e) => e.key === 'Enter' && commitPages()}
+          />
+        </label>
+        <ul className="flex flex-wrap gap-1.5 px-4 py-3">
+          {sites.length === 0 && <li className="text-sm text-faint">{t('sites.social.none')}</li>}
+          {sites.map((name) => (
+            <li key={name} data-testid="social-site" className="flex items-center gap-1 rounded-full border border-line bg-surface py-0.5 pl-2.5 pr-1 font-mono text-xs">
+              {name}
+              <button type="button" aria-label={`${t('common.delete')} ${name}`} title={t('common.delete')} onClick={() => saveSocial((current) => withoutSocialSite(current, name))} className="rounded-full p-0.5 text-muted hover:bg-hover hover:text-fg">
+                <X className="h-3 w-3" />
+              </button>
+            </li>
+          ))}
+        </ul>
+        <div className="flex flex-wrap items-center gap-2 bg-subtle/50 px-4 py-3">
+          <input
+            aria-label={t('sites.hostLabel')}
+            className={`${inputClass} min-w-0 flex-1`}
+            placeholder="forum.example.com"
+            value={site}
+            onChange={(e) => setSite(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && add()}
+            data-testid="social-new"
+          />
+          <Button onClick={add} disabled={!socialHost(site)} data-testid="social-add">
+            <Plus className="h-4 w-4" />
+            {t('sites.addPolicy')}
+          </Button>
+        </div>
+      </Card>
+    </div>
+  );
+}
+
 export function SitesSection({ settings }: { settings: Settings }) {
   const { t } = useTranslation();
   const [origins, setOrigins] = useState<string[]>([]);
@@ -160,6 +247,7 @@ export function SitesSection({ settings }: { settings: Settings }) {
         ))}
       </Card>
       <SitePolicies settings={settings} />
+      <SocialSites settings={settings} />
     </Section>
   );
 }

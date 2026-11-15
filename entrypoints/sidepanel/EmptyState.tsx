@@ -1,4 +1,4 @@
-import { ArrowRight, BadgePercent, FileText, Languages, MessagesSquare, Plug, Scale, ShieldAlert, Sparkles, TextQuote } from 'lucide-react';
+import { ArrowRight, BadgePercent, FileText, Languages, Megaphone, MessagesSquare, Plug, Scale, ShieldAlert, Sparkles, TextQuote } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { SlashCommand } from '../../src/chat/commands';
@@ -15,6 +15,7 @@ const QUICK_ACTIONS: { id: SlashCommand['id']; icon: typeof FileText }[] = [
 const SHOPPING_ACTIONS: { id: SlashCommand['id']; icon: typeof FileText }[] = [
   { id: 'prices', icon: Scale },
   { id: 'reviews', icon: MessagesSquare },
+  { id: 'reputation', icon: Megaphone },
   { id: 'flaws', icon: ShieldAlert },
   { id: 'deal', icon: BadgePercent },
 ];

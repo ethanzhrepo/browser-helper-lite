@@ -1,4 +1,4 @@
-import { Bot, Database, Info, Languages, Mic, PartyPopper, Plug, Search, ShieldCheck, SlidersHorizontal, X } from 'lucide-react';
+import { Bot, Database, Info, Languages, Mic, PartyPopper, Plug, Puzzle, Search, ShieldCheck, SlidersHorizontal, X } from 'lucide-react';
 import { useEffect, useState, type ComponentType, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { Settings } from '../../src/shared/types';
@@ -11,15 +11,17 @@ import { DataSection } from './DataSection';
 import { LanguageSection } from './LanguageSection';
 import { SearchSection } from './SearchSection';
 import { SitesSection } from './SitesSection';
+import { SkillsSection } from './SkillsSection';
 import { SlotsSection } from './SlotsSection';
 import { VoiceSection } from './VoiceSection';
 
-type SectionId = 'providers' | 'models' | 'agent' | 'search' | 'voice' | 'sites' | 'language' | 'data' | 'about';
+type SectionId = 'providers' | 'models' | 'agent' | 'skills' | 'search' | 'voice' | 'sites' | 'language' | 'data' | 'about';
 
 const SECTIONS: { id: SectionId; icon: ComponentType<{ className?: string }>; render: (s: Settings) => ReactNode }[] = [
   { id: 'providers', icon: Plug, render: (s) => <ConnectionsSection settings={s} /> },
   { id: 'models', icon: SlidersHorizontal, render: (s) => <SlotsSection settings={s} /> },
   { id: 'agent', icon: Bot, render: (s) => <AgentSection settings={s} /> },
+  { id: 'skills', icon: Puzzle, render: (s) => <SkillsSection settings={s} /> },
   { id: 'search', icon: Search, render: (s) => <SearchSection settings={s} /> },
   { id: 'voice', icon: Mic, render: (s) => <VoiceSection settings={s} /> },
   { id: 'sites', icon: ShieldCheck, render: (s) => <SitesSection settings={s} /> },

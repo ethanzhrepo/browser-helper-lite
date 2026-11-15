@@ -54,7 +54,8 @@
       "prices": "Comparar precios en otras tiendas",
       "reviews": "Resumir las opiniones",
       "flaws": "Qué mirar antes de comprar",
-      "deal": "¿Es una buena oferta?"
+      "deal": "¿Es una buena oferta?",
+      "reputation": "Qué se dice de él"
     },
     "tip": "/ para comandos · @ para adjuntar una página, selección o pestaña",
     "body": "Pregunta sobre esta página o encárgame una tarea en tus pestañas.",
@@ -89,7 +90,8 @@
     "regionFailed": "No se pudo hacer la captura. Haz clic derecho en la página y elige «Preguntar por una parte de la página».",
     "removeImage": "Quitar la imagen",
     "imageAlt": "Parte de {{site}}",
-    "removeCommand": "Quitar el comando"
+    "removeCommand": "Quitar el comando",
+    "removeSkill": "Quitar la habilidad"
   },
   "context": {
     "unavailable": "Esta página no se puede leer",
@@ -149,6 +151,11 @@
       "label": "¿Buena oferta?",
       "description": "Si el descuento es real",
       "prompt": "¿Es este precio una buena oferta? Comprueba si el descuento es real (el precio de los últimos meses, el precio en otras tiendas), compáralo con productos similares y dime: comprar ya, esperar o pasar, y por qué."
+    },
+    "reputation": {
+      "label": "Reputación",
+      "description": "Pruebas y lo que dicen los usuarios",
+      "prompt": "¿Qué se dice de este producto? Mira las pruebas de los analistas y lo que cuentan los usuarios en foros y redes sociales. Dime qué gusta y de qué se quejan, con enlaces a las fuentes."
     }
   },
   "message": {
@@ -209,7 +216,8 @@
       "about": "Acerca de",
       "agent": "Agente",
       "search": "Búsqueda",
-      "voice": "Voz"
+      "voice": "Voz",
+      "skills": "Habilidades"
     }
   },
   "connections": {
@@ -301,6 +309,13 @@
       "confirmEach": "Preguntar siempre",
       "confirmRisky": "Preguntar si hay riesgo",
       "auto": "Automático (salvo alto riesgo)"
+    },
+    "social": {
+      "title": "Foros y redes sociales",
+      "description": "Aquí el asistente solo lee, en la pestaña, con tu sesión. Un me gusta, un voto, seguir o publicar siempre te lo pregunta antes. Un sitio de la lista incluye sus subdominios.",
+      "pages": "Páginas de un sitio así que mira una petición",
+      "none": "Ningún sitio: estas reglas no se aplican en ninguna parte.",
+      "restore": "Restablecer"
     }
   },
   "language": {
@@ -414,7 +429,8 @@
       "view_page": "Mirar la página",
       "click_at": "Pulsar {{target}} en {{x}}, {{y}}",
       "research_pages": "Investigar: {{question}}",
-      "watch_page": "Vigilar {{site}}: {{condition}}"
+      "watch_page": "Vigilar {{site}}: {{condition}}",
+      "load_skill": "Usar la habilidad: {{name}}"
     },
     "directions": {
       "up": "arriba",
@@ -443,7 +459,8 @@
         "download": "Descarga un archivo. Permite solo los archivos que esperas.",
         "sensitivePage": "Esta página gestiona la seguridad de la cuenta, claves o pagos, así que cada cambio pregunta.",
         "unseen": "El asistente no puede leer lo que está dibujado aquí. Revisa la imagen.",
-        "watch": "La página se vuelve a leer en segundo plano, sin tocarla, durante 30 días como máximo. Tu modelo solo se consulta cuando cambia lo que se vigila."
+        "watch": "La página se vuelve a leer en segundo plano, sin tocarla, durante 30 días como máximo. Tu modelo solo se consulta cuando cambia lo que se vigila.",
+        "social": "Esto actúa en tu nombre en una red social (un me gusta, seguir, publicar)."
       },
       "allowOnce": "Permitir una vez",
       "allowTask": "Permitir en esta tarea",
@@ -749,5 +766,49 @@
       "confirm": "Durante los próximos {{minutes}} minutos esta página se recarga cada {{seconds}} segundos. El sitio puede responder con un CAPTCHA o bloquearte. ¿Empezar?"
     },
     "retry": "más lenta, próximo intento a las {{time}}"
+  },
+  "skills": {
+    "title": "Habilidades",
+    "description": "Cómo aborda el asistente un tipo de trabajo y qué aspecto tiene su respuesta. Carga una habilidad cuando el trabajo se presenta.",
+    "builtin": "Integradas",
+    "builtinHint": "Vienen con la extensión. Desactiva las que no quieras.",
+    "installed": "Instaladas",
+    "installedHint": "Las habilidades que escribiste o instalaste. Escribe una barra y el nombre para usar una.",
+    "show": "Ver las instrucciones",
+    "export": "Descargar como archivo",
+    "add": {
+      "file": "Desde un archivo",
+      "write": "Escribir una",
+      "address": "Dirección de un archivo de habilidad",
+      "addressPlaceholder": "https://… (un archivo de habilidad, p. ej. en GitHub)",
+      "fetch": "Obtener"
+    },
+    "form": {
+      "review": "Léela antes de instalarla",
+      "write": "Nueva habilidad",
+      "change": "Cambiar la habilidad",
+      "note": "Una habilidad son instrucciones que el asistente sigue como si fueran tuyas. Instala solo lo que hayas leído. Es texto, no código, y no puede desactivar las aprobaciones.",
+      "name": "Nombre",
+      "nameHint": "Letras, dígitos y guiones.",
+      "description": "Cuándo usarla",
+      "descriptionHint": "Una línea. El asistente siempre la ve y decide por ella.",
+      "instructions": "Instrucciones",
+      "instructionsHint": "{{used}} de {{max}} caracteres",
+      "sites": "Sitios que nombra: {{sites}}",
+      "install": "Instalar"
+    },
+    "errors": {
+      "header": "No es un archivo de habilidad: debe empezar con un encabezado (name, description) entre dos líneas de «---».",
+      "name": "La habilidad necesita un nombre.",
+      "builtinName": "Una habilidad integrada tiene este nombre. Elige otro.",
+      "taken": "Ya hay instalada una habilidad con este nombre.",
+      "description": "Di en una línea cuándo usarla.",
+      "descriptionLong": "La descripción es demasiado larga.",
+      "instructions": "La habilidad no tiene instrucciones.",
+      "instructionsLong": "Las instrucciones son demasiado largas.",
+      "tooMany": "No se pueden instalar más de {{max}} habilidades.",
+      "address": "Escribe una dirección que empiece por https://.",
+      "fetch": "No se pudo obtener el archivo. Descárgalo y usa «Desde un archivo»."
+    }
   }
 }

@@ -52,7 +52,8 @@
       "prices": "去其他商家比价",
       "reviews": "总结评价",
       "flaws": "下单前有什么坑",
-      "deal": "这个价格划算吗"
+      "deal": "这个价格划算吗",
+      "reputation": "看看口碑"
     },
     "tip": "/ 调用指令 · @ 附带页面、选中内容或标签页",
     "body": "可以问这个页面，也可以让我在标签页里办事。",
@@ -87,7 +88,8 @@
     "regionFailed": "没能截图。请在页面上点右键，选「框选提问」。",
     "removeImage": "移除图片",
     "imageAlt": "{{site}} 的截图",
-    "removeCommand": "移除指令"
+    "removeCommand": "移除指令",
+    "removeSkill": "移除技能"
   },
   "context": {
     "unavailable": "无法读取此页面",
@@ -147,6 +149,11 @@
       "label": "值不值",
       "description": "折扣是不是真的",
       "prompt": "这个价格划算吗？核实折扣是否属实（近几个月的价格、其他商家的价格），和同类商品比一比，然后告诉我：现在买、再等等还是不买，以及理由。"
+    },
+    "reputation": {
+      "label": "口碑",
+      "description": "专业评测和用户口碑",
+      "prompt": "这个商品口碑怎么样？去看看专业评测，以及论坛和社交媒体上用户的反馈，告诉我大家认可什么、吐槽什么，并附上来源链接。"
     }
   },
   "message": {
@@ -207,7 +214,8 @@
       "about": "关于",
       "agent": "Agent",
       "search": "搜索",
-      "voice": "语音"
+      "voice": "语音",
+      "skills": "技能"
     }
   },
   "connections": {
@@ -295,6 +303,13 @@
       "confirmEach": "每次都问",
       "confirmRisky": "有风险时问",
       "auto": "全自动（高风险除外）"
+    },
+    "social": {
+      "title": "论坛和社交媒体",
+      "description": "在这些网站上，助手只在标签页里用你的登录状态浏览。点赞、投票、关注、发帖一律先问你。列表里的网站包含它的子域名。",
+      "pages": "一次请求在同一个网站最多看几个页面",
+      "none": "列表为空：这些规则不对任何网站生效。",
+      "restore": "恢复默认"
     }
   },
   "language": {
@@ -400,7 +415,8 @@
       "view_page": "查看页面",
       "click_at": "在 {{x}}, {{y}} 处点击 {{target}}",
       "research_pages": "调研：{{question}}",
-      "watch_page": "盯着 {{site}}：{{condition}}"
+      "watch_page": "盯着 {{site}}：{{condition}}",
+      "load_skill": "使用技能：{{name}}"
     },
     "directions": {
       "up": "上",
@@ -429,7 +445,8 @@
         "download": "会下载文件。只允许你预期中的文件。",
         "sensitivePage": "这个页面涉及账户安全、密钥或支付，每次改动都会问你。",
         "unseen": "助手读不到这里画的内容，请看图确认。",
-        "watch": "会在后台重新读取这个页面，只读不操作，最长 30 天。只有盯着的内容变了才会用到你的模型。"
+        "watch": "会在后台重新读取这个页面，只读不操作，最长 30 天。只有盯着的内容变了才会用到你的模型。",
+        "social": "这会以你的名义在社交网站上操作（点赞、关注、发帖等）。"
       },
       "allowOnce": "允许一次",
       "allowTask": "本任务内都允许",
@@ -727,5 +744,49 @@
       "confirm": "接下来 {{minutes}} 分钟，每 {{seconds}} 秒刷新一次这个页面。网站可能弹出验证码或拦截你。开始吗？"
     },
     "retry": "已放慢，{{time}} 再看"
+  },
+  "skills": {
+    "title": "技能",
+    "description": "助手做某一类事的方法，以及回答的样子。用得上时才加载。",
+    "builtin": "内置",
+    "builtinHint": "随扩展提供，不想要的可以关掉。",
+    "installed": "已安装",
+    "installedHint": "你自己写的或安装的技能。输入斜杠加名称来使用。",
+    "show": "查看内容",
+    "export": "下载为文件",
+    "add": {
+      "file": "从文件安装",
+      "write": "自己写",
+      "address": "技能文件的地址",
+      "addressPlaceholder": "https://…（技能文件，例如 GitHub 上的）",
+      "fetch": "获取"
+    },
+    "form": {
+      "review": "安装前请先读一遍",
+      "write": "新技能",
+      "change": "修改技能",
+      "note": "技能是助手会当作你的话来执行的说明。只安装你读过的。它是文字，不是代码，也不能关掉确认。",
+      "name": "名称",
+      "nameHint": "字母、数字和连字符。",
+      "description": "什么时候用",
+      "descriptionHint": "一行。助手始终能看到，并据此决定用不用。",
+      "instructions": "内容",
+      "instructionsHint": "{{used}} / {{max}} 字符",
+      "sites": "提到的网站：{{sites}}",
+      "install": "安装"
+    },
+    "errors": {
+      "header": "这不是技能文件：开头要有夹在两行「---」之间的头部（name、description）。",
+      "name": "请填写名称。",
+      "builtinName": "这是内置技能的名称，请换一个。",
+      "taken": "已安装同名技能。",
+      "description": "请用一行说明什么时候用。",
+      "descriptionLong": "说明太长。",
+      "instructions": "技能没有内容。",
+      "instructionsLong": "内容太长。",
+      "tooMany": "最多安装 {{max}} 个技能。",
+      "address": "请输入以 https:// 开头的地址。",
+      "fetch": "文件获取失败。请下载后用「从文件安装」。"
+    }
   }
 }

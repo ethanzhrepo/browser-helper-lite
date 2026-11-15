@@ -1,3 +1,6 @@
+import type { SocialSettings } from '../agent/social';
+import type { SkillSettings } from '../skills/skills';
+
 export type Vendor = 'openai' | 'anthropic' | 'google' | 'deepseek' | 'openai-compatible';
 
 /**
@@ -133,6 +136,10 @@ export interface Settings {
   sitePolicies: Record<string, SitePolicy>;
   /** Requests saved from finished tasks. */
   commands: SavedCommand[];
+  /** Instructions for kinds of work, loaded when the work comes up (see skills.ts). */
+  skills: SkillSettings;
+  /** Which sites count as forums and social media, and how many of their pages a request looks at (see social.ts). */
+  social: SocialSettings;
   /** Ask GitHub once a day whether a newer release exists (an unpacked extension is not updated by Chrome). */
   checkUpdates: boolean;
   updatedAt: number;
@@ -206,6 +213,8 @@ export interface MessageRecord {
   reasoning?: string;
   contexts?: ContextSnapshot[];
   images?: MessageImage[];
+  /** Skills the user chose for this request (a slash command, a quick action): their instructions go with it. */
+  skills?: string[];
   /** The tab the user was on when they sent this. Kept so the message reads the same in every later call (see caching.ts). */
   tab?: { title: string; url: string };
   /** The saved command this request was started from; its steps go to the model as a hint. */
