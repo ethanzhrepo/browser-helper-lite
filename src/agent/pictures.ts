@@ -28,6 +28,8 @@ export interface ReplyPicture {
   width: number;
   height: number;
   at: number;
+  /** Not fetched yet: the server lets the extension read it only with access to its site, which the user may give (see keep-pictures.ts). `image` is empty. */
+  pending?: boolean;
 }
 
 export const MAX_REPLY_PICTURES = 8;

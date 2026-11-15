@@ -180,7 +180,10 @@
     "copyCsv": "Copier en CSV",
     "downloadCsv": "Télécharger en CSV",
     "sortBy": "Trier par cette colonne",
-    "tokensCached": "↑{{input}} ↓{{output}} · {{cached}} en cache"
+    "tokensCached": "↑{{input}} ↓{{output}} · {{cached}} en cache",
+    "showPicture": "Afficher",
+    "showPictureHint": "Autoriser l'extension à charger les images de {{host}}",
+    "pictureFailed": "Chargement impossible"
   },
   "history": {
     "title": "Historique",

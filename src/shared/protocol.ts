@@ -79,6 +79,17 @@ export interface RegionCaptureResult {
   mediaType?: 'image/png' | 'image/jpeg';
 }
 
+/** The user let the extension load pictures from a site: fetch the pictures of the conversation that wait for it (see keep-pictures.ts). */
+export interface PictureShowRequest {
+  type: 'picture.show';
+  /** One of the waiting pictures. */
+  id: string;
+}
+
+export interface PictureShowResult {
+  ok: boolean;
+}
+
 /** Something the user does to a watch in the panel; done in the background, which holds the timers. */
 export type WatchActionRequest = { type: 'watch.action'; id: string } & (
   | { action: 'check' | 'pause' | 'resume' | 'delete' }
@@ -92,4 +103,4 @@ export interface WatchActionResult {
   ok: boolean;
 }
 
-export type RuntimeRequest = ConnectionTestRequest | SearchTestRequest | TranscribeRequest | DataClearRequest | RegionCaptureRequest;
+export type RuntimeRequest = ConnectionTestRequest | SearchTestRequest | TranscribeRequest | DataClearRequest | RegionCaptureRequest | PictureShowRequest;

@@ -65,6 +65,8 @@ function assistant(messages: ChatMessage[]): Reply {
     if (!used('load_skill')) return say('Getting the skill.', 'load_skill', { name: 'reputation' });
     return say(`Loaded: ${results.includes('<skill name="reputation">') ? 'yes' : 'no'}. Only reads: ${results.includes('Do not like, follow, comment') ? 'yes' : 'no'}.`);
   }
+  // A picture on another server, never read in this turn.
+  if (request.includes('SK-PIC')) return say(`Here it is: ![Green charger](http://pics.shop.test:${new URL(origin).port}/pic/green-late.png)`);
   if (request.includes('SK-USE')) return say(request.includes('<skill name="forum-check">') && request.includes('Report the three complaints') ? 'Used forum-check.' : 'No skill came along.');
   if (request.includes('SK-CLICK')) {
     if (!used('view_page')) return say('Looking at the page.', 'view_page');
@@ -119,7 +121,7 @@ test.describe.serial('skills, product pictures, grouped tabs and forums', () => 
   test.beforeAll(async () => {
     server = await startMockServer({ assistant, pages, files: { '/skills/forum.md': FORUM_SKILL.replace('Forum Check', 'Remote Forum') } });
     // The forum is the mock server under a social site's name.
-    ({ context, extensionId } = await launch({ args: ['--host-resolver-rules=MAP www.smzdm.com 127.0.0.1, MAP bbs.myforum.test 127.0.0.1'] }));
+    ({ context, extensionId } = await launch({ args: ['--host-resolver-rules=MAP www.smzdm.com 127.0.0.1, MAP bbs.myforum.test 127.0.0.1, MAP pics.shop.test 127.0.0.1'] }));
     await seed(
       context,
       extensionId,
@@ -191,6 +193,71 @@ test.describe.serial('skills, product pictures, grouped tabs and forums', () => 
     await panel.reload();
     await expect(panel.getByTestId('assistant-message').last().getByTestId('reply-picture')).toHaveCount(2, { timeout: 15_000 });
     expect(server.pictureRequests.length).toBe(before);
+    await site.close();
+    await panel.close();
+  });
+
+  test('a picture whose server wants access to its site is shown after one click, and only one the extension kept for it', async () => {
+    const { site, panel } = await openSiteAndPanel(context, extensionId, `${server.origin}/plain.html`);
+    await ask(panel, 'SK-PIC show me the charger');
+    const reply = panel.getByTestId('assistant-message').last();
+    await expect(reply).toContainText('Here it is:', { timeout: 20_000 });
+    const url = `http://pics.shop.test:${new URL(server.origin).port}/pic/green-late.png`;
+    // The model wrote the address without having read it: a link, nothing to show, nothing fetched.
+    await expect(reply.getByTestId('blocked-image')).toHaveCount(1);
+    await expect(reply.getByTestId('show-picture')).toHaveCount(0);
+    expect(server.pictureRequests.some((request) => request.url.includes('green-late'))).toBe(false);
+    // A forged request for it does nothing: only an address the background kept as waiting can be fetched.
+    const conversationId = await panel.evaluate(
+      () =>
+        new Promise<string>((resolve) => {
+          const open = indexedDB.open('browser-helper');
+          open.onsuccess = () => {
+            const all = open.result.transaction('messages').objectStore('messages').getAll();
+            all.onsuccess = () => resolve((all.result as { conversationId: string; content: string }[]).find((m) => m.content.includes('SK-PIC'))!.conversationId);
+          };
+        }),
+    );
+    const id = `${conversationId} ${url}`;
+    expect(await panel.evaluate((pictureId) => chrome.runtime.sendMessage({ type: 'picture.show', id: pictureId }), id)).toEqual({ ok: false });
+    expect(server.pictureRequests.some((request) => request.url.includes('green-late'))).toBe(false);
+
+    // What the background keeps when the server lets the extension read the picture only with access to its site.
+    await panel.evaluate(
+      ({ pictureId, conversation, address }) =>
+        new Promise<void>((resolve) => {
+          const open = indexedDB.open('browser-helper');
+          open.onsuccess = () => {
+            const put = open.result.transaction('pictures', 'readwrite').objectStore('pictures').put({ id: pictureId, conversationId: conversation, url: address, image: '', mediaType: 'image/webp', width: 0, height: 0, at: Date.now(), pending: true });
+            put.onsuccess = () => resolve();
+          };
+        }),
+      { pictureId: id, conversation: conversationId, address: url },
+    );
+    // Written past the database library, which tells the panel of its own writes only: the panel reads it again.
+    await panel.reload();
+    const show = reply.getByTestId('show-picture');
+    await expect(show).toHaveText('Show');
+    await expect(show).toHaveAttribute('title', 'Let the extension load pictures from pics.shop.test');
+    await screenshot(panel, 'feature-picture-show');
+    // The click asks Chrome for access to that one site (granted already in this build, so Chrome does not ask), then the picture is fetched.
+    await show.click();
+    const picture = reply.getByTestId('reply-picture');
+    await expect(picture).toHaveCount(1, { timeout: 15_000 });
+    const pixel = await picture.evaluate(async (element) => {
+      const img = element as HTMLImageElement;
+      await img.decode();
+      const canvas = document.createElement('canvas');
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      canvas.getContext('2d')!.drawImage(img, 0, 0);
+      return [...canvas.getContext('2d')!.getImageData(img.naturalWidth >> 1, img.naturalHeight >> 1, 1, 1).data];
+    });
+    expect(pixel[1]).toBeGreaterThan(120);
+    expect(pixel[0]).toBeLessThan(80);
+    const fetched = server.pictureRequests.filter((request) => request.url.includes('green-late'));
+    expect(fetched).toEqual([{ url: '/pic/green-late.png', cookie: undefined, referer: undefined }]);
+    await expect(reply.getByTestId('show-picture')).toHaveCount(0);
     await site.close();
     await panel.close();
   });

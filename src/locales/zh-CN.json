@@ -178,7 +178,10 @@
     "copyCsv": "复制 CSV",
     "downloadCsv": "下载 CSV",
     "sortBy": "按这一列排序",
-    "tokensCached": "↑{{input}} ↓{{output}} · 缓存 {{cached}}"
+    "tokensCached": "↑{{input}} ↓{{output}} · 缓存 {{cached}}",
+    "showPicture": "显示",
+    "showPictureHint": "允许扩展加载 {{host}} 的图片",
+    "pictureFailed": "加载失败"
   },
   "history": {
     "title": "历史记录",

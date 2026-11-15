@@ -1,6 +1,6 @@
 import 'katex/dist/katex.min.css';
 import { liveQuery } from 'dexie';
-import { ArrowDown, ArrowUp, Check, Copy, Download, ImageOff } from 'lucide-react';
+import { ArrowDown, ArrowUp, Check, Copy, Download, ImageOff, Loader2 } from 'lucide-react';
 import { Children, createContext, isValidElement, lazy, memo, Suspense, useContext, useEffect, useState, type AnchorHTMLAttributes, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import ReactMarkdown from 'react-markdown';
@@ -9,7 +9,9 @@ import rehypeKatex from 'rehype-katex';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import { urlDataLeak } from '../agent/injection';
+import { browser } from 'wxt/browser';
 import { pictureKey, type ReplyPicture } from '../agent/pictures';
+import { requestHostAccess } from '../permissions/hosts';
 import { db } from '../storage/db';
 import { normalizeMath } from './math';
 import { sortOrder, toCsv } from './table';
@@ -90,7 +92,7 @@ export function usePictures(conversationId: string | undefined): ReadonlyMap<str
  */
 function ReplyImage({ src, alt }: { src?: string; alt?: string }) {
   const stored = useContext(PicturesContext).get(src ? pictureKey(src) : '');
-  if (!stored) return <BlockedImage src={src} alt={alt} />;
+  if (!stored || stored.pending) return <BlockedImage src={src} alt={alt} pending={stored} />;
   return (
     <img
       src={`data:${stored.mediaType};base64,${stored.image}`}
@@ -108,12 +110,29 @@ function ReplyImage({ src, alt }: { src?: string; alt?: string }) {
  * Images in replies are not loaded: a reply shaped by a malicious page could
  * point an image at an attacker's server with your data in the URL (§8.2).
  * They are shown as a link you can open yourself.
+ *
+ * `pending`: a picture the extension may fetch, but whose server lets it
+ * only with access to the site. One click asks Chrome for that access.
  */
-function BlockedImage({ src, alt }: { src?: string; alt?: string }) {
+function BlockedImage({ src, alt, pending }: { src?: string; alt?: string; pending?: ReplyPicture }) {
   const { t } = useTranslation();
+  const [state, setState] = useState<'idle' | 'busy' | 'failed'>('idle');
   const label = alt?.trim() || t('message.image');
   const safe = src && /^https?:/i.test(src) ? src : undefined;
-  return (
+  const show = () => {
+    if (!pending) return;
+    setState('busy');
+    // Asked for in the click itself, before anything is awaited: Chrome allows the request only then.
+    requestHostAccess(pending.url)
+      .then(async (granted) => {
+        if (!granted) return setState('idle');
+        const result = (await browser.runtime.sendMessage({ type: 'picture.show', id: pending.id })) as { ok?: boolean } | undefined;
+        // On success the stored picture replaces this link.
+        if (!result?.ok) setState('failed');
+      })
+      .catch(() => setState('failed'));
+  };
+  const link = (
     <a
       href={safe}
       target="_blank"
@@ -126,6 +145,29 @@ function BlockedImage({ src, alt }: { src?: string; alt?: string }) {
       <span className="truncate">{label}</span>
       {safe && <span className="shrink-0 text-faint">· {hostOf(safe)}</span>}
     </a>
+  );
+  if (!pending) return link;
+  return (
+    <span className="inline-flex max-w-full items-center gap-1 align-middle">
+      {link}
+      {state === 'failed' ? (
+        <span className="shrink-0 text-xs text-faint" data-testid="picture-failed">
+          {t('message.pictureFailed')}
+        </span>
+      ) : (
+        <button
+          type="button"
+          onClick={show}
+          disabled={state === 'busy'}
+          title={t('message.showPictureHint', { host: hostOf(pending.url) })}
+          data-testid="show-picture"
+          className="inline-flex shrink-0 items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-medium text-accent hover:bg-accent-soft disabled:opacity-50"
+        >
+          {state === 'busy' && <Loader2 className="h-3 w-3 animate-spin" />}
+          {t('message.showPicture')}
+        </button>
+      )}
+    </span>
   );
 }
 

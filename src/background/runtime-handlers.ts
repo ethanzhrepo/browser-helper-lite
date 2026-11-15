@@ -1,4 +1,5 @@
 import { browser } from 'wxt/browser';
+import { showPendingPictures } from '../agent/keep-pictures';
 import { toErrorInfo } from '../providers/errors';
 import { fetchModelList } from '../providers/model-list';
 import { pickSlot, resolveModelRef } from '../providers/resolve';
@@ -135,6 +136,15 @@ export function registerRuntimeHandlers(): void {
     }
     if (message?.type === 'region.capture') {
       void captureRegion(message).then(sendResponse);
+      return true;
+    }
+    if (message?.type === 'picture.show') {
+      void loadSettings()
+        .then((settings) => showPendingPictures(message.id, settings.sitePolicies))
+        .then(
+          (ok) => sendResponse({ ok }),
+          () => sendResponse({ ok: false }),
+        );
       return true;
     }
     if (message?.type === 'data.clear') {

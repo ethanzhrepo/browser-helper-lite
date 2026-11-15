@@ -1,4 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
+import { keepPicture, showPendingPictures } from '../../src/agent/keep-pictures';
+import { db } from '../../src/storage/db';
 import type { TargetInfo } from '../../src/agent/page/types';
 import { addressesIn, allowedPictures, MAX_REPLY_PICTURES, pictureKey, picturesIn, replyPictures } from '../../src/agent/pictures';
 import { buildAssistantSystemPrompt } from '../../src/agent/prompt';
@@ -204,6 +206,73 @@ See https://shop.test/volt, or (https://shop.test/terms).`;
     expect(product(`https://cdn.shop.test/${'x'.repeat(500)}.jpg`)?.image).toBeUndefined();
     expect(pictureAddress(undefined)).toBeUndefined();
     expect(describeProduct({ name: 'Volt', image: 'https://cdn.shop.test/volt.jpg' })).toContain('- Picture: https://cdn.shop.test/volt.jpg');
+  });
+});
+
+describe('pictures whose server wants access to its site', () => {
+  const URL_A = 'https://cdn.shop.test/a.jpg';
+  const URL_B = 'https://cdn.shop.test/b.jpg';
+  const picture = { image: 'AAAA', mediaType: 'image/webp', width: 200, height: 160 };
+  /** What the server does: lets the extension read it, refuses (as CORS does without access), or answers with something that is not a picture. */
+  let server: 'reads' | 'refuses' | 'other' = 'refuses';
+  let access = false;
+  const options = {
+    load: async () => {
+      if (server === 'refuses') throw new TypeError('Failed to fetch');
+      return server === 'reads' ? picture : undefined;
+    },
+    hasAccess: async () => access,
+  };
+  beforeEach(async () => {
+    await db.pictures.clear();
+    server = 'refuses';
+    access = false;
+  });
+
+  it('keeps a placeholder when only access to the site would let the extension read the picture', async () => {
+    expect(await keepPicture('c1', URL_A, options)).toBe('needsAccess');
+    expect(await db.pictures.toArray()).toMatchObject([{ conversationId: 'c1', url: URL_A, image: '', pending: true }]);
+    // Asked again: still one.
+    expect(await keepPicture('c1', URL_A, options)).toBe('needsAccess');
+    expect(await db.pictures.count()).toBe(1);
+    // With access already, more would not help: nothing is offered.
+    await db.pictures.clear();
+    access = true;
+    expect(await keepPicture('c1', URL_A, options)).toBe('failed');
+    expect(await db.pictures.count()).toBe(0);
+  });
+
+  it('fetches the waiting pictures of that site once the user gave access, and only those', async () => {
+    await keepPicture('c1', URL_A, options);
+    await keepPicture('c1', URL_B, options);
+    await keepPicture('c1', 'https://img.other.test/c.jpg', options);
+    await keepPicture('c2', 'https://cdn.shop.test/d.jpg', options);
+    const [first] = await db.pictures.where('conversationId').equals('c1').toArray();
+    // A picture that is not waiting cannot be fetched this way.
+    expect(await showPendingPictures('c1 https://cdn.shop.test/never.jpg', {}, options)).toBe(false);
+    // A site the user blocked is not fetched from.
+    server = 'reads';
+    access = true;
+    expect(await showPendingPictures(first!.id, { 'shop.test': 'blocked' }, options)).toBe(false);
+    expect(await showPendingPictures(first!.id, {}, options)).toBe(true);
+    const stored = new Map((await db.pictures.toArray()).map((p) => [p.url, p]));
+    expect(stored.get(URL_A)).toMatchObject({ image: 'AAAA' });
+    expect(stored.get(URL_A)!.pending).toBeUndefined();
+    expect(stored.get(URL_B)).toMatchObject({ image: 'AAAA' });
+    // Another site, and another conversation, still wait.
+    expect(stored.get('https://img.other.test/c.jpg')).toMatchObject({ pending: true });
+    expect(stored.get('https://cdn.shop.test/d.jpg')).toMatchObject({ pending: true });
+    // Kept once: not fetched again.
+    server = 'refuses';
+    expect(await keepPicture('c1', URL_A, options)).toBe('kept');
+  });
+
+  it('drops the placeholder when the address turns out not to be a picture', async () => {
+    await keepPicture('c1', URL_A, options);
+    server = 'other';
+    access = true;
+    expect(await showPendingPictures((await db.pictures.toArray())[0]!.id, {}, options)).toBe(false);
+    expect(await db.pictures.count()).toBe(0);
   });
 });
 

@@ -13,7 +13,8 @@ import { searchApiKey } from '../search/keys';
 import { apiSearch, buildSearchUrl, deepseekFetch, fetchEndpoint, formatSearchResults, readsThroughDeepSeek, searchEndpoint } from '../search/search';
 import type { Locale, MessageImage, MessageRecord, SearchProviderId, Settings, SitePolicy } from '../shared/types';
 import { ActionError, AgentBrowser, sleep, unwrap, type GroupStatus, type Screen } from './browser-controller';
-import { addressesIn, allowedPictures, fetchPicture, pictureId, pictureKey, picturesIn, replyPictures } from './pictures';
+import { keepPicture } from './keep-pictures';
+import { addressesIn, allowedPictures, pictureKey, picturesIn, replyPictures } from './pictures';
 import { isSocialAct, SOCIAL_IN_TAB, socialLimitNote, socialPages, socialSite, socialSites } from './social';
 import { containsCardNumber, containsSecret, findInjection, newBoundary, siteOf, urlDataLeak, wrapUntrusted } from './injection';
 import { decide, modeDecision, policyFor, type ActionKind } from './policy';
@@ -22,7 +23,7 @@ import type { TargetInfo } from './page/types';
 import { actionKind, classifyAction, downloadRisk, formSubmission } from './risk';
 import { cachedInstructions, cacheOptions, withBreakpoint } from '../providers/caching';
 import { enabledSkills, findSkill, renderSkill } from '../skills/skills';
-import { db, savePicture, saveShot } from '../storage/db';
+import { saveShot } from '../storage/db';
 import { clampSeconds, WATCH_DAYS, type Watch } from '../watch/watch';
 import { cropPreview, thumbnail } from './screenshot';
 import { isSensitivePage } from './sensitive';
@@ -613,10 +614,7 @@ export class AgentRunner {
       allowedPictures(reply, this.seenAddresses()).map(async (url) => {
         try {
           if (policyFor(hostOf(url), this.settings.sitePolicies) === 'blocked') return;
-          const id = pictureId(conversationId, url);
-          if (await db.pictures.get(id)) return;
-          const picture = await fetchPicture(url, this.abort.signal);
-          if (picture) await savePicture({ id, conversationId, url: pictureKey(url), ...picture, at: Date.now() });
+          await keepPicture(conversationId, url, { signal: this.abort.signal });
         } catch (error) {
           // A reply without its picture is still the reply: the panel shows a link instead.
           console.debug('No picture', url, error);

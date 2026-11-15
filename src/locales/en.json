@@ -179,7 +179,10 @@
     "copyCsv": "Copy CSV",
     "downloadCsv": "Download CSV",
     "sortBy": "Sort by this column",
-    "tokensCached": "↑{{input}} ↓{{output}} · {{cached}} cached"
+    "tokensCached": "↑{{input}} ↓{{output}} · {{cached}} cached",
+    "showPicture": "Show",
+    "showPictureHint": "Let the extension load pictures from {{host}}",
+    "pictureFailed": "Couldn't load it"
   },
   "history": {
     "title": "History",

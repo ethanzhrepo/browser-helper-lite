@@ -154,13 +154,14 @@ const pictureSchema = z.object({
   id: z.string().min(1),
   conversationId: z.string().min(1),
   url: z.string().max(2000),
-  // Shown as an image: nothing else may be in it.
-  image: z.string().regex(/^[A-Za-z0-9+/]+={0,2}$/),
+  // Shown as an image: nothing else may be in it. Empty only while it waits for access to its site.
+  image: z.string().regex(/^[A-Za-z0-9+/]*={0,2}$/),
   mediaType: z.enum(['image/webp', 'image/jpeg', 'image/png']),
   width: z.number(),
   height: z.number(),
   at: z.number(),
-});
+  pending: z.boolean().optional(),
+}).refine((picture) => picture.pending === true || picture.image.length > 0, 'A picture without its image');
 
 const shotSchema = z.object({
   id: z.string().min(1),
