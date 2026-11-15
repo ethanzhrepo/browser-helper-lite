@@ -260,6 +260,16 @@ export function scriptedAssistant(messages: ChatMessage[]): Reply {
   }
 
   if (request.includes('TEST-STOP')) return say('Waiting.', 'wait', { seconds: 1 });
+  // A model that searches on and on without reading anything, then reads a page and searches once more.
+  if (request.includes('TEST-SEARCHES')) {
+    const origin = /url="(https?:\/\/[^/"]+)/.exec(request)?.[1] ?? '';
+    const searches = history.match(/- web_search /g)?.length ?? 0;
+    if (searches < 8) return say('Another search.', 'web_search', { query: `cable guide ${searches + 1}` });
+    if (!used('research_pages')) return say('Reading a result.', 'research_pages', { question: 'cable guide', urls: [`${origin}/review.html`] });
+    if (searches < 9) return say('One more search.', 'web_search', { query: 'cable guide after reading' });
+    const refused = history.match(/- web_search [^\n]*→ Not searched: you have searched 6 times in a row without reading a page/g)?.length ?? 0;
+    return say(`Searches refused: ${refused}. After reading: ${/- web_search [^\n]*after reading[^\n]*→ (?!Not searched)/.test(history) ? 'searched' : 'refused'}.`);
+  }
   // A search in a tab of its own, then a page opened in a new tab and read there.
   if (request.includes('TEST-TABS')) {
     const origin = /url="(https?:\/\/[^/"]+)/.exec(request)?.[1] ?? '';

@@ -207,6 +207,18 @@ test.describe.serial('assistant with the DOM driver', () => {
     await expect(site.locator('#cart')).toHaveText('Cart: 1 item');
   });
 
+  test('searching on and on without reading is stopped after six searches, until a page is read', async () => {
+    const { site, panel } = await openSiteAndPanel(context, extensionId, `${server.origin}/shop.html`);
+    await chooseMode(panel, 'auto');
+    const before = server.hits.filter((hit) => hit.startsWith('/search?')).length;
+    await ask(panel, 'TEST-SEARCHES: find a cable guide');
+    // Six searches went out, the seventh and eighth did not; after a page was read, the next one did.
+    await expect(panel.getByTestId('assistant-message').last()).toContainText('Searches refused: 2. After reading: searched.', { timeout: 60_000 });
+    expect(server.hits.filter((hit) => hit.startsWith('/search?')).length - before).toBe(7);
+    await site.close();
+    await panel.close();
+  });
+
   test('the assistant works behind the tab the user is looking at; its tabs come to the front only for a user who follows it', async () => {
     /** Counts the tabs that come to the front from now on, and says which one is there. */
     const watchFront = async (panel: import('@playwright/test').Page) => {

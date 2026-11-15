@@ -116,6 +116,10 @@ const CAPTCHA_GRACE_LOOKS = 3;
 const CAPTCHA_GRACE_MS = 1000;
 /** From this many web searches in one turn on, the assistant is told to stop rephrasing and read. */
 const SEARCH_NUDGE_AFTER = 3;
+/** After this many searches in a row with no page read in between, the next search is not made: the results are to be read first. */
+const MAX_SEARCHES_UNREAD = 6;
+/** What counts as reading: a page is opened or its text is taken in. */
+const READS = new Set(['read_url', 'research_pages', 'read_page', 'extract', 'look', 'navigate', 'open_tab']);
 /** Coming to the same page this many times in one turn gets a note. */
 const REVISIT_NOTE_AT = 3;
 /** Buttons whose second click in a row is most likely a mistake: they add to a cart, order, send or subscribe. */
@@ -230,6 +234,8 @@ export class AgentRunner {
   private readonly visits = new Map<string, number>();
   /** Web searches made in this turn. */
   private searches = 0;
+  /** Web searches made since a page was last read. */
+  private unreadSearches = 0;
   /** Replay pictures stored so far. */
   private frames = 0;
   /** The address of a page last seen asking for a password or a one-time code: no pictures of it are kept. */
@@ -1074,6 +1080,7 @@ export class AgentRunner {
 
       await this.checkpoint();
       const outcome = await this.execute(action);
+      if (action.status === 'done' && READS.has(action.tool)) this.unreadSearches = 0;
       this.task.driver = this.ctl.driver ?? this.task.driver;
       this.update();
       const prefix = action.status === 'error' ? 'Error: ' : '';
@@ -1720,7 +1727,13 @@ export class AgentRunner {
     const search = this.settings.search;
     const provider = search.provider;
     action.target = SEARCH_LABELS[provider];
+    // Searching on and on without reading what was found goes nowhere: the results come first.
+    if (this.unreadSearches >= MAX_SEARCHES_UNREAD) {
+      action.status = 'rejected';
+      return `Not searched: you have searched ${this.unreadSearches} times in a row without reading a page. Read the most relevant results you already have (read_url, research_pages, or open one), then search again if something is still missing; or answer from what you have and say what you could not confirm.`;
+    }
     this.searches += 1;
+    this.unreadSearches += 1;
     const results = await this.searchWith(query, action);
     // Rephrasing a search over and over rarely finds what three searches did not.
     return this.searches >= SEARCH_NUDGE_AFTER
