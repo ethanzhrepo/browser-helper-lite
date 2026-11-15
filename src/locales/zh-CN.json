@@ -90,7 +90,9 @@
     "removeImage": "移除图片",
     "imageAlt": "{{site}} 的截图",
     "removeCommand": "移除指令",
-    "removeSkill": "移除技能"
+    "removeSkill": "移除技能",
+    "placeholderAdd": "它在工作，可以随时补充一句…",
+    "add": "补充给这个任务"
   },
   "context": {
     "unavailable": "无法读取此页面",
@@ -437,7 +439,8 @@
       "research_pages": "调研：{{question}}",
       "watch_page": "盯着 {{site}}：{{condition}}",
       "load_skill": "使用技能：{{name}}",
-      "read_skill_file": "读取技能文件：{{path}}"
+      "read_skill_file": "读取技能文件：{{path}}",
+      "report_progress": "已汇报：{{stage}}"
     },
     "directions": {
       "up": "上",

@@ -57,6 +57,7 @@ export function actionLabel(t: TFunction, action: AgentAction): string {
     condition: clip(String(a.condition ?? ''), 120),
     name: String(a.name ?? ''),
     path: String(a.path ?? ''),
+    stage: clip(String(a.stage ?? ''), 60),
     site: hostOf(a.url),
     x: String(Math.round(Number(a.x ?? 0))),
     y: String(Math.round(Number(a.y ?? 0))),
@@ -221,6 +222,12 @@ export function AgentRunView({ task, request, onSend }: {
           <StatusIcon className={`h-3.5 w-3.5 ${status.spin ? 'animate-spin' : ''}`} strokeWidth={2.25} />
         </span>
         <span className="shrink-0 font-semibold tracking-tight">{t(`agent.status.${task.status}`)}</span>
+        {active && task.stage && (
+          <span className="shrink-0 rounded-full bg-accent-soft px-2 py-0.5 text-[11px] font-medium text-accent" data-testid="run-stage">
+            {task.stage.step ? `${task.stage.step}${task.stage.of ? `/${task.stage.of}` : ''} ` : ''}
+            {task.stage.name}
+          </span>
+        )}
         <span className="min-w-0 flex-1 truncate text-xs text-muted" data-testid="run-activity">
           {about}
         </span>

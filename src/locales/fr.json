@@ -92,7 +92,9 @@
     "removeImage": "Retirer l'image",
     "imageAlt": "Partie de {{site}}",
     "removeCommand": "Retirer la commande",
-    "removeSkill": "Retirer la compétence"
+    "removeSkill": "Retirer la compétence",
+    "placeholderAdd": "Ajoutez une précision pendant le travail…",
+    "add": "Ajouter à cette tâche"
   },
   "context": {
     "unavailable": "Cette page ne peut pas être lue",
@@ -451,7 +453,8 @@
       "research_pages": "Recherche approfondie : {{question}}",
       "watch_page": "Surveiller {{site}} : {{condition}}",
       "load_skill": "Utiliser la compétence : {{name}}",
-      "read_skill_file": "Lecture de {{path}}"
+      "read_skill_file": "Lecture de {{path}}",
+      "report_progress": "Étape rendue : {{stage}}"
     },
     "directions": {
       "up": "le haut",

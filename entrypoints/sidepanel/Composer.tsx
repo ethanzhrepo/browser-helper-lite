@@ -97,6 +97,8 @@ export function Composer(props: {
   onStop: () => void;
   /** A reply is in progress: the send button becomes a stop button. */
   busy: boolean;
+  /** The assistant is working, and takes what is typed as an addition to that turn. */
+  canAdd?: boolean;
   disabled: boolean;
   voice: { state: VoiceState; level: number; toggle: () => void };
 }) {
@@ -197,7 +199,10 @@ export function Composer(props: {
     }
   };
 
-  const canSend = !disabled && !busy && Boolean(text.trim() || props.selection || props.includePage || props.tabContexts.length > 0 || props.images.length > 0);
+  const adding = busy && Boolean(props.canAdd);
+  const canSend = adding
+    ? !disabled && Boolean(text.trim())
+    : !disabled && !busy && Boolean(text.trim() || props.selection || props.includePage || props.tabContexts.length > 0 || props.images.length > 0);
   const listening = props.voice.state === 'listening';
 
   return (
@@ -346,7 +351,9 @@ export function Composer(props: {
                 ? t('composer.placeholderNoModel')
                 : listening
                   ? t('voice.listening')
-                  : (props.placeholder ?? t('composer.placeholder'))
+                  : adding
+                    ? t('composer.placeholderAdd')
+                    : (props.placeholder ?? t('composer.placeholder'))
             }
             onChange={(e) => {
               onTextChange(e.target.value);
@@ -371,6 +378,18 @@ export function Composer(props: {
                 <ScanSearch className="h-4 w-4" />
               </button>
               <MicButton {...props.voice} disabled={disabled} />
+              {adding && text.trim() && (
+                <button
+                  type="button"
+                  data-testid="add-button"
+                  onClick={props.onSend}
+                  aria-label={t('composer.add')}
+                  title={t('composer.add')}
+                  className="flex h-8 w-8 items-center justify-center rounded-full text-white shadow-soft transition-all brand-gradient hover:brightness-110"
+                >
+                  <ArrowUp className="h-4 w-4" strokeWidth={2.5} />
+                </button>
+              )}
               {busy ? (
                 <button
                   type="button"

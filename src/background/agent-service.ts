@@ -121,12 +121,10 @@ async function finishTask(runner: AgentRunner, t: TFunction) {
   const task = runner.task;
   await browser.notifications?.clear(notificationId(task.id)).catch(() => undefined);
   const partial = task.draft.trim();
-  const content =
-    task.status === 'done'
-      ? (task.result?.summary ?? '')
-      : task.status === 'stopped'
-        ? partial || (task.steps.length > 0 ? t('agent.stoppedSummary') : '')
-        : partial;
+  // A task that was stopped or failed keeps the parts of the answer it had given (report_progress).
+  const given = (task.sections ?? []).join('\n\n');
+  const rest = task.status === 'stopped' ? partial || (task.steps.length > 0 ? t('agent.stoppedSummary') : '') : partial;
+  const content = task.status === 'done' ? (task.result?.summary ?? '') : [given, rest].filter(Boolean).join('\n\n');
   task.draft = '';
   await appendMessage({
     conversationId: task.conversationId,
@@ -287,6 +285,9 @@ function handleClientMessage(message: AgentClientMessage, port: Browser.runtime.
       break;
     case 'respond':
       runner.respond(message.response);
+      break;
+    case 'say':
+      runner.say(message.text);
       break;
   }
 }

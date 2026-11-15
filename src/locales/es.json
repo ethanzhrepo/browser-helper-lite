@@ -92,7 +92,9 @@
     "removeImage": "Quitar la imagen",
     "imageAlt": "Parte de {{site}}",
     "removeCommand": "Quitar el comando",
-    "removeSkill": "Quitar la habilidad"
+    "removeSkill": "Quitar la habilidad",
+    "placeholderAdd": "Añade algo mientras trabaja…",
+    "add": "Añadir a esta tarea"
   },
   "context": {
     "unavailable": "Esta página no se puede leer",
@@ -451,7 +453,8 @@
       "research_pages": "Investigar: {{question}}",
       "watch_page": "Vigilar {{site}}: {{condition}}",
       "load_skill": "Usar la habilidad: {{name}}",
-      "read_skill_file": "Leyendo {{path}}"
+      "read_skill_file": "Leyendo {{path}}",
+      "report_progress": "Informado: {{stage}}"
     },
     "directions": {
       "up": "arriba",

@@ -516,6 +516,7 @@ const SKILLS: EvalTask[] = [
     check: async (o, env) => {
       if (!loaded(o).includes('reputation')) return `did not load the reputation skill (loaded: ${loaded(o).join(', ') || 'none'})`;
       if (!used(o, 'web_search')) return 'did not search the web';
+      if (o.tools.filter((tool) => tool === 'report_progress').length < 1) return 'gave nothing along the way: what testers found should come before the owners are read';
       if (o.tools.filter((tool) => tool === 'web_search').length > 4) return `${o.tools.filter((tool) => tool === 'web_search').length} searches`;
       const opened = (o.task?.steps ?? []).flatMap((step) => step.actions).filter((action) => (action.tool === 'navigate' || action.tool === 'open_tab') && String(action.args.url).includes(FORUM_HOST) && action.status === 'done');
       if (opened.length === 0) return 'did not open the forum thread in the tab';
@@ -605,6 +606,8 @@ const setRegion = (env: Env, region: string) =>
     const settings = (await chrome.storage.local.get('settings:v1'))['settings:v1'];
     await chrome.storage.local.set({ 'settings:v1': { ...settings, region: value } });
   }, region);
+/** How many parts of the answer were given while still working (report_progress). */
+const reports = (outcome: Outcome) => outcome.tools.filter((tool) => tool === 'report_progress').length;
 const needs = (o: Outcome, skill: string) => (loaded(o).includes(skill) ? undefined : `did not load the ${skill} skill (loaded: ${loaded(o).join(', ') || 'none'})`);
 
 /** The other built-in skills: each is loaded for its kind of work, and does it. See skill-pages.ts for the pages. */
@@ -621,8 +624,11 @@ const BUILTIN_SKILL_TASKS: EvalTask[] = [
       if (missing) return missing;
       if (!used(o, 'read_skill_file')) return 'did not read where to look in the country (references/sources-by-region.md)';
       if (used2(o, 'web_search') > 6) return `${used2(o, 'web_search')} searches`;
-      const lead = o.answer.replace(/^Reasoning\s*/, '').slice(0, 300);
-      if (!/Breeze S5/i.test(lead)) return 'the pick is not the Breeze S5 (quiet, no hair tangling, ¥1,799)';
+      // Its stages come as they are ready: at least the need and the candidates before the answer.
+      if (reports(o) < 2) return `gave ${reports(o)} parts of the answer along the way instead of at least two`;
+      // The pick is in the last part: the answer after the stages.
+      const last = o.answer.slice(-2500);
+      if (!/(首选|推荐|建议|最适合|pick|recommend)[\s\S]{0,200}Breeze S5|Breeze S5[\s\S]{0,120}(首选|推荐|最适合|最均衡)/i.test(last)) return 'the pick is not the Breeze S5 (quiet, no hair tangling, ¥1,799)';
       if (!/Orbit Mini[\s\S]{0,200}(缠|毛|hair)|(缠|毛|hair)[\s\S]{0,200}Orbit Mini/i.test(o.answer)) return 'misses that the Orbit Mini tangles pet hair';
       if (!(await hasTable(env))) return 'no comparison table';
       return (await links(env)).length > 0 ? undefined : 'no links to sources';
@@ -684,8 +690,8 @@ const BUILTIN_SKILL_TASKS: EvalTask[] = [
       const missing = needs(o, 'travel-compare');
       if (missing) return missing;
       if (o.approvals.some((card) => /\bBook\b/.test(card))) return 'tried to book';
-      const lead = o.answer.replace(/^Reasoning\s*/, '').slice(0, 300);
-      if (!/AirMid/i.test(lead) || !/129/.test(o.answer)) return 'the answer is not AirMid at €129 with the bag';
+      if (reports(o) < 1) return 'did not give the offers found before working out the totals';
+      if (!/(cheapest|best|pick|recommend|go with|book)[\s\S]{0,200}AirMid|AirMid[\s\S]{0,160}(cheapest|best|lowest)/i.test(o.answer) || !/129/.test(o.answer)) return 'the answer is not AirMid at €129 with the bag';
       return /134|45/.test(o.answer) ? undefined : 'does not show that SkyLow costs €134 with its €45 bag';
     },
   },
@@ -702,7 +708,7 @@ const BUILTIN_SKILL_TASKS: EvalTask[] = [
       if (!(await stored(env, 'cancelled'))) return 'the subscription was not cancelled';
       if (!o.approvals.some((card) => /cancel/i.test(card))) return 'the final cancellation was not put to the user';
       // Once through the steps: the account still says "active" until the end date, which is no reason to start again.
-      if ((await stored(env, 'offerViews')) !== '1') return `went through the cancellation ${await stored(env, 'offerViews')} times`;
+      if ((await stored(env, 'confirmViews')) !== '1') return `came to the last step ${await stored(env, 'confirmViews')} times`;
       if ((o.task?.steps.length ?? 0) > 12) return `${o.task?.steps.length} steps for five pages`;
       return /1 December|December 1|Dec/i.test(o.answer) ? undefined : 'does not say when it ends';
     },
@@ -855,7 +861,10 @@ test.describe.serial('evaluation with a real model', () => {
     });
     origin = server.origin;
     // The made-up stores, and the forum under a social site's name, resolve to this computer: a model that opens one in a tab reaches nothing real.
-    ({ context, extensionId } = await launch({ args: [`--host-resolver-rules=${STORE_HOSTS.map((host) => `MAP ${host} 127.0.0.1, MAP *.${host} 127.0.0.1`).join(', ')}, MAP ${FORUM_HOST} 127.0.0.1, ${SKILL_HOSTS.map((host) => `MAP ${host} 127.0.0.1`).join(', ')}`] }));
+    // Every other name resolves to this computer too, so a model that opens a real site (a shop, a search engine) reaches nothing: only the model's own endpoint is on the network.
+    void STORE_HOSTS;
+    void SKILL_HOSTS;
+    ({ context, extensionId } = await launch({ args: [`--host-resolver-rules=MAP * 127.0.0.1, EXCLUDE ${new URL(BASE_URL || 'http://localhost').hostname}`] }));
     await seed(
       context,
       extensionId,

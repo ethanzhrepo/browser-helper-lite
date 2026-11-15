@@ -85,7 +85,7 @@ describe('built-in skills', () => {
     // Every tool a skill names is one the assistant has.
     const tools = new Set(Object.keys(toolsFor({ provider: 'deepseek', deepseekFetch: true }, { skills: true, skillFiles: true })));
     for (const skill of BUILTIN_SKILLS) {
-      for (const name of `${skill.instructions} ${skill.compatibility}`.match(/\b(?:read|view|web|research|watch|load|ask|hand|open|close|switch|go|click|select|extract|look|navigate|type|press|scroll)_[a-z_]+\b/g) ?? []) {
+      for (const name of `${skill.instructions} ${skill.compatibility}`.match(/\b(?:read|view|web|research|watch|load|ask|hand|open|close|switch|go|click|select|extract|look|navigate|type|press|scroll|report)_[a-z_]+\b/g) ?? []) {
         expect(tools.has(name), `${skill.name} names ${name}`).toBe(true);
       }
     }
@@ -121,6 +121,19 @@ describe('built-in skills', () => {
     expect(guide.files![0]!.text).toContain('## China (CN)');
     expect(guide.files![0]!.text).toContain('smzdm.com');
     expect(guide.files![0]!.text).toContain('rtings.com');
+    // The longer ones are laid out in stages, each giving its result as it is ready; the last stage is the final message.
+    const staged = ['buying-guide', 'reputation', 'compare-prices', 'fact-check', 'travel-compare', 'site-trust', 'news-perspectives'];
+    for (const skill of BUILTIN_SKILLS) {
+      const stages = [...skill.instructions.matchAll(/^Stage (\d+) of (\d+), /gm)];
+      expect(stages.length > 0, skill.name).toBe(staged.includes(skill.name));
+      if (stages.length === 0) continue;
+      expect(skill.instructions).toContain('call report_progress with that stage\'s result');
+      expect(stages.map((match) => Number(match[1]))).toEqual(stages.map((_, index) => index + 1));
+      expect(new Set(stages.map((match) => match[2]))).toEqual(new Set([String(stages.length)]));
+      expect(skill.instructions).toMatch(new RegExp(`^Stage ${stages.length} of ${stages.length}, [^\\n]*\\(your final message\\)$`, 'm'));
+      // Every stage but the last says what to report.
+      expect(skill.instructions.match(/^- Report: /gm)).toHaveLength(stages.length - 1);
+    }
     // What acts on a site leaves the last step to the user; what only reads says so.
     expect(BUILTIN_SKILLS.find((skill) => skill.name === 'cancel-subscription')!.instructions).toContain('The final confirmation is the user');
     expect(BUILTIN_SKILLS.find((skill) => skill.name === 'travel-compare')!.instructions).toContain('Stop at the booking step');

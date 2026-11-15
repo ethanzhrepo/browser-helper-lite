@@ -91,7 +91,9 @@
     "removeImage": "Remove image",
     "imageAlt": "Part of {{site}}",
     "removeCommand": "Remove command",
-    "removeSkill": "Remove skill"
+    "removeSkill": "Remove skill",
+    "placeholderAdd": "Add something while it works…",
+    "add": "Add to this task"
   },
   "context": {
     "unavailable": "This page can't be read",
@@ -444,7 +446,8 @@
       "research_pages": "Research: {{question}}",
       "watch_page": "Watch {{site}}: {{condition}}",
       "load_skill": "Use the skill: {{name}}",
-      "read_skill_file": "Reading {{path}}"
+      "read_skill_file": "Reading {{path}}",
+      "report_progress": "Reported: {{stage}}"
     },
     "directions": {
       "up": "up",

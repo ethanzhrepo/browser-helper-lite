@@ -131,6 +131,14 @@ export interface AgentTask {
   steps: AgentStep[];
   /** Text of the model call in progress, streamed to the panel. */
   draft: string;
+  /**
+   * Parts of the answer the assistant gave while still working, one for each
+   * stage of a longer task (report_progress). They are shown as they come,
+   * and the final reply follows them.
+   */
+  sections?: string[];
+  /** The stage of a longer task that was reported last: its name, and where it is among the stages. */
+  stage?: { name: string; step?: number; of?: number };
   waiting?: WaitReason;
   pauseReason?: PauseReason;
   result?: { success: boolean; summary: string };
@@ -181,6 +189,8 @@ export type AgentClientMessage =
   | { type: 'stop'; taskId: string }
   | { type: 'takeOver'; taskId: string }
   | { type: 'respond'; taskId: string; response: WaitResponse }
+  /** Something the user adds while the turn is under way ("not that brand"); the assistant reads it before its next step. */
+  | { type: 'say'; taskId: string; text: string }
   | { type: 'ping' };
 
 export type AgentServerMessage = { type: 'task'; task: AgentTask };

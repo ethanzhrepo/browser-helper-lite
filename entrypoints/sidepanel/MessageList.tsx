@@ -131,12 +131,14 @@ export function MessageList({ messages, tasks, pendingTaskId, canChange, speech,
 function TurnView({ task, replied, request, onSend }: { task: AgentTask; replied: boolean; request?: string; onSend: (message: AgentClientMessage) => void }) {
   const active = ACTIVE_STATUSES.includes(task.status);
   const hasActions = task.steps.some((step) => step.actions.length > 0);
+  // What the assistant has reported so far, then what it is writing now.
+  const content = [...(task.sections ?? []), task.draft].filter(Boolean).join('\n\n');
   return (
     <>
       {hasActions && <AgentRunView task={task} request={request} onSend={onSend} />}
-      {!replied && (task.draft || (active && !task.waiting)) && (
+      {!replied && (content || (active && !task.waiting)) && (
         // A finished turn without a stored reply was cut off (e.g. the extension restarted).
-        <AssistantMessage content={task.draft} modelId={task.model.modelId} streaming={active} aborted={!active && task.status !== 'done'} />
+        <AssistantMessage content={content} modelId={task.model.modelId} streaming={active} aborted={!active && task.status !== 'done'} />
       )}
     </>
   );

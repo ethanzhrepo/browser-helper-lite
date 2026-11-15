@@ -96,6 +96,17 @@ function assistant(messages: ChatMessage[]): Reply {
     const refusedClicks = history.match(/- click [^\n]*→ Not tried again: this exact action failed 2 times/g)?.length ?? 0;
     return say(`Opens refused: ${refusedOpens}. Clicks failed: ${failedClicks}, refused: ${refusedClicks}.`);
   }
+  // A longer task in stages: each stage's result is given as it is ready.
+  if (request.includes('FT-STAGES')) {
+    const waits = history.match(/- wait /g)?.length ?? 0;
+    if (!used('report_progress')) {
+      return say('', 'report_progress', { stage: 'Candidates', step: 1, of: 2, content: '## Candidates\n\n| Cable | Price |\n|---|---|\n| Cable A | $9.99 |\n| Cable B | $5.49 |' });
+    }
+    if (waits < (request.includes('LONG') ? 6 : 1)) return say('Checking the reviews.', 'wait', { seconds: 3 });
+    return say(`## Pick\n\nCable B. Reported: ${results.includes('Shown to the user as the next part of your answer') ? 'yes' : 'no'}.`);
+  }
+  // What the user adds while the assistant works.
+  if (request.includes('FT-ADDED')) return say(/The user adds, while you are working:\s*FT-ADDED not Cable A/.test(request) ? 'Understood: Cable A is out. Cable B it is.' : 'unexpected');
   if (request.includes('FT-REGION')) return say(results ? 'unexpected' : 'It is a red block.');
   return say('Nothing to do.');
 }
@@ -665,5 +676,64 @@ test.describe.serial('research, tables, pictures and reading aloud', () => {
     expect(server.hits.filter((hit) => hit === '/long.html').length - before).toBe(4);
     await opened.site.close();
     await opened.panel.close();
+  });
+
+  test('a longer task gives each stage\'s result as it is ready, and the final reply follows them', async () => {
+    const opened = await openSiteAndPanel(context, extensionId, `${server.origin}/red.html`);
+    const side = opened.panel;
+    await ask(side, 'FT-STAGES which cable?');
+    // While it still works: the first part of the answer is there, as a table, and the run says which stage was reached.
+    const run = side.getByTestId('agent-run').last();
+    const reply = side.getByTestId('assistant-message').last();
+    await expect(reply.getByRole('heading', { name: 'Candidates' })).toBeVisible({ timeout: 20_000 });
+    await expect(run).toHaveAttribute('data-status', 'running');
+    await expect(run.getByTestId('run-stage')).toHaveText('1/2 Candidates');
+    await expect(reply.getByTestId('data-table')).toBeVisible();
+    // Done: both parts, in their order, in one reply; the model was told that the first was shown.
+    await expect(reply.getByRole('heading', { name: 'Pick' })).toBeVisible({ timeout: 20_000 });
+    await expect(reply).toContainText('Cable B. Reported: yes.');
+    await expect(reply.getByRole('heading')).toHaveText(['Candidates', 'Pick']);
+    await expect(side.getByTestId('assistant-message')).toHaveCount(1);
+    await expect(run.getByTestId('run-stage')).toHaveCount(0);
+    // Kept with the conversation.
+    await side.reload();
+    await expect(side.getByTestId('assistant-message').last().getByRole('heading')).toHaveText(['Candidates', 'Pick'], { timeout: 15_000 });
+    await opened.site.close();
+    await side.close();
+  });
+
+  test('what the user types while the assistant works reaches it before its next step; a stopped task keeps what it had given', async () => {
+    const opened = await openSiteAndPanel(context, extensionId, `${server.origin}/red.html`);
+    const side = opened.panel;
+    await ask(side, 'FT-STAGES LONG which cable?');
+    const run = side.getByTestId('agent-run').last();
+    await expect(side.getByTestId('assistant-message').last().getByRole('heading', { name: 'Candidates' })).toBeVisible({ timeout: 20_000 });
+    // The box takes an addition to the task under way; Stop stays next to it.
+    const input = side.getByTestId('composer-input');
+    await expect(input).toHaveAttribute('placeholder', 'Add something while it works…');
+    await expect(side.getByTestId('add-button')).toHaveCount(0);
+    await input.fill('FT-ADDED not Cable A');
+    await expect(side.getByTestId('add-button')).toBeVisible();
+    await expect(side.getByTestId('stop-button')).toBeVisible();
+    await input.press('Enter');
+    await expect(input).toHaveValue('');
+    // It is part of the conversation, and the assistant answers to it at its next step instead of waiting on.
+    await expect(side.getByTestId('user-message').last()).toContainText('FT-ADDED not Cable A');
+    await expect(side.getByTestId('assistant-message').last()).toContainText('Understood: Cable A is out. Cable B it is.', { timeout: 20_000 });
+    await expect(run).toHaveAttribute('data-status', 'done');
+    // The candidates given before stay in the reply.
+    await expect(side.getByTestId('assistant-message').last().getByRole('heading', { name: 'Candidates' })).toBeVisible();
+    expect(server.chatRequests.at(-1)!.messages.some((m) => m.role === 'user' && JSON.stringify(m.content).includes('The user adds, while you are working'))).toBe(true);
+
+    // Stopped midway: the part that was given is kept.
+    await ask(side, 'FT-STAGES LONG again');
+    const second = side.getByTestId('assistant-message').last();
+    await expect(second.getByRole('heading', { name: 'Candidates' })).toBeVisible({ timeout: 20_000 });
+    await side.getByTestId('stop-button').click();
+    await expect(side.getByTestId('agent-run').last()).toHaveAttribute('data-status', 'stopped', { timeout: 10_000 });
+    await expect(side.getByTestId('assistant-message').last()).toContainText('The task was stopped.');
+    await expect(side.getByTestId('assistant-message').last().getByRole('heading', { name: 'Candidates' })).toBeVisible();
+    await opened.site.close();
+    await side.close();
   });
 });

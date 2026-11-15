@@ -103,6 +103,16 @@ export const assistantTools = {
     description: 'Wait for the page to finish loading or updating.',
     inputSchema: z.object({ seconds: z.number().min(0.5).max(10) }),
   }),
+  report_progress: tool({
+    description:
+      'Add a part of the answer while you are still working: the result of one stage of a longer task (candidates found, what the reviews say, a table so far). The user sees it at once, as the next part of your answer, and can redirect you. Your final message follows what you reported: do not repeat it there. Not for short tasks, and not to say what you are about to do.',
+    inputSchema: z.object({
+      content: z.string().describe('This part of the answer, in Markdown, in the user\'s language, written as it should stay in the answer'),
+      stage: z.string().optional().describe('A few words naming the stage just finished, in the user\'s language'),
+      step: z.number().int().min(1).optional().describe('Its number among the stages'),
+      of: z.number().int().min(1).optional().describe('How many stages there are'),
+    }),
+  }),
   ask_user: tool({
     description: 'Ask the user a question and wait for the answer. Use it for choices, missing personal details or ambiguity.',
     inputSchema: z.object({ question: z.string() }),
@@ -158,7 +168,7 @@ export function toolsFor(search: { provider: string; deepseekFetch?: boolean }, 
 export const ELEMENT_TOOLS = new Set<string>(['click', 'type', 'hover', 'select_option']);
 
 /** Tools that only read; they never take over the tab. */
-export const READING_TOOLS = new Set<string>(['read_page', 'view_page', 'extract', 'look', 'web_search', 'read_url', 'research_pages', 'watch_page', 'load_skill', 'read_skill_file', 'ask_user']);
+export const READING_TOOLS = new Set<string>(['read_page', 'view_page', 'extract', 'look', 'web_search', 'read_url', 'research_pages', 'watch_page', 'load_skill', 'read_skill_file', 'report_progress', 'ask_user']);
 
 /** Tools after which the model gets a fresh page view. */
 export const VIEW_AFTER = new Set<string>([

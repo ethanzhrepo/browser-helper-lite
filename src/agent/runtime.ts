@@ -35,7 +35,7 @@ import { ELEMENT_TOOLS, READING_TOOLS, toolsFor, VIEW_AFTER } from './tools';
 
 /** Tools that go through the risk check and may need approval. */
 const GUARDED_TOOLS = new Set([...ELEMENT_TOOLS, 'press', 'click_at']);
-import type { AgentAction, AgentStep, AgentTask, InjectionWarning, PauseReason, RiskReason, WaitReason, WaitResponse } from './types';
+import { ACTIVE_STATUSES, type AgentAction, type AgentStep, type AgentTask, type InjectionWarning, type PauseReason, type RiskReason, type WaitReason, type WaitResponse } from './types';
 
 export interface RunnerDeps {
   /** Called after every state change: broadcast and persist. */
@@ -96,6 +96,9 @@ const COMMON_SUFFIXES = new Set([
 const SNAPSHOT_CHARS = 14_000;
 const READ_PAGE_CHARS = 40_000;
 const MAX_CONSECUTIVE_ERRORS = 6;
+/** Parts of the answer given while working (report_progress): how many, and how long in all. */
+const MAX_SECTIONS = 12;
+const MAX_SECTION_CHARS = 40_000;
 /** How often one address may be opened in a turn, and how often one action may fail the same way, before it is refused: a task may take a hundred steps, and should not spend them going in circles. */
 const MAX_OPENS_OF_AN_ADDRESS = 4;
 const MAX_SAME_FAILURES = 2;
@@ -865,20 +868,54 @@ export class AgentRunner {
     return true;
   }
 
+  // ---- What the user adds while the turn is under way ----
+
+  /** What the user said since the assistant last looked. */
+  private remarks: string[] = [];
+
+  /** The user adds something while the turn runs: read before the next step, and it keeps the turn from ending on an answer written without it. */
+  say(text: string): void {
+    const remark = clip(text.trim(), 4000);
+    if (remark && ACTIVE_STATUSES.includes(this.task.status)) this.remarks.push(remark);
+  }
+
+  /** Puts what the user added into the conversation with the model. True when there was something. */
+  private takeRemarks(): boolean {
+    if (this.remarks.length === 0) return false;
+    const said = this.remarks.splice(0).join('\n\n');
+    // Sites the user names are their choice, as in the request.
+    for (const match of said.matchAll(/\b(?:https?:\/\/)?((?:[a-z0-9-]+\.)+[a-z]{2,})\b/gi)) this.rememberHost(`https://${match[1]}`);
+    this.messages.push({ role: 'user', content: `The user adds, while you are working:\n${said}\n\nTake it into account from here on; what you have done so far stands unless it says otherwise.` });
+    return true;
+  }
+
   // ---- Main loop ----
 
   private async loop(): Promise<void> {
     for (;;) {
       await this.checkpoint();
+      this.takeRemarks();
       const atLimit = this.task.steps.length >= this.task.maxSteps;
       const { text, toolCalls, responseMessages } = await this.callModel(atLimit);
+
+      // The user added something while this answer was being written: it is not the answer yet.
+      if (toolCalls.length === 0 && !atLimit && this.remarks.length > 0) {
+        this.messages.push(...responseMessages);
+        this.task.draft = '';
+        this.reasoning = '';
+        this.update();
+        continue;
+      }
 
       if (toolCalls.length === 0 || atLimit || this.task.chatOnly) {
         // The replay ends on what the task left behind; taken before the task reports that it is done.
         if (this.frames > 0) await this.recordFrame(this.task.steps.length + 1);
-        await this.keepPictures(text);
+        // What was reported along the way is the first part of the answer; the final message follows it.
+        const parts = [...(this.task.sections ?? []), text.trim()].filter(Boolean);
+        const summary = parts.join('\n\n') || this.deps.t('agent.emptyAnswer');
+        await this.keepPictures(summary);
         this.task.status = 'done';
-        this.task.result = { success: true, summary: text.trim() || this.deps.t('agent.emptyAnswer') };
+        this.task.result = { success: true, summary };
         return;
       }
 
@@ -1251,6 +1288,28 @@ export class AgentRunner {
         // The address goes to DeepSeek and from there to the site: the same checks as for opening it.
         if (!(await this.allowNavigation(action, url))) return 'continue';
         action.result = await this.readUrl(url);
+        return 'continue';
+      }
+      case 'report_progress': {
+        const content = str('content').trim();
+        if (!content) throw new ActionError('Give the part of the answer to show.');
+        const sections = this.task.sections ?? [];
+        if (sections.includes(content)) {
+          action.result = 'This is shown already. Go on.';
+          return 'continue';
+        }
+        if (sections.length >= MAX_SECTIONS || sections.join('').length + content.length > MAX_SECTION_CHARS) {
+          throw new ActionError('The answer so far is long enough. Finish the task and give the rest in your final message.');
+        }
+        this.task.sections = [...sections, content];
+        const name = clip(str('stage').replace(/\s+/g, ' ').trim(), 60);
+        const step = Number.isInteger(args.step) ? num('step') : undefined;
+        const of = Number.isInteger(args.of) ? num('of') : undefined;
+        if (name || step) this.task.stage = { name, ...(step ? { step } : {}), ...(step && of && of >= step ? { of } : {}) };
+        action.target = name || undefined;
+        // Its pictures are fetched now, so they show with it and not only at the end.
+        void this.keepPictures(content).catch(() => undefined);
+        action.result = 'Shown to the user as the next part of your answer. Go on with the next stage. Your final message follows it: do not repeat what is shown, add what is new and the conclusion.';
         return 'continue';
       }
       case 'load_skill': {

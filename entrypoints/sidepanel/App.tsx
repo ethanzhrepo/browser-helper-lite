@@ -267,9 +267,19 @@ export function App() {
     agent.send({ type: 'respond', taskId: question.id, response: { kind: 'answer', text: reply } });
   };
 
+  /** Adds something to the turn under way; it is part of the conversation, and the assistant reads it before its next step. */
+  const addToTurn = async (remark: string) => {
+    if (!activeTask) return;
+    setText('');
+    await conversation.appendUser({ text: remark, tab: tab && { title: tab.title, url: tab.url }, taskId: activeTask.id });
+    agent.send({ type: 'say', taskId: activeTask.id, text: remark });
+  };
+
   const handleSend = async (typed = text, { byVoice = false } = {}) => {
     const prompt = typed.trim();
     if (question) return prompt ? answer(prompt) : undefined;
+    // While the assistant works, what is typed goes to the turn under way.
+    if (activeTask && !pendingTaskId) return prompt ? addToTurn(prompt) : undefined;
     if (!chatSlot || activeTask || pendingTaskId) return;
     const contexts: ContextSnapshot[] = [];
     if (includePage && tab) {
@@ -598,6 +608,7 @@ export function App() {
               onSend={() => void handleSend()}
               onStop={() => activeTask && agent.send({ type: 'stop', taskId: activeTask.id })}
               busy={busy}
+              canAdd={Boolean(activeTask && !question && !pendingTaskId)}
               disabled={!hasModel}
               voice={{ state: voice.state, level: voice.level, toggle: toggleVoice }}
             />

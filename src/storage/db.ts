@@ -206,6 +206,8 @@ export async function truncateConversation(conversationId: string, fromMessageId
         task.goal = '';
         task.steps = [];
         task.draft = '';
+        delete task.sections;
+        delete task.stage;
         delete task.result;
         delete task.error;
         delete task.waiting;
