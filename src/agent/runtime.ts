@@ -96,6 +96,9 @@ const COMMON_SUFFIXES = new Set([
 const SNAPSHOT_CHARS = 14_000;
 const READ_PAGE_CHARS = 40_000;
 const MAX_CONSECUTIVE_ERRORS = 6;
+/** How often one address may be opened in a turn, and how often one action may fail the same way, before it is refused: a task may take a hundred steps, and should not spend them going in circles. */
+const MAX_OPENS_OF_AN_ADDRESS = 4;
+const MAX_SAME_FAILURES = 2;
 /** research_pages: how many pages one call reads, how many at a time, and how long each page's notes may be. */
 const RESEARCH_PAGES = 12;
 const RESEARCH_FETCHES = 4;
@@ -191,6 +194,10 @@ export class AgentRunner {
   private readonly deniedOrigins = new Set<string>();
   private recentSignatures: string[] = [];
   private consecutiveErrors = 0;
+  /** How often each action (tool, arguments, tab) failed in this turn. */
+  private readonly failures = new Map<string, number>();
+  /** How often each address was opened in this turn. */
+  private readonly opens = new Map<string, number>();
   /** Set once the turn operates a page: the tab is grouped and shows the overlay. */
   private engaged = false;
   private main!: ResolvedModel;
@@ -1164,6 +1171,13 @@ export class AgentRunner {
 
   private async execute(action: AgentAction): Promise<Outcome> {
     const warning = this.repeatWarning(action);
+    // Failed twice the same way: a third try would fail too.
+    const signature = `${action.tool}:${JSON.stringify(action.args)}@${this.ctl.currentTabId}`;
+    if ((this.failures.get(signature) ?? 0) >= MAX_SAME_FAILURES) {
+      action.status = 'rejected';
+      action.result = `Not tried again: this exact action failed ${MAX_SAME_FAILURES} times in this request, the same way. Do it another way (another tool, another element, other arguments), or tell the user what is in the way.`;
+      return 'continue';
+    }
     try {
       // Actions that need no approval take over the tab right away; the others once allowed (see guarded and scroll).
       if (!READING_TOOLS.has(action.tool) && !GUARDED_TOOLS.has(action.tool) && action.tool !== 'scroll') await this.engage();
@@ -1178,6 +1192,7 @@ export class AgentRunner {
       if (error instanceof StopError || this.stopped) throw new StopError();
       action.status = 'error';
       action.result = clip(error instanceof Error ? error.message : String(error), 500);
+      this.failures.set(signature, (this.failures.get(signature) ?? 0) + 1);
       this.consecutiveErrors += 1;
       if (this.consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) throw new Error(`Too many failed actions in a row. Last error: ${action.result}`);
       if (this.consecutiveErrors >= 3) action.result += '\nSeveral actions failed in a row. Look at the page again and change your approach.';
@@ -1297,7 +1312,15 @@ export class AgentRunner {
           action.result = this.socialLimit(url);
           return 'continue';
         }
+        // Going back to the same address again and again reads nothing new.
+        const address = withoutHash(url);
+        if ((this.opens.get(address) ?? 0) >= MAX_OPENS_OF_AN_ADDRESS) {
+          action.status = 'rejected';
+          action.result = `Not opened: you have opened this address ${MAX_OPENS_OF_AN_ADDRESS} times in this request, and it shows nothing new. Answer from what you have read; if something is missing, read the page once with read_page or research_pages, or say what you could not find.`;
+          return 'continue';
+        }
         if (!(await this.allowNavigation(action, url))) return 'continue';
+        this.opens.set(address, (this.opens.get(address) ?? 0) + 1);
         if (action.tool === 'navigate') await this.ctl.navigate(url);
         else {
           const tabId = await this.ctl.openTab(url);

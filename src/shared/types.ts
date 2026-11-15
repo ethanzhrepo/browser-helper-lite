@@ -126,7 +126,8 @@ export interface SavedCommand {
 }
 
 export interface Settings {
-  schemaVersion: 1;
+  /** 2 since the step limit's default went from 30 to 100 (see withDefaults). */
+  schemaVersion: number;
   connections: Connection[];
   slots: Partial<Record<Capability, SlotAssignment>>;
   language: LanguageSetting;

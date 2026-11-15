@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ENABLE_CDP_DRIVER } from '../../src/shared/build-flags';
 import type { AgentMode, AgentSettings, Settings } from '../../src/shared/types';
-import { updateSettings } from '../../src/storage/settings';
+import { DEFAULT_MAX_STEPS, MAX_MAX_STEPS, MIN_MAX_STEPS, updateSettings } from '../../src/storage/settings';
 import { Card, ChoiceCard, Field, inputClass, Section, Toggle } from './Section';
 
 const MODES: { id: AgentMode; icon: LucideIcon }[] = [
@@ -29,7 +29,7 @@ export function AgentSection({ settings }: { settings: Settings }) {
   useEffect(() => setMaxSteps(String(agent.maxSteps)), [agent.maxSteps]);
 
   const commitMaxSteps = () => {
-    const value = Math.min(Math.max(Math.round(Number(maxSteps)) || 30, 5), 100);
+    const value = Math.min(Math.max(Math.round(Number(maxSteps)) || DEFAULT_MAX_STEPS, MIN_MAX_STEPS), MAX_MAX_STEPS);
     setMaxSteps(String(value));
     if (value !== agent.maxSteps) saveAgent({ maxSteps: value });
   };
@@ -135,12 +135,12 @@ export function AgentSection({ settings }: { settings: Settings }) {
         </div>
       </Card>
       <Card className="p-5">
-        <Field label={t('agentSettings.maxSteps')} htmlFor="max-steps" hint={t('agentSettings.maxStepsHint')}>
+        <Field label={t('agentSettings.maxSteps')} htmlFor="max-steps" hint={t('agentSettings.maxStepsHint', { min: MIN_MAX_STEPS, max: MAX_MAX_STEPS, usual: DEFAULT_MAX_STEPS })}>
           <input
             id="max-steps"
             type="number"
-            min={5}
-            max={100}
+            min={MIN_MAX_STEPS}
+            max={MAX_MAX_STEPS}
             className={`${inputClass} sm:w-40`}
             value={maxSteps}
             onChange={(e) => setMaxSteps(e.target.value)}

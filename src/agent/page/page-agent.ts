@@ -156,6 +156,9 @@ function shortHref(href: string): string {
   }
 }
 
+/** Keys that do nothing by themselves. */
+const MODIFIER_KEYS = new Set(['Shift', 'Control', 'Alt', 'Meta', 'AltGraph', 'CapsLock', 'NumLock', 'ScrollLock', 'Fn', 'FnLock', 'Hyper', 'Super', 'Symbol', 'SymbolLock', 'OS', 'ContextMenu']);
+
 function isEditable(el: Element): boolean {
   if (el instanceof HTMLTextAreaElement) return !el.readOnly;
   if (el instanceof HTMLInputElement) {
@@ -409,10 +412,36 @@ export function createPageAgent(): PageAgentApi {
     if (host.style.cssText !== hostCss) styleHost();
   }).observe(host, { attributes: true, attributeFilter: ['style', 'hidden', 'class'] });
 
-  // Real (trusted) input from the user while the agent runs pauses the task (§4.3).
+  /**
+   * Whether an input of the user's takes the page over: pressing something on
+   * it, or typing into it. Not what leaves the page as it is: a click on text
+   * or on empty space (to select, or to bring the window forward), the other
+   * mouse buttons, keys held with others and shortcuts of the browser or the
+   * system (copy, find, switching tabs, opening the panel), and keys that
+   * only scroll.
+   */
+  const takesOver = (event: Event): boolean => {
+    const path = event.composedPath().filter((node): node is Element => node instanceof Element);
+    const target = path[0];
+    if (event instanceof KeyboardEvent) {
+      if (event.ctrlKey || event.metaKey || event.altKey || MODIFIER_KEYS.has(event.key) || /^F\d+$/.test(event.key)) return false;
+      if (target && isEditable(target)) return true;
+      // Enter or Space on a button or a link presses it; elsewhere keys scroll or move the focus.
+      if (event.key !== 'Enter' && event.key !== ' ') return false;
+      return Boolean(target && target !== document.body && target !== document.documentElement && isInteractive(target, getComputedStyle(target)));
+    }
+    if (event instanceof MouseEvent) {
+      if (event.button !== 0) return false;
+      return path.some((el) => el !== document.body && el !== document.documentElement && (isEditable(el) || isInteractive(el, getComputedStyle(el))));
+    }
+    return false;
+  };
+
+  // Real (trusted) input from the user that takes the page over while the agent runs pauses the task (§4.3).
   const onUserInput = (event: Event) => {
     if (!event.isTrusted || acting || overlayMode !== 'running') return;
     if (event.composedPath().includes(host)) return;
+    if (!takesOver(event)) return;
     const now = Date.now();
     if (now - lastInterference < 1000) return;
     lastInterference = now;

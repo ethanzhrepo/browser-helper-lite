@@ -14,10 +14,18 @@ const SECRETS_KEY = 'secrets:v1';
 
 type Secrets = Record<string, string>;
 
+/** Steps a task may take: the default, and the range the setting accepts. */
+export const DEFAULT_MAX_STEPS = 100;
+export const MIN_MAX_STEPS = 5;
+export const MAX_MAX_STEPS = 500;
+/** The default until version 0.3.1. */
+const OLD_DEFAULT_MAX_STEPS = 30;
+const SCHEMA_VERSION = 2;
+
 export const DEFAULT_AGENT_SETTINGS: AgentSettings = {
   mode: 'auto',
   useCdp: true,
-  maxSteps: 30,
+  maxSteps: DEFAULT_MAX_STEPS,
   notifications: true,
   screenshots: 'auto',
   autoScreenshot: true,
@@ -44,7 +52,7 @@ export const DEFAULT_VOICE_SETTINGS: VoiceSettings = {
 
 export function defaultSettings(): Settings {
   return {
-    schemaVersion: 1,
+    schemaVersion: SCHEMA_VERSION,
     connections: [],
     slots: {},
     language: 'auto',
@@ -71,16 +79,20 @@ type StoredSettings = Partial<Settings> & {
 export function withDefaults(stored: StoredSettings | undefined): Settings {
   const defaults = defaultSettings();
   // M1 kept the browser search engine with the agent settings.
-  const { searchEngine, customSearchUrl, ...agent } = stored?.agent ?? {};
+  const { searchEngine, customSearchUrl, ...storedAgent } = stored?.agent ?? {};
+  const agent: Partial<AgentSettings> = { ...storedAgent };
   const legacySearch: Partial<SearchSettings> = {
     ...(searchEngine ? { engine: searchEngine } : {}),
     ...(customSearchUrl ? { customUrl: customSearchUrl } : {}),
   };
   // M1's separate agent model now follows the current model.
   const { agent: _agentSlot, ...slots } = (stored?.slots ?? {}) as Settings['slots'] & { agent?: unknown };
+  // Settings saved before the default step limit went up carry the old default; a limit the user sets after that is kept, whatever it is.
+  if ((stored?.schemaVersion ?? 1) < SCHEMA_VERSION && agent.maxSteps === OLD_DEFAULT_MAX_STEPS) agent.maxSteps = DEFAULT_MAX_STEPS;
   return {
     ...defaults,
     ...stored,
+    schemaVersion: SCHEMA_VERSION,
     slots,
     agent: { ...defaults.agent, ...agent },
     search: {

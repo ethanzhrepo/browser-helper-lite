@@ -156,7 +156,12 @@ test.describe.serial('assistant operating pages', () => {
     await expect(run.locator('[data-tool="wait"]').first()).toBeHidden();
     await expect(run.getByTestId('run-activity')).toHaveText(/^Working on /);
 
+    // A click on empty space leaves the page as it is, and the assistant at work (see features.spec.ts for more of these).
     await site.mouse.click(400, 300);
+    await site.waitForTimeout(600);
+    await expect(run).toHaveAttribute('data-status', 'running');
+    // A click into the search field takes the page over.
+    await site.getByPlaceholder('Search products').click();
     await expect(run).toHaveAttribute('data-status', 'paused', { timeout: 10_000 });
     await expect(run).toContainText('Paused because you used the page');
 

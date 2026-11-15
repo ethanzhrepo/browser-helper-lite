@@ -19,7 +19,7 @@ import {
 import { keepLegacySkills, listInstalledSkills, restoreSkills } from '../skills/store';
 import { MAX_KDF_ITERATIONS, MIN_KDF_ITERATIONS, seal, unseal, type Sealed } from './backup-crypto';
 import { db } from './db';
-import { loadSecrets, loadSettings, replaceSettings, withDefaults } from './settings';
+import { loadSecrets, loadSettings, MAX_MAX_STEPS, MIN_MAX_STEPS, replaceSettings, withDefaults } from './settings';
 
 // Zod's JIT uses eval, which the extension's CSP forbids.
 z.config({ jitless: true });
@@ -58,7 +58,7 @@ const settingsSchema = z.looseObject({
     .looseObject({
       mode: z.enum(['query', 'auto', 'manual']).optional(),
       useCdp: z.boolean().optional(),
-      maxSteps: z.number().int().min(5).max(100).optional(),
+      maxSteps: z.number().int().min(MIN_MAX_STEPS).max(MAX_MAX_STEPS).optional(),
       notifications: z.boolean().optional(),
       screenshots: z.enum(['auto', 'main', 'vision']).optional(),
       autoScreenshot: z.boolean().optional(),

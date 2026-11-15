@@ -606,7 +606,7 @@
     "notifications": "Me prévenir quand une tâche a besoin de moi",
     "notificationsHint": "Pour les CAPTCHA, connexions et validations.",
     "maxSteps": "Limite d'étapes par tâche",
-    "maxStepsHint": "De 5 à 100.",
+    "maxStepsHint": "De {{min}} à {{max}} ; {{usual}} par défaut. Une tâche qui tourne en rond consomme plus de jetons avec une limite plus haute.",
     "mode": "Mode par défaut",
     "modeHint": "Se change aussi sous la zone de message, même en cours de tâche.",
     "screenshots": "Les captures sont lues par",

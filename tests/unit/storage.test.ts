@@ -90,6 +90,21 @@ describe('settings defaults and migration', () => {
     expect(settings.voice.engine).toBe('browser');
   });
 
+  it('lets a task take 100 steps by default, and moves settings that carry the old default of 30', async () => {
+    expect((await loadSettings()).agent.maxSteps).toBe(100);
+    const saved = (maxSteps: number, schemaVersion?: number) => withDefaults({ ...(schemaVersion ? { schemaVersion } : {}), agent: { maxSteps } } as Parameters<typeof withDefaults>[0]).agent.maxSteps;
+    // Saved before the change: 30 was the default, not a choice. Another number was a choice.
+    expect([saved(30), saved(30, 1), saved(20), saved(60)]).toEqual([100, 100, 20, 60]);
+    // Set after the change: kept, also 30.
+    await updateSettings((s) => ({ ...s, agent: { ...s.agent, maxSteps: 30 } }));
+    expect(await loadSettings()).toMatchObject({ schemaVersion: 2, agent: { maxSteps: 30 } });
+    // A backup keeps the version with the number, and takes a limit up to 500 but no higher.
+    const backup = parseBackup(JSON.stringify(await buildBackup({ includeKeys: false })));
+    expect(withDefaults(backup.settings).agent.maxSteps).toBe(30);
+    expect(() => parseBackup(JSON.stringify({ ...backup, settings: { ...backup.settings, agent: { ...backup.settings!.agent, maxSteps: 500 } } }))).not.toThrow();
+    expect(() => parseBackup(JSON.stringify({ ...backup, settings: { ...backup.settings, agent: { ...backup.settings!.agent, maxSteps: 501 } } }))).toThrow();
+  });
+
   it('moves the M1 search engine out of the agent settings and drops the agent slot', () => {
     const migrated = withDefaults({
       agent: { useCdp: false, maxSteps: 20, notifications: true, searchEngine: 'custom', customSearchUrl: 'https://s.example/?q=%s' },

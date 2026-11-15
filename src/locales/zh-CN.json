@@ -586,7 +586,7 @@
     "notifications": "任务需要我时通知我",
     "notificationsHint": "遇到验证码、登录或需要确认时。",
     "maxSteps": "每个任务的步数上限",
-    "maxStepsHint": "5 到 100。",
+    "maxStepsHint": "{{min}} 到 {{max}}，默认 {{usual}}。上限越高，任务绕圈时消耗的 token 越多。",
     "mode": "默认模式",
     "modeHint": "也可以在输入框下方随时切换，任务进行中也生效。",
     "screenshots": "由谁看截图",

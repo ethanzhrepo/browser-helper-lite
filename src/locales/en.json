@@ -596,7 +596,7 @@
     "notifications": "Notify me when a task needs me",
     "notificationsHint": "For CAPTCHAs, sign-ins and approvals.",
     "maxSteps": "Step limit per task",
-    "maxStepsHint": "5 to 100.",
+    "maxStepsHint": "{{min}} to {{max}}; {{usual}} unless you change it. A task that goes in circles uses more of your model's tokens with a higher limit.",
     "mode": "Default mode",
     "modeHint": "Also switchable below the message box, even mid-task.",
     "screenshots": "Screenshots are read by",

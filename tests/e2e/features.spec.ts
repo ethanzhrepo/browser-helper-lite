@@ -29,9 +29,17 @@ const PRODUCT_HTML = `<!doctype html><html lang="en"><head><title>Volt 65W charg
   aggregateRating: { '@type': 'AggregateRating', ratingValue: '4.4', reviewCount: '1286' },
 })}</script></head><body><main><h1>Volt 65W charger</h1><p>Now <span>$34</span><sup>.99</sup></p><p>Charges a laptop and a phone.</p></main></body></html>`;
 
+/** A page to use while the assistant works on it: text, a field, a button, and a count of what was pressed. */
+const BUSY_HTML = `<!doctype html><title>Busy</title><body style="margin:0;background:#fff;font:16px sans-serif">
+<p id="text" style="position:absolute;left:40px;top:40px;width:400px">Plain text of the page, to select and to click on.</p>
+<button id="go" style="position:absolute;left:40px;top:120px;width:160px;height:50px" onclick="this.textContent='Started'">Start</button>
+<input id="field" style="position:absolute;left:40px;top:200px;width:200px" placeholder="Notes">
+<button id="other" style="position:absolute;left:40px;top:260px;width:160px;height:50px" onclick="this.textContent='Pressed'">Other</button>
+</body>`;
+
 const stockPage = (state: string) => `<!doctype html><title>65W charger</title><h1>65W charger</h1><p id="stock">${state}</p>`;
 /** Served as they are at the moment of the request, so a test can change what a page says. */
-const pages: Record<string, string> = { '/red.html': RED_HTML, '/buttons.html': BUTTONS_HTML, '/long.html': LONG_HTML, '/product.html': PRODUCT_HTML, '/stock.html': stockPage('Out of stock') };
+const pages: Record<string, string> = { '/red.html': RED_HTML, '/buttons.html': BUTTONS_HTML, '/long.html': LONG_HTML, '/product.html': PRODUCT_HTML, '/stock.html': stockPage('Out of stock'), '/busy.html': BUSY_HTML };
 
 function assistant(messages: ChatMessage[]): Reply {
   const { request, history, results } = readTurn(messages);
@@ -67,6 +75,26 @@ function assistant(messages: ChatMessage[]): Reply {
     const clicks = history.match(/- click /g)?.length ?? 0;
     if (clicks < 2) return say('Adding Cable B.', 'click', { index: indexOf(view, /\[(\d+)\]<button[^\n]*aria-label="Add Cable B to cart"/) });
     return say('Cable B is in the cart.');
+  }
+  // Works on the page, then keeps busy for a while.
+  if (request.includes('FT-BUSY')) {
+    const { view } = readTurn(messages);
+    const waits = history.match(/- wait /g)?.length ?? 0;
+    if (!used('view_page')) return say('Looking at the page.', 'view_page');
+    if (!used('click')) return say('Starting.', 'click', { index: indexOf(view, /\[(\d+)\]<button[^\n]*>Start<\/button>/) });
+    if (waits < 4) return say('Waiting.', 'wait', { seconds: 3 });
+    return say('Done waiting.');
+  }
+  // A model that goes in circles: the same address over and over, then the same failing click.
+  if (request.includes('FT-LOOP')) {
+    const opens = history.match(/- navigate /g)?.length ?? 0;
+    const clicks = history.match(/- click /g)?.length ?? 0;
+    if (opens < 6) return say('Opening it again.', 'navigate', { url: `${origin}/long.html` });
+    if (clicks < 4) return say('Pressing it again.', 'click', { index: 987 });
+    const refusedOpens = history.match(/- navigate [^\n]*→ Not opened: you have opened this address 4 times/g)?.length ?? 0;
+    const failedClicks = history.match(/- click [^\n]*→ Error:/g)?.length ?? 0;
+    const refusedClicks = history.match(/- click [^\n]*→ Not tried again: this exact action failed 2 times/g)?.length ?? 0;
+    return say(`Opens refused: ${refusedOpens}. Clicks failed: ${failedClicks}, refused: ${refusedClicks}.`);
   }
   if (request.includes('FT-REGION')) return say(results ? 'unexpected' : 'It is a red block.');
   return say('Nothing to do.');
@@ -579,5 +607,63 @@ test.describe.serial('research, tables, pictures and reading aloud', () => {
     await item.getByRole('button', { name: 'Delete' }).click();
     await expect(panel.getByTestId('watch-item')).toHaveCount(0);
     await panel.getByRole('button', { name: 'Back' }).click();
+  });
+
+  test('using the page pauses the assistant only when the user presses or types something on it', async () => {
+    const opened = await openSiteAndPanel(context, extensionId, `${server.origin}/busy.html`);
+    const { site: busy, panel: side } = opened;
+    const run = side.getByTestId('agent-run').last();
+    await ask(side, 'FT-BUSY start and wait');
+    await expect(busy.locator('#go')).toHaveText('Started', { timeout: 20_000 });
+    await expect(run).toHaveAttribute('data-status', 'running');
+    await busy.bringToFront();
+
+    // What leaves the page as it is: keys held with others, shortcuts, keys that scroll, the other mouse buttons, a click on text or on empty space.
+    await busy.keyboard.press('Shift');
+    await busy.keyboard.press('Meta');
+    await busy.keyboard.press('ControlOrMeta+c');
+    await busy.keyboard.press('Alt+Shift+h');
+    await busy.keyboard.press('F5').catch(() => undefined);
+    await busy.keyboard.press('PageDown');
+    await busy.keyboard.press('Space');
+    await busy.mouse.click(600, 500);
+    await busy.locator('#text').click();
+    await busy.locator('#text').dblclick();
+    await busy.locator('#other').click({ button: 'right' });
+    await busy.waitForTimeout(1200);
+    await expect(run).toHaveAttribute('data-status', 'running');
+    await expect(busy.locator('#other')).toHaveText('Other');
+
+    // Typing into a field takes the page over.
+    await busy.locator('#field').focus();
+    await busy.keyboard.type('mine');
+    await expect(run).toHaveAttribute('data-status', 'paused', { timeout: 10_000 });
+    await expect(side.getByTestId('agent-run').last()).toContainText('Paused because you used the page.');
+    await side.bringToFront();
+    await side.getByTestId('agent-controls').getByRole('button', { name: 'Resume' }).click();
+    await expect(run).toHaveAttribute('data-status', 'running', { timeout: 10_000 });
+
+    // So does pressing a button.
+    await busy.bringToFront();
+    await busy.waitForTimeout(1100);
+    await busy.locator('#other').click();
+    await expect(busy.locator('#other')).toHaveText('Pressed');
+    await expect(run).toHaveAttribute('data-status', 'paused', { timeout: 10_000 });
+    await side.bringToFront();
+    await side.getByTestId('agent-controls').getByRole('button', { name: 'Resume' }).click();
+    await expect(side.getByTestId('assistant-message').last()).toContainText('Done waiting.', { timeout: 40_000 });
+    await busy.close();
+    await side.close();
+  });
+
+  test('going in circles is stopped: an address opened over and over, an action that keeps failing the same way', async () => {
+    const opened = await openSiteAndPanel(context, extensionId, `${server.origin}/red.html`);
+    const before = server.hits.filter((hit) => hit === '/long.html').length;
+    await ask(opened.panel, 'FT-LOOP go on');
+    // Four opens went through, the fifth and sixth did not; two clicks failed, the third and fourth were not tried.
+    await expect(opened.panel.getByTestId('assistant-message').last()).toContainText('Opens refused: 2. Clicks failed: 2, refused: 2.', { timeout: 60_000 });
+    expect(server.hits.filter((hit) => hit === '/long.html').length - before).toBe(4);
+    await opened.site.close();
+    await opened.panel.close();
   });
 });

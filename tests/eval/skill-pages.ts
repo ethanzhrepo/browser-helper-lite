@@ -140,6 +140,7 @@ const CANCEL_PAGES: Record<string, string> = {
   '/account/offer.html': page(
     'Before you go – StreamMax',
     `<h1>Wait! Keep Premium for 50% off</h1><p>Stay for 3 more months at $7.49 a month.</p>
+<script>localStorage.setItem('offerViews', String(Number(localStorage.getItem('offerViews') || 0) + 1));</script>
 <button id="keep" style="font-size:20px;padding:12px 24px" onclick="localStorage.setItem('offer','taken');location.href='/account/kept.html'">Keep my discount</button>
 <p><a href="/account/reason.html" style="font-size:11px;color:#999">No thanks, continue to cancel</a></p>`,
   ),

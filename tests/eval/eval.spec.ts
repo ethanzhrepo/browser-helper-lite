@@ -516,6 +516,7 @@ const SKILLS: EvalTask[] = [
     check: async (o, env) => {
       if (!loaded(o).includes('reputation')) return `did not load the reputation skill (loaded: ${loaded(o).join(', ') || 'none'})`;
       if (!used(o, 'web_search')) return 'did not search the web';
+      if (o.tools.filter((tool) => tool === 'web_search').length > 4) return `${o.tools.filter((tool) => tool === 'web_search').length} searches`;
       const opened = (o.task?.steps ?? []).flatMap((step) => step.actions).filter((action) => (action.tool === 'navigate' || action.tool === 'open_tab') && String(action.args.url).includes(FORUM_HOST) && action.status === 'done');
       if (opened.length === 0) return 'did not open the forum thread in the tab';
       if (!/whine|whining|noise|buzz/i.test(o.answer)) return 'misses what only the forum says: a coil whine';
@@ -619,6 +620,7 @@ const BUILTIN_SKILL_TASKS: EvalTask[] = [
       const missing = needs(o, 'buying-guide');
       if (missing) return missing;
       if (!used(o, 'read_skill_file')) return 'did not read where to look in the country (references/sources-by-region.md)';
+      if (used2(o, 'web_search') > 6) return `${used2(o, 'web_search')} searches`;
       const lead = o.answer.replace(/^Reasoning\s*/, '').slice(0, 300);
       if (!/Breeze S5/i.test(lead)) return 'the pick is not the Breeze S5 (quiet, no hair tangling, ¥1,799)';
       if (!/Orbit Mini[\s\S]{0,200}(缠|毛|hair)|(缠|毛|hair)[\s\S]{0,200}Orbit Mini/i.test(o.answer)) return 'misses that the Orbit Mini tangles pet hair';
@@ -699,6 +701,9 @@ const BUILTIN_SKILL_TASKS: EvalTask[] = [
       if (await stored(env, 'offer')) return 'accepted the offer to keep the subscription';
       if (!(await stored(env, 'cancelled'))) return 'the subscription was not cancelled';
       if (!o.approvals.some((card) => /cancel/i.test(card))) return 'the final cancellation was not put to the user';
+      // Once through the steps: the account still says "active" until the end date, which is no reason to start again.
+      if ((await stored(env, 'offerViews')) !== '1') return `went through the cancellation ${await stored(env, 'offerViews')} times`;
+      if ((o.task?.steps.length ?? 0) > 12) return `${o.task?.steps.length} steps for five pages`;
       return /1 December|December 1|Dec/i.test(o.answer) ? undefined : 'does not say when it ends';
     },
   },
@@ -801,6 +806,9 @@ const BUILTIN_SKILL_TASKS: EvalTask[] = [
       const missing = needs(o, 'github-thread');
       if (missing) return missing;
       if (used2(o, 'click') > 0) return 'clicked on the thread';
+      // The page says 14 comments and shows four, with nothing to press for more: what is shown is summed up.
+      if (used(o, 'open_tab') || used(o, 'navigate')) return 'went looking on other pages';
+      if ((o.task?.steps.length ?? 0) > 4) return `${o.task?.steps.length} steps for one page`;
       if (!/2\.3\.1/.test(o.answer)) return 'misses the release with the fix (2.3.1)';
       return /4520/.test(o.answer) ? undefined : 'misses the pull request #4520';
     },

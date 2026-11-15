@@ -606,7 +606,7 @@
     "notifications": "Avisarme cuando una tarea me necesite",
     "notificationsHint": "Para CAPTCHA, inicios de sesión y aprobaciones.",
     "maxSteps": "Límite de pasos por tarea",
-    "maxStepsHint": "De 5 a 100.",
+    "maxStepsHint": "De {{min}} a {{max}}; {{usual}} por defecto. Una tarea que da vueltas gasta más tokens con un límite más alto.",
     "mode": "Modo predeterminado",
     "modeHint": "También se cambia bajo el cuadro de mensaje, incluso en plena tarea.",
     "screenshots": "Quién lee las capturas",

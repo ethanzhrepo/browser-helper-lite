@@ -8,7 +8,7 @@ metadata:
   version: "1.0"
 ---
 
-1. Read the whole thread with read_page. On a long thread, expand the hidden comments ("Load more") when they matter, and read the linked issues and pull requests together with research_pages.
+1. Read the thread once with read_page, and sum up what it shows. A comment count higher than the comments you see is no reason to look further. Only when the page has a control for hidden comments ("Load more", "N hidden items") and the answer may be in them, press it once. Read a linked issue or pull request, with research_pages, only when the thread does not say what it did; do not open it in a tab.
 2. Report:
    - The problem in a sentence or two, with the environment and versions involved.
    - How to reproduce it, when the thread says.
