@@ -359,7 +359,9 @@ export function registerAgentService(): void {
   browser.notifications?.onClicked.addListener((id) => {
     const runner = [...runners.values()].find((r) => notificationId(r.task.id) === id);
     if (!runner) return;
-    const tabId = runner.currentTabId;
+    // Where the user is needed: a search tab that shows a CAPTCHA, or else the tab the task works in.
+    const waiting = runner.task.waiting;
+    const tabId = (waiting?.kind === 'handoff' ? waiting.tabId : undefined) ?? runner.currentTabId;
     void browser.notifications.clear(id);
     // The click lets us open the side panel there, if it is not open yet.
     openPanel(tabId).catch(() => undefined);

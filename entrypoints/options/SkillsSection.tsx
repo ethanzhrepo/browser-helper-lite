@@ -1,11 +1,11 @@
 import { AlertTriangle, Download, FileText, FileUp, Link2, Loader2, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { SHOPPING_SKILLS } from '../../src/chat/commands';
 import type { Settings } from '../../src/shared/types';
 import { BUILTIN_SKILLS } from '../../src/skills/builtin';
 import { fetchSkill, readSkillUpload, zipSkill } from '../../src/skills/package';
 import {
+  allSkills,
   checkSkill,
   isSkillName,
   MAX_INSTALLED_SKILLS,
@@ -14,8 +14,10 @@ import {
   SkillError,
   sitesIn,
   toSkillName,
+  usedSkills,
   type Skill,
 } from '../../src/skills/skills';
+import { skillTitle } from '../../src/skills/titles';
 import { installSkill, removeSkill } from '../../src/skills/store';
 import { useInstalledSkills } from '../../src/skills/useInstalledSkills';
 import { updateSettings } from '../../src/storage/settings';
@@ -32,9 +34,6 @@ type Draft = Skill & {
   from?: 'file' | 'address';
 };
 const EMPTY: Draft = { name: '', description: '', instructions: '' };
-
-/** The slash command of each built-in skill, for its name in the user's language. */
-const COMMAND_OF = Object.fromEntries(Object.entries(SHOPPING_SKILLS).map(([command, skill]) => [skill, command]));
 
 function download(skill: Skill) {
   const url = URL.createObjectURL(new Blob([zipSkill(skill) as BlobPart], { type: 'application/zip' }));
@@ -183,6 +182,8 @@ export function SkillsSection({ settings }: { settings: Settings }) {
     }
   }
   const sites = draft ? sitesIn(draft) : [];
+  /** The skills the one in the form builds on: they are loaded with it. */
+  const draftUses = draft ? usedSkills(draft, allSkills(installed)).map((used) => used.name) : [];
 
   return (
     <Section title={t('skills.title')} description={t('skills.description')}>
@@ -194,15 +195,16 @@ export function SkillsSection({ settings }: { settings: Settings }) {
           </div>
           <ul className="divide-y divide-line rounded-lg border border-line">
             {BUILTIN_SKILLS.map((skill) => {
-              const command = COMMAND_OF[skill.name];
+              const title = skillTitle(t, skill);
+              const uses = usedSkills(skill, BUILTIN_SKILLS).map((used) => used.name);
               return (
                 <li key={skill.name} className="px-3 py-2" data-testid="skill-row" data-skill={skill.name}>
                   <div className="flex items-center gap-2">
                     <div className="min-w-0 flex-1">
                       <div className="text-[13px] font-medium">
-                        {command ? t(`commands.${command}.label`) : skill.name} <span className="font-mono text-xs font-normal text-faint">{skill.name}</span>
+                        {title.label} {title.titled && <span className="font-mono text-xs font-normal text-faint">{skill.name}</span>}
                       </div>
-                      <div className="truncate text-xs text-muted">{command ? t(`commands.${command}.description`) : skill.description}</div>
+                      <div className="truncate text-xs text-muted">{title.description}</div>
                     </div>
                     <IconButton label={t('skills.export')} onClick={() => download(skill)} className="h-7 w-7">
                       <Download className="h-3.5 w-3.5" />
@@ -212,6 +214,11 @@ export function SkillsSection({ settings }: { settings: Settings }) {
                   <details className="mt-1 text-xs text-muted">
                     <summary className="cursor-pointer select-none text-faint hover:text-fg">{t('skills.show')}</summary>
                     <p className="mt-1.5 text-muted">{skill.description}</p>
+                    {uses.length > 0 && (
+                      <p className="mt-1 text-muted" data-testid="skill-uses">
+                        {t('skills.uses', { names: uses.join(', ') })}
+                      </p>
+                    )}
                     <pre className="mt-1.5 max-h-64 overflow-auto whitespace-pre-wrap rounded-md bg-subtle p-2.5 font-sans leading-relaxed">{skill.instructions}</pre>
                   </details>
                 </li>
@@ -344,6 +351,11 @@ export function SkillsSection({ settings }: { settings: Settings }) {
             {sites.length > 0 && (
               <p className="text-xs text-muted" data-testid="skill-sites">
                 {t('skills.form.sites', { sites: sites.join(', ') })}
+              </p>
+            )}
+            {draftUses.length > 0 && (
+              <p className="text-xs text-muted" data-testid="skill-uses">
+                {t('skills.uses', { names: draftUses.join(', ') })}
               </p>
             )}
             {problem?.where === 'form' && (

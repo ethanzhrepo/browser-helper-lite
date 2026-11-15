@@ -8,7 +8,9 @@ export * from './format';
  * Skills (see format.ts for what one is). The prompt lists each enabled
  * skill by name and description; the model fetches the instructions with
  * load_skill, and the files they point to with read_skill_file. A skill the
- * user picks with a slash command comes with the request instead.
+ * user picks with a slash command comes with the request instead. A skill can
+ * build on others: it calls one "the <name> skill", and that one is loaded
+ * with it (see usedSkills).
  */
 
 /** A skill the user installed or wrote; kept in the extension's database (see store.ts). */
@@ -81,6 +83,56 @@ export function renderSkill(skill: Skill): string {
   return parts.join('\n');
 }
 
+/** The most skills that are loaded along with one, however many it names. */
+export const MAX_USED_SKILLS = 4;
+
+/**
+ * The skills a skill builds on: those its instructions call "the <name>
+ * skill", and those these name in turn, nearest first. `known` is every skill
+ * there is, so one that is turned off is found too (see loadSkill).
+ */
+export function usedSkills(skill: Skill, known: readonly Skill[]): Skill[] {
+  const found: Skill[] = [];
+  const seen = new Set([skill.name]);
+  const queue = [skill];
+  while (queue.length > 0 && found.length < MAX_USED_SKILLS) {
+    const from = queue.shift()!;
+    for (const other of known) {
+      if (seen.has(other.name) || found.length >= MAX_USED_SKILLS) continue;
+      // Names are lowercase letters, digits and hyphens: nothing to escape.
+      if (!new RegExp(`\\bthe ${other.name} skill(?![\\w-])`).test(from.instructions)) continue;
+      seen.add(other.name);
+      found.push(other);
+      queue.push(other);
+    }
+  }
+  return found;
+}
+
+/**
+ * A skill as load_skill returns it: its instructions, then the skills it
+ * builds on that are not in the conversation yet. Those are told that the
+ * first one leads, so two sets of stages do not run at once. `loaded` gets
+ * the names of what was returned.
+ */
+export function loadSkill(skill: Skill, settings: Pick<Settings, 'skills'>, installed: readonly Skill[], loaded: Set<string>): string {
+  const enabled = new Set(enabledSkills(settings, installed).map((s) => s.name));
+  const used = usedSkills(skill, allSkills(installed));
+  const along = used.filter((s) => enabled.has(s.name) && !loaded.has(s.name));
+  const off = used.filter((s) => !enabled.has(s.name)).map((s) => s.name);
+  const parts = [renderSkill(skill)];
+  if (along.length > 0) {
+    parts.push(
+      `"${skill.name}" builds on ${along.length > 1 ? 'the skills' : 'the skill'} below, loaded with it. Use ${along.length > 1 ? 'their' : 'its'} method where "${skill.name}" says so. The stages, the reports and the form of the answer are those of "${skill.name}"; where they differ, "${skill.name}" decides.`,
+      ...along.map(renderSkill),
+    );
+  }
+  if (off.length > 0) parts.push(`The user turned off ${off.map((name) => `"${name}"`).join(', ')}, which "${skill.name}" names: do that part as "${skill.name}" describes it, without ${off.length > 1 ? 'them' : 'it'}.`);
+  loaded.add(skill.name);
+  for (const s of along) loaded.add(s.name);
+  return parts.join('\n');
+}
+
 /** The most of a skill's file that one read_skill_file returns. */
 export const SKILL_FILE_READ_CHARS = 30_000;
 
@@ -96,5 +148,7 @@ export function renderSkillFile(skill: Skill, file: SkillFile, offset = 0): stri
 /** A file of a skill by its path as the instructions give it ("./references/a.md" works too). */
 export function findSkillFile(skill: Skill, path: string): SkillFile | undefined {
   const wanted = path.trim().replace(/\\/g, '/').replace(/^(\.\/|\/)+/, '');
-  return (skill.files ?? []).find((file) => file.path === wanted);
+  const files = skill.files ?? [];
+  // As written first; then whatever the case, as a model may write "CN.md" for "cn.md".
+  return files.find((file) => file.path === wanted) ?? files.find((file) => file.path.toLowerCase() === wanted.toLowerCase());
 }

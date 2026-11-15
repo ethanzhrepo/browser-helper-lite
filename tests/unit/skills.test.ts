@@ -20,7 +20,9 @@ import {
   findSkill,
   findSkillFile,
   isSkillName,
+  loadSkill,
   MAX_INSTALLED_SKILLS,
+  MAX_USED_SKILLS,
   parseSkillFile,
   renderSkill,
   renderSkillFile,
@@ -29,9 +31,15 @@ import {
   SKILL_FILE_READ_CHARS,
   SKILL_INSTRUCTION_CHARS,
   toSkillName,
+  usedSkills,
   type Skill,
   type SkillProblem,
 } from '../../src/skills/skills';
+import { skillTitle } from '../../src/skills/titles';
+import en from '../../src/locales/en.json';
+import es from '../../src/locales/es.json';
+import fr from '../../src/locales/fr.json';
+import zhCN from '../../src/locales/zh-CN.json';
 import { installSkill, listInstalledSkills, moveLegacySkills, removeSkill, restoreSkills } from '../../src/skills/store';
 import { db } from '../../src/storage/db';
 import { IP_REGION_KEY, IP_REGION_MAX_AGE_MS, ipRegion, lookUpIpRegion } from '../../src/shared/ip-region';
@@ -116,11 +124,27 @@ describe('built-in skills', () => {
     expect(BUILTIN_SKILLS.find((skill) => skill.name === 'compare-prices')!.instructions).toContain('![name](address)');
     // The buying guide comes with where to look in each country, as a file of its folder.
     const guide = BUILTIN_SKILLS.find((skill) => skill.name === 'buying-guide')!;
-    expect(guide.instructions).toContain('references/sources-by-region.md');
-    expect(guide.files!.map((file) => file.path)).toEqual(['references/sources-by-region.md']);
-    expect(guide.files![0]!.text).toContain('## China (CN)');
-    expect(guide.files![0]!.text).toContain('smzdm.com');
-    expect(guide.files![0]!.text).toContain('rtings.com');
+    // One file per country, so only the user's is read, and one for everywhere.
+    const codes = ['cn', 'tw', 'hk', 'jp', 'kr', 'us', 'ca', 'gb', 'de', 'fr', 'es', 'it', 'nl', 'au', 'in'];
+    expect(guide.files!.map((file) => file.path).sort()).toEqual([...codes, 'anywhere'].map((code) => `references/sources/${code}.md`).sort());
+    expect(guide.instructions).toContain('references/sources/<code>.md');
+    expect(guide.instructions).toContain('references/sources/anywhere.md');
+    // Every file is named in the instructions by its code, and stays small.
+    const listed = /\(([a-z, ]+); at and ch are in de, be in nl, nz in au\)/.exec(guide.instructions)![1]!.split(', ');
+    expect(listed).toEqual(codes);
+    for (const file of guide.files!) expect(file.text.length, file.path).toBeLessThan(1000);
+    expect(findSkillFile(guide, 'references/sources/cn.md')!.text).toContain('smzdm.com');
+    expect(findSkillFile(guide, 'references/sources/cn.md')!.text).not.toContain('rtings.com');
+    expect(findSkillFile(guide, 'references/sources/de.md')!.text).toContain('Austria (AT), Switzerland (CH)');
+    expect(findSkillFile(guide, 'references/sources/anywhere.md')!.text).toContain('rtings.com');
+    expect(findSkillFile(guide, 'references/sources/anywhere.md')!.text).toContain('opened in the tab and only read');
+    // A model that writes the code in capitals still gets the file.
+    expect(findSkillFile(guide, 'references/sources/CN.md')!.path).toBe('references/sources/cn.md');
+    // It builds on two other skills instead of saying the same again; no other built-in skill names another.
+    for (const skill of BUILTIN_SKILLS) {
+      expect(usedSkills(skill, BUILTIN_SKILLS).map((used) => used.name), skill.name).toEqual(skill.name === 'buying-guide' ? ['compare-prices', 'reputation'] : []);
+    }
+    expect(guide.instructions).not.toContain('![name](address)');
     // The longer ones are laid out in stages, each giving its result as it is ready; the last stage is the final message.
     const staged = ['buying-guide', 'reputation', 'compare-prices', 'fact-check', 'travel-compare', 'site-trust', 'news-perspectives'];
     for (const skill of BUILTIN_SKILLS) {
@@ -135,7 +159,7 @@ describe('built-in skills', () => {
       expect(skill.instructions.match(/^- Report: /gm)).toHaveLength(stages.length - 1);
     }
     // What acts on a site leaves the last step to the user; what only reads says so.
-    expect(BUILTIN_SKILLS.find((skill) => skill.name === 'cancel-subscription')!.instructions).toContain('The final confirmation is the user');
+    expect(BUILTIN_SKILLS.find((skill) => skill.name === 'cancel-subscription')!.instructions).toContain('the final confirmation is the user');
     expect(BUILTIN_SKILLS.find((skill) => skill.name === 'travel-compare')!.instructions).toContain('Stop at the booking step');
     expect(BUILTIN_SKILLS.find((skill) => skill.name === 'form-filling')!.instructions).toContain('Never type passwords');
     expect(BUILTIN_SKILLS.find((skill) => skill.name === 'site-trust')!.instructions).toContain('Only read');
@@ -397,6 +421,94 @@ describe('a skill from an address', () => {
     expect(await problemOfAsync(() => fetchSkill('https://example.com/page.html', serve({ 'https://example.com/page.html': '<html></html>' })))).toBe('header');
     // Plain http only from this computer.
     expect(await fetchSkill('http://127.0.0.1:8080/forum.md', serve({ 'http://127.0.0.1:8080/forum.md': SKILL_MD }))).toEqual(FORUM);
+  });
+});
+
+describe('the titles of skills', () => {
+  const locales = { en, 'zh-CN': zhCN, fr, es } as Record<string, { commands: Record<string, { label: string; description: string }>; skills: { names: Record<string, { label: string; description: string }> } }>;
+  const reader = (locale: string) =>
+    ((key: string, options?: { defaultValue?: string }) => {
+      const value = key.split('.').reduce<unknown>((at, part) => (at as Record<string, unknown> | undefined)?.[part], locales[locale]);
+      return typeof value === 'string' ? value : (options?.defaultValue ?? key);
+    }) as unknown as Parameters<typeof skillTitle>[0];
+
+  it('every built-in skill has a title and a line in each language; its name stays the same', () => {
+    const withCommand = new Set(Object.values(SHOPPING_SKILLS));
+    const named = BUILTIN_SKILLS.filter((skill) => !withCommand.has(skill.name)).map((skill) => skill.name);
+    for (const locale of Object.keys(locales)) {
+      expect(Object.keys(locales[locale]!.skills.names).sort(), locale).toEqual([...named].sort());
+      const labels = new Set<string>();
+      for (const skill of BUILTIN_SKILLS) {
+        const title = skillTitle(reader(locale), skill);
+        expect(title.titled, `${locale} ${skill.name}`).toBe(true);
+        expect(title.label, `${locale} ${skill.name}`).not.toBe(skill.name);
+        // Short: a menu line, not the description the model reads.
+        expect(title.label.length, `${locale} ${skill.name}`).toBeLessThanOrEqual(28);
+        expect(title.description.length, `${locale} ${skill.name}`).toBeLessThanOrEqual(48);
+        labels.add(title.label);
+      }
+      expect(labels.size, locale).toBe(BUILTIN_SKILLS.length);
+    }
+    expect(skillTitle(reader('zh-CN'), BUILTIN_SKILLS.find((skill) => skill.name === 'buying-guide')!)).toEqual({ label: '导购', description: '按你所在地区选品牌和型号', titled: true });
+    expect(skillTitle(reader('zh-CN'), BUILTIN_SKILLS.find((skill) => skill.name === 'compare-prices')!).label).toBe('比价');
+  });
+
+  it('an installed skill goes by its name and description, also when it is called like a built-in one', () => {
+    expect(skillTitle(reader('zh-CN'), FORUM)).toEqual({ label: 'forum-check', description: FORUM.description, titled: false });
+    expect(skillTitle(reader('zh-CN'), { ...FORUM, name: 'fact-check' })).toEqual({ label: 'fact-check', description: FORUM.description, titled: false });
+  });
+});
+
+describe('a skill that builds on others', () => {
+  const lead: Skill = { name: 'pick-a-charger', description: 'Use when the user wants a charger.', instructions: 'Find three chargers. Check each the way the forum-check skill does it, and the price as the compare-prices skill says.' };
+  const settings = (off: string[] = []) => ({ skills: { off } });
+
+  it('names them as "the <name> skill"; a word that is also a name does not count', () => {
+    expect(usedSkills(lead, allSkills([FORUM, lead])).map((skill) => skill.name)).toEqual(['compare-prices', 'forum-check']);
+    // "reputation" as a word, "the reputation skills", and a longer name that ends the same.
+    const prose: Skill = { ...lead, name: 'prose', instructions: 'Mind the seller\'s reputation. Ask about the reputation skills. Not the brand-reputation skill. Use this skill.' };
+    expect(usedSkills(prose, allSkills([prose]))).toEqual([]);
+    expect(usedSkills(FORUM, allSkills([FORUM, lead]))).toEqual([]);
+    // Those they name in turn come along, nearest first, and a circle ends.
+    const a: Skill = { ...FORUM, name: 'a-first', instructions: 'Do as the b-second skill says.' };
+    const b: Skill = { ...FORUM, name: 'b-second', instructions: 'Do as the c-third skill says, and the a-first skill.' };
+    const c: Skill = { ...FORUM, name: 'c-third', instructions: 'Read.' };
+    expect(usedSkills(a, [a, b, c]).map((skill) => skill.name)).toEqual(['b-second', 'c-third']);
+    // However many it names, only so many are loaded along.
+    const many = Array.from({ length: 8 }, (_, index): Skill => ({ ...FORUM, name: `part-${index}` }));
+    const all: Skill = { ...FORUM, name: 'all-parts', instructions: many.map((skill) => `Use the ${skill.name} skill.`).join(' ') };
+    expect(usedSkills(all, [all, ...many])).toHaveLength(MAX_USED_SKILLS);
+  });
+
+  it('is loaded with them, and they are told that it leads', () => {
+    const loaded = new Set<string>();
+    const text = loadSkill(lead, settings(), [FORUM, lead], loaded);
+    expect(text.startsWith('<skill name="pick-a-charger">')).toBe(true);
+    expect(text).toContain('"pick-a-charger" builds on the skills below, loaded with it. Use their method where "pick-a-charger" says so. The stages, the reports and the form of the answer are those of "pick-a-charger"; where they differ, "pick-a-charger" decides.');
+    expect(text.indexOf('<skill name="compare-prices">')).toBeGreaterThan(text.indexOf('builds on'));
+    expect(text).toContain('<skill name="forum-check">\nSearch the forum for the model and "problems".\n</skill>');
+    expect([...loaded].sort()).toEqual(['compare-prices', 'forum-check', 'pick-a-charger']);
+
+    // One that is in the conversation already is not sent again.
+    const again = new Set(['forum-check']);
+    const second = loadSkill(lead, settings(), [FORUM, lead], again);
+    expect(second).toContain('builds on the skill below');
+    expect(second).toContain('<skill name="compare-prices">');
+    expect(second).not.toContain('<skill name="forum-check">');
+
+    // One the user turned off stays off: the model is told to do without.
+    const without = loadSkill(lead, settings(['compare-prices']), [FORUM, lead], new Set());
+    expect(without).not.toContain('<skill name="compare-prices">');
+    expect(without).toContain('The user turned off "compare-prices", which "pick-a-charger" names: do that part as "pick-a-charger" describes it, without it.');
+
+    // A skill that names none is returned as it is.
+    expect(loadSkill(FORUM, settings(), [FORUM], new Set())).toBe(renderSkill(FORUM));
+
+    // The buying guide brings reputation and compare-prices, once.
+    const guide = BUILTIN_SKILLS.find((skill) => skill.name === 'buying-guide')!;
+    const bundle = loadSkill(guide, settings(), [], new Set());
+    for (const name of ['buying-guide', 'compare-prices', 'reputation']) expect(bundle.split(`<skill name="${name}">`)).toHaveLength(2);
+    expect(bundle).toContain('![name](address)');
   });
 });
 

@@ -7,8 +7,6 @@ export type PageCommand =
   | { kind: 'probe'; locators: string[] }
   /** Keep comparing them as the page changes, and say so once when one differs. */
   | { kind: 'live'; id: string; parts: WatchPart[]; everySeconds: number }
-  /** Whether the page asks to prove that a person is there (a CAPTCHA, a "checking your browser" page). */
-  | { kind: 'blocked' }
   | { kind: 'stop' };
 
 /**
@@ -94,18 +92,6 @@ export function watchInPage(command: PageCommand): WatchPart[] | (string | null)
     }
     case 'probe':
       return command.locators.map(textAt);
-    case 'blocked': {
-      const shown = (selector: string) =>
-        [...document.querySelectorAll(selector)].some((element) => {
-          const rect = element.getBoundingClientRect();
-          return rect.width > 0 && rect.height > 0;
-        });
-      return (
-        /\/sorry\//.test(location.pathname) ||
-        /^(just a moment|attention required|access denied|are you a robot|verify you are human|robot check)/i.test(document.title) ||
-        shown('.g-recaptcha, .h-captcha, .cf-turnstile, #challenge-form, iframe[src*="recaptcha"], iframe[src*="hcaptcha"], iframe[src*="challenges.cloudflare.com"], iframe[src*="captcha"]')
-      );
-    }
     case 'stop':
       scope.__browserHelperWatch?.stop();
       return true;

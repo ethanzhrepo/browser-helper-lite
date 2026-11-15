@@ -76,6 +76,8 @@ test.describe.serial('assistant operating pages', () => {
 
     // The finished run says what it did in a few words; the steps (type, click, look…) show only when asked for.
     await expect(run.getByTestId('run-activity')).toHaveText('1 search · 1 site');
+    await expect(run.getByTestId('run-details')).toContainText('Finished');
+    await expect(run.getByTestId('run-elapsed')).toHaveCount(0);
     await expect(run.getByTestId('run-steps')).toBeHidden();
     await run.getByTestId('run-details').click();
     for (const tool of ['web_search', 'view_page', 'type', 'extract', 'look', 'click']) {
@@ -155,6 +157,9 @@ test.describe.serial('assistant operating pages', () => {
     // "Wait 1 s" is not shown: the run says which site it is working on.
     await expect(run.locator('[data-tool="wait"]').first()).toBeHidden();
     await expect(run.getByTestId('run-activity')).toHaveText(/^Working on /);
+    // While it works, the line is what it is doing, with how long it has been at it; "Working" alone is not shown.
+    await expect(run.getByTestId('run-details')).not.toContainText(/Working(?! on)/);
+    await expect(run.getByTestId('run-elapsed')).toHaveText(/^\d+:\d\d$/);
 
     // A click on empty space leaves the page as it is, and the assistant at work (see features.spec.ts for more of these).
     await site.mouse.click(400, 300);
@@ -200,5 +205,44 @@ test.describe.serial('assistant with the DOM driver', () => {
     await expect(panel.getByTestId('approval-card')).toHaveCount(0);
     await expect(run.getByTestId('driver-badge')).toHaveText('dom');
     await expect(site.locator('#cart')).toHaveText('Cart: 1 item');
+  });
+
+  test('the assistant works behind the tab the user is looking at; its tabs come to the front only for a user who follows it', async () => {
+    /** Counts the tabs that come to the front from now on, and says which one is there. */
+    const watchFront = async (panel: import('@playwright/test').Page) => {
+      await panel.evaluate(() => {
+        const scope = window as unknown as { activated: number[] };
+        scope.activated = [];
+        chrome.tabs.onActivated.addListener(({ tabId }) => void scope.activated.push(tabId));
+      });
+      return {
+        activated: () => panel.evaluate(() => (window as unknown as { activated: number[] }).activated.length),
+        front: () => panel.evaluate(async () => (await chrome.tabs.query({ active: true, currentWindow: true }))[0]?.url ?? ''),
+      };
+    };
+
+    // The user is on another tab (here the panel's own page): a search, a new tab and reading it all happen behind it.
+    const away = await openSiteAndPanel(context, extensionId, `${server.origin}/shop.html`);
+    await chooseMode(away.panel, 'auto');
+    const elsewhere = await watchFront(away.panel);
+    await ask(away.panel, 'TEST-TABS: what does the guide say?');
+    await expect(away.panel.getByTestId('assistant-message').last()).toContainText('The guide says: Braided cables last longer.', { timeout: 30_000 });
+    expect(await elsewhere.activated()).toBe(0);
+    expect(await elsewhere.front()).toContain('chrome-extension://');
+    for (const page of context.pages()) if (page.url().includes('/review.html')) await page.close();
+    await away.site.close();
+    await away.panel.close();
+
+    // The user is looking at the assistant's tab: the tab it opens comes to the front, and the search tab does not.
+    const near = await openSiteAndPanel(context, extensionId, `${server.origin}/shop.html`);
+    await near.site.bringToFront();
+    const following = await watchFront(near.panel);
+    await ask(near.panel, 'TEST-TABS: what does the guide say?');
+    await expect(near.panel.getByTestId('assistant-message').last()).toContainText('The guide says: Braided cables last longer.', { timeout: 30_000 });
+    expect(await following.front()).toBe(`${server.origin}/review.html`);
+    expect(await following.activated()).toBe(1);
+    for (const page of context.pages()) if (page.url().includes('/review.html')) await page.close();
+    await near.site.close();
+    await near.panel.close();
   });
 });

@@ -22,6 +22,7 @@ import type { ActiveTab } from '../../src/browser/page-context';
 import { matchCommands, type SlashCommand } from '../../src/chat/commands';
 import type { AgentMode, ContextKind, ContextSnapshot, MessageImage, SavedCommand } from '../../src/shared/types';
 import type { Skill } from '../../src/skills/skills';
+import { skillTitle } from '../../src/skills/titles';
 import { faviconUrl } from '../../src/ui/favicon';
 import type { PageAccess } from '../../src/ui/useActiveTab';
 import type { VoiceState } from '../../src/voice/useVoiceInput';
@@ -134,7 +135,7 @@ export function Composer(props: {
       items = [
         ...matchCommands(commandQuery, commandLabel).map((command): MenuItem => ({ kind: 'command', command })),
         ...props.savedCommands.filter((saved) => saved.name.toLowerCase().includes(q)).map((saved): MenuItem => ({ kind: 'saved', saved })),
-        ...props.skills.filter((skill) => skill.name.includes(q)).map((skill): MenuItem => ({ kind: 'skill', skill })),
+        ...props.skills.filter((skill) => skill.name.includes(q) || skillTitle(t, skill).label.toLowerCase().includes(q)).map((skill): MenuItem => ({ kind: 'skill', skill })),
       ];
     } else if (mentionQuery !== undefined) {
       const q = mentionQuery.toLowerCase();
@@ -244,8 +245,11 @@ export function Composer(props: {
                   </span>
                 ) : item.kind === 'skill' ? (
                   <span className="min-w-0" data-testid="skill-option">
-                    <span className="block font-medium">{item.skill.name}</span>
-                    <span className="block truncate text-xs text-muted">{item.skill.description}</span>
+                    <span className="block font-medium">
+                      {skillTitle(t, item.skill).label}
+                      {skillTitle(t, item.skill).titled && <span className="ml-1.5 font-mono text-xs font-normal text-faint">{item.skill.name}</span>}
+                    </span>
+                    <span className="block truncate text-xs text-muted">{skillTitle(t, item.skill).description}</span>
                   </span>
                 ) : item.kind === 'saved' ? (
                   <span className="min-w-0" data-testid="saved-command">

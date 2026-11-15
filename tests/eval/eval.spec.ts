@@ -622,7 +622,11 @@ const BUILTIN_SKILL_TASKS: EvalTask[] = [
     check: async (o, env) => {
       const missing = needs(o, 'buying-guide');
       if (missing) return missing;
-      if (!used(o, 'read_skill_file')) return 'did not read where to look in the country (references/sources-by-region.md)';
+      const read = (o.task?.steps ?? []).flatMap((step) => step.actions.filter((action) => action.tool === 'read_skill_file' && action.status !== 'error').map((action) => String(action.args.path).toLowerCase()));
+      if (!read.some((path) => path.endsWith('sources/cn.md'))) return `did not read where to look in China (references/sources/cn.md; read: ${read.join(', ') || 'nothing'})`;
+      // The skills it builds on come with it: loading them again is a wasted step.
+      const again = loaded(o).filter((name) => name === 'reputation' || name === 'compare-prices');
+      if (again.length > 0) return `loaded ${again.join(', ')} although it came with the buying guide`;
       if (used2(o, 'web_search') > 6) return `${used2(o, 'web_search')} searches`;
       // Its stages come as they are ready: at least the need and the candidates before the answer.
       if (reports(o) < 2) return `gave ${reports(o)} parts of the answer along the way instead of at least two`;
@@ -1004,7 +1008,8 @@ test.describe.serial('evaluation with a real model', () => {
               };
             }),
         );
-        outcome.tools = outcome.task?.steps.flatMap((step) => step.actions.map((action) => action.tool)) ?? [];
+        // What ran: a call left out because the page changed under it did nothing, and is not counted.
+        outcome.tools = outcome.task?.steps.flatMap((step) => step.actions.filter((action) => action.status !== 'skipped').map((action) => action.tool)) ?? [];
         if (outcome.task?.status !== 'done') why = `ended as ${outcome.task?.status ?? 'nothing'}: ${outcome.answer.slice(0, 120)}`;
         else why = (await task.check(outcome, env)) ?? '';
       } catch (error) {

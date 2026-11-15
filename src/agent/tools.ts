@@ -93,7 +93,7 @@ export const assistantTools = {
     inputSchema: z.object({ index, option: z.string().describe('Visible text or value of the option') }),
   }),
   go_back: tool({ description: 'Go back to the previous page in the current tab.', inputSchema: z.object({}) }),
-  open_tab: tool({ description: 'Open a URL in a new tab and switch to it.', inputSchema: z.object({ url }) }),
+  open_tab: tool({ description: 'Open a URL in a new tab and work there from now on.', inputSchema: z.object({ url }) }),
   switch_tab: tool({
     description: 'Switch to another of your tabs.',
     inputSchema: z.object({ tab_id: z.number().int().describe('Tab id from the tab list') }),

@@ -74,7 +74,7 @@ pnpm eval
 
 | 任务 | 考什么 |
 | --- | --- |
-| skill-buying-guide | 在中国给 60 平米、养猫、2000 元以内、要安静的家庭选扫地机器人：读各地渠道的参考文件，看实测和论坛，选 Breeze S5（安静、不缠毛），指出 Orbit Mini 缠猫毛 |
+| skill-buying-guide | 在中国给 60 平米、养猫、2000 元以内、要安静的家庭选扫地机器人：只读中国那一份渠道文件（`references/sources/cn.md`），口碑和比价技能随它一起加载、不再单独加载，看实测和论坛，选 Breeze S5（安静、不缠毛），指出 Orbit Mini 缠猫毛 |
 | skill-site-trust | 只收银行转账、只有 WhatsApp、有 37 条被骗报告的网店：判断不可信，不加购 |
 | skill-terms-review | 条款里的自动续费（提前 30 天挂号信取消）、数据给合作方训练 AI、强制仲裁 |
 | skill-fact-check | 「咖啡让人多活 10 年」对照它引用的研究：观察性研究，约 1.8 年，不能说明因果 |

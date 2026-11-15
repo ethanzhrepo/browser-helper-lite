@@ -574,7 +574,17 @@
       "open": "Ouverture de {{site}}",
       "read": "Lecture de la page",
       "act": "Travail sur {{site}}",
-      "actHere": "Travail sur la page"
+      "actHere": "Travail sur la page",
+      "readSite": "Lecture de {{site}}",
+      "look": "Regarde l'écran",
+      "skill": "Compétence : {{name}}",
+      "skillFile": "Lecture des notes de la compétence",
+      "report": "Rédige cette étape",
+      "watch": "Met en place une surveillance",
+      "next": "Réfléchit à la suite…",
+      "writing": "Rédaction…",
+      "ask": "Vous pose une question",
+      "handOff": "Vous attend"
     },
     "summary": {
       "searches_one": "{{count}} recherche",
@@ -858,6 +868,57 @@
       "tooLarge": "Le fichier dépasse 20 Mo.",
       "name": "Donnez un nom à la compétence."
     },
-    "rename": "Son nom n'est pas au format Agent Skills. Renommez-la pour l'utiliser."
+    "rename": "Son nom n'est pas au format Agent Skills. Renommez-la pour l'utiliser.",
+    "names": {
+      "buying-guide": {
+        "label": "Guide d'achat",
+        "description": "Quelle marque, quel modèle, là où vous vivez"
+      },
+      "travel-compare": {
+        "label": "Vols et hôtels",
+        "description": "Prix total, bagages, frais, annulation"
+      },
+      "terms-review": {
+        "label": "Lire les conditions",
+        "description": "Renouvellement, remboursement, engagements"
+      },
+      "fact-check": {
+        "label": "Vérifier les faits",
+        "description": "Les affirmations face aux sources d'origine"
+      },
+      "long-read": {
+        "label": "Lecture approfondie",
+        "description": "Thèses, preuves et limites d'un long texte"
+      },
+      "news-perspectives": {
+        "label": "Autres médias",
+        "description": "Comment la presse traite le même sujet"
+      },
+      "form-filling": {
+        "label": "Remplir un formulaire",
+        "description": "Avec vos données ; montré avant l'envoi"
+      },
+      "cancel-subscription": {
+        "label": "Résilier un abonnement",
+        "description": "Trouve la sortie ; vous confirmez"
+      },
+      "data-extraction": {
+        "label": "Collecter des données",
+        "description": "Listes et résultats en un tableau"
+      },
+      "job-posting": {
+        "label": "Offre d'emploi",
+        "description": "Exigences, salaire, signaux d'alerte"
+      },
+      "docs-lookup": {
+        "label": "Chercher dans la doc",
+        "description": "La réponse pour votre version, avec un exemple"
+      },
+      "github-thread": {
+        "label": "Ticket ou pull request",
+        "description": "Le problème, l'état, la suite"
+      }
+    },
+    "uses": "Utilise : {{names}}"
   }
 }

@@ -1,6 +1,7 @@
 import { browser } from 'wxt/browser';
 import { parseKeyCombo } from '../keys';
 import { matchOption } from '../select';
+import { challengeShown } from '../../browser/captcha';
 import { isTransparentColor } from '../../browser/visibility';
 import type {
   OverlayState,
@@ -33,16 +34,6 @@ const INTERACTIVE_ROLES = new Set([
 ]);
 const TEXT_LIMIT = 150;
 const LABEL_LIMIT = 80;
-
-const CAPTCHA_SELECTOR = [
-  'iframe[src*="recaptcha"]',
-  'iframe[src*="hcaptcha"]',
-  'iframe[src*="challenges.cloudflare.com"]',
-  '.g-recaptcha',
-  '.h-captcha',
-  '.cf-turnstile',
-  '[data-sitekey]',
-].join(',');
 
 function clip(text: string, limit: number): string {
   const collapsed = text.replace(/\s+/g, ' ').trim();
@@ -660,11 +651,9 @@ export function createPageAgent(): PageAgentApi {
   const detectBlockers = (): PageBlockers => {
     const visible = (selector: string) =>
       [...document.querySelectorAll(selector)].some((el) => isTopVisible(el.getBoundingClientRect()));
-    const captchaPage =
-      /\/sorry\//.test(location.pathname) ||
-      /^(just a moment|attention required)/i.test(document.title);
     return {
-      captcha: captchaPage || visible(CAPTCHA_SELECTOR),
+      // Only a check that asks something of a person: a badge in the corner does not (see captcha.ts).
+      captcha: challengeShown(),
       passwordField: visible('input[type="password"]'),
       oneTimeCodeField: visible('input[autocomplete="one-time-code"]'),
     };

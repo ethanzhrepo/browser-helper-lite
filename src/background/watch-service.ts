@@ -15,6 +15,7 @@ import type { WatchActionRequest, WatchActionResult } from '../shared/protocol';
 import type { Settings, Usage } from '../shared/types';
 import { db, newId } from '../storage/db';
 import { loadSettings } from '../storage/settings';
+import { challengeShown } from '../browser/captcha';
 import { watchInPage, type PageCommand } from '../watch/page';
 import {
   afterCheck,
@@ -143,7 +144,12 @@ function tabSession(watch: Watch, tabId: number, keep: boolean): PageSession {
       return { title: page.title, content: page.markdown };
     },
     locate: (quotes) => inPage<WatchPart[]>(tabId, { kind: 'locate', quotes }),
-    blocked: () => inPage<boolean>(tabId, { kind: 'blocked' }),
+    // Whether the page asks to prove that a person is there (a CAPTCHA to solve, a "checking your browser" page).
+    blocked: async () => {
+      const [injection] = await browser.scripting.executeScript({ target: { tabId }, func: challengeShown });
+      // "Access denied" asks nothing of a person, but the page is not what is watched either.
+      return injection?.result === true || /^access denied/i.test((await browser.tabs.get(tabId).catch(() => undefined))?.title ?? '');
+    },
     live: async (parts) => {
       if (keep) await inPage(tabId, { kind: 'live', id: watch.id, parts, everySeconds: watch.everySeconds });
     },

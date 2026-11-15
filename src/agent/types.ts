@@ -72,7 +72,7 @@ export type WaitReason =
       preview?: string;
     }
   | { kind: 'question'; question: string }
-  | { kind: 'handoff'; reason: HandoffReason; message?: string; site: string }
+  | { kind: 'handoff'; reason: HandoffReason; message?: string; site: string; /** The tab the user is needed in, when it is not the one the task works in (a search). */ tabId?: number }
   | { kind: 'permission'; origin: string; url: string };
 
 export type RiskReason =

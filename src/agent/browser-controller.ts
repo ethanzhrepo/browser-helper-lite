@@ -66,6 +66,8 @@ const GROUP_COLORS: Record<GroupStatus, `${Browser.tabGroups.Color}`> = {
 };
 
 const NO_GROUP = -1;
+/** How long a picture of a tab behind others may take with the debugger, before the tab is brought to the front for it. */
+const HIDDEN_SHOT_MS = 2500;
 
 /**
  * The agent's hands in the browser: which tab it works in, how it reaches the
@@ -310,38 +312,68 @@ export class AgentBrowser {
     await this.joinGroup(tabId, { respectUserGroups: false });
   }
 
-  async switchTo(tabId: number, activate = true): Promise<void> {
+  /** The tab in front, in the window the assistant works in. */
+  async frontTab(): Promise<Browser.tabs.Tab | undefined> {
+    const current = await browser.tabs.get(this.currentTabId).catch(() => undefined);
+    if (!current) return undefined;
+    if (current.active) return current;
+    return (await browser.tabs.query({ active: true, windowId: current.windowId }).catch(() => []))[0];
+  }
+
+  /**
+   * Whether the user is looking at the assistant's work: the tab in front, in
+   * the window it works in, is one of its tabs. Only then does a tab it opens
+   * or turns to come to the front. A user who went to another tab is left
+   * there, and the work goes on behind.
+   */
+  async followed(): Promise<boolean> {
+    const front = await this.frontTab();
+    return front?.id !== undefined && this.tabs.has(front.id);
+  }
+
+  /** Makes a tab the one the assistant works in; it comes to the front when the user is following (or `show` says so). */
+  async switchTo(tabId: number, show?: boolean): Promise<void> {
     if (!this.tabs.has(tabId)) throw new ActionError(`Tab ${tabId} is not one of your tabs.`);
+    const activate = show ?? (await this.followed());
     await this.hideOverlay(this.currentTabId);
     this.currentTabId = tabId;
-    if (activate) await browser.tabs.update(tabId, { active: true });
+    if (activate) await browser.tabs.update(tabId, { active: true }).catch(() => undefined);
     await this.refreshOverlay();
   }
 
-  /** Opens a tab for the agent. A `scratch` tab (e.g. for a search) is closed again soon and not grouped. */
-  async openTab(url: string, { active = true, scratch = false } = {}): Promise<number> {
+  /**
+   * Opens a tab for the agent, in its own window, behind the tab in front. A
+   * `scratch` tab (e.g. for a search) is closed again soon and not grouped.
+   * `show` brings it to the front, when the user is following.
+   */
+  async openTab(url: string, { show = true, scratch = false } = {}): Promise<number> {
     const opener = await browser.tabs.get(this.currentTabId).catch(() => undefined);
+    const activate = show && (await this.followed());
     // Opened in the background and linked to the conversation first, so the side
     // panel keeps showing this conversation when the tab comes to the front.
     const tab = await browser.tabs.create({
       url,
       active: false,
+      // Next to the tab it works in: not in whatever window the user is using now.
+      windowId: opener?.windowId,
       openerTabId: opener?.id,
       index: opener ? opener.index + 1 : undefined,
     });
     await this.options.onTabOpened?.(tab.id!).catch(() => undefined);
     if (scratch) this.tabs.add(tab.id!);
     else await this.adopt(tab.id!);
-    if (active) await browser.tabs.update(tab.id!, { active: true });
+    if (activate) await browser.tabs.update(tab.id!, { active: true }).catch(() => undefined);
     return tab.id!;
   }
 
   async closeTab(tabId: number): Promise<void> {
     if (!this.tabs.has(tabId)) throw new ActionError(`Tab ${tabId} is not one of your tabs.`);
     if (tabId === this.startTabId) throw new ActionError('The tab the task started in cannot be closed.');
+    // Asked before it is gone: closing the tab in front puts another one there.
+    const followed = this.currentTabId === tabId && (await this.followed());
     await browser.tabs.remove(tabId).catch(() => undefined);
     this.tabs.delete(tabId);
-    if (this.currentTabId === tabId) await this.switchTo(this.startTabId);
+    if (this.currentTabId === tabId) await this.switchTo(this.startTabId, followed);
   }
 
   async navigate(url: string): Promise<void> {
@@ -519,23 +551,40 @@ export class AgentBrowser {
   async screen({ activate }: { activate: boolean }, tabId = this.currentTabId): Promise<Screen | undefined> {
     await this.assertAllowed(tabId);
     let tab = await browser.tabs.get(tabId);
-    // Hidden tabs may not render, so an asked-for look brings the tab to the front first.
-    if (activate && !tab.active) {
+    // The user's tab, when they are looking at something else: it is put back after the picture is taken.
+    let back: number | undefined;
+    // Without the debugger, Chrome only takes a picture of the tab in front, so an asked-for look brings the tab there.
+    const toFront = async () => {
+      const front = await this.frontTab();
+      if (front?.id !== undefined && !this.tabs.has(front.id)) back = front.id;
       tab = (await browser.tabs.update(tabId, { active: true })) ?? tab;
       // Chrome takes a moment to put the tab on screen; a capture before that shows the tab that was in front.
       for (let i = 0; i < 20 && !(await this.call(tabId, 'shown').catch(() => true)); i++) await sleep(75);
-    }
-    const viewport = await this.call(tabId, 'viewport');
-    await this.call(tabId, 'highlight', true).catch(() => undefined);
-    await sleep(150);
+    };
+    // With the debugger in use, the picture is first tried where the tab is, behind the others.
+    if (activate && !tab.active && !(this.cdp && this.usedInput)) await toFront();
     let raw: string | undefined;
+    let viewport: Awaited<ReturnType<typeof this.viewportOf>>;
     try {
+      viewport = await this.viewportOf(tabId);
+      await this.call(tabId, 'highlight', true).catch(() => undefined);
+      await sleep(150);
       raw = await this.capture(tab, activate);
+      // A hidden tab is not always drawn: when the debugger gave nothing in time, the tab comes to the front after all.
+      if (!raw && activate && !tab.active) {
+        await toFront();
+        raw = await this.capture(tab, activate);
+      }
     } finally {
       await this.call(tabId, 'highlight', false).catch(() => undefined);
+      if (back !== undefined) await browser.tabs.update(back, { active: true }).catch(() => undefined);
     }
     if (!raw) return undefined;
     return { ...(await fitScreenshot(raw, viewport.pixelRatio)), viewport, tabId, url: tab.url ?? '' };
+  }
+
+  private viewportOf(tabId: number) {
+    return this.call(tabId, 'viewport');
   }
 
   private async capture(tab: Browser.tabs.Tab, activate: boolean): Promise<string | undefined> {
@@ -543,7 +592,10 @@ export class AgentBrowser {
     // Only reuse an attached debugger; attaching just for a screenshot would show Chrome's debugging bar.
     if (this.cdp && this.usedInput) {
       try {
-        return await this.cdp.screenshot(tabId);
+        if (tab.active) return await this.cdp.screenshot(tabId);
+        // Behind other tabs Chrome may never draw the page: the picture is given a moment, no more.
+        const shot = await Promise.race([this.cdp.screenshot(tabId), sleep(HIDDEN_SHOT_MS).then(() => undefined)]);
+        if (shot) return shot;
       } catch (error) {
         this.dropCdp(error);
       }

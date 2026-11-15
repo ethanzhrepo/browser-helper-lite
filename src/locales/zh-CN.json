@@ -558,7 +558,17 @@
       "open": "打开 {{site}}",
       "read": "阅读页面",
       "act": "在 {{site}} 上操作",
-      "actHere": "操作页面"
+      "actHere": "操作页面",
+      "readSite": "阅读 {{site}}",
+      "look": "查看屏幕",
+      "skill": "使用技能：{{name}}",
+      "skillFile": "查阅技能资料",
+      "report": "整理阶段结果",
+      "watch": "设置盯页面",
+      "next": "思考下一步…",
+      "writing": "正在写…",
+      "ask": "等你回答",
+      "handOff": "等你处理"
     },
     "summary": {
       "searches_other": "搜索 {{count}} 次",
@@ -832,6 +842,57 @@
       "tooLarge": "文件超过 20 MB。",
       "name": "请填写名称。"
     },
-    "rename": "名称不符合 Agent Skills 规范，改名后才能使用。"
+    "rename": "名称不符合 Agent Skills 规范，改名后才能使用。",
+    "names": {
+      "buying-guide": {
+        "label": "导购",
+        "description": "按你所在地区选品牌和型号"
+      },
+      "travel-compare": {
+        "label": "机票酒店比价",
+        "description": "含行李、税费的总价和退改条件"
+      },
+      "terms-review": {
+        "label": "看条款",
+        "description": "续费、退款、你同意了什么"
+      },
+      "fact-check": {
+        "label": "核查事实",
+        "description": "对照原始来源逐条核对"
+      },
+      "long-read": {
+        "label": "精读长文",
+        "description": "论点、证据和局限"
+      },
+      "news-perspectives": {
+        "label": "多方报道",
+        "description": "各家媒体怎么报同一件事"
+      },
+      "form-filling": {
+        "label": "填表",
+        "description": "用你给的资料填，提交前给你看"
+      },
+      "cancel-subscription": {
+        "label": "退订",
+        "description": "找到取消入口，最后一步由你确认"
+      },
+      "data-extraction": {
+        "label": "采集数据",
+        "description": "把列表和结果整理成一张表"
+      },
+      "job-posting": {
+        "label": "看职位",
+        "description": "要求、薪资、要留意的地方"
+      },
+      "docs-lookup": {
+        "label": "查文档",
+        "description": "对应你的版本，附示例"
+      },
+      "github-thread": {
+        "label": "议题和 PR",
+        "description": "问题、现状、下一步"
+      }
+    },
+    "uses": "用到：{{names}}"
   }
 }

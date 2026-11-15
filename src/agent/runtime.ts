@@ -22,7 +22,7 @@ import { buildAssistantSystemPrompt, currentTabNote, formatView, newTextNote, OU
 import type { TargetInfo } from './page/types';
 import { actionKind, classifyAction, downloadRisk, formSubmission } from './risk';
 import { cachedInstructions, cacheOptions, withBreakpoint } from '../providers/caching';
-import { enabledSkills, findSkill, findSkillFile, renderSkill, renderSkillFile, type InstalledSkill, type Skill } from '../skills/skills';
+import { enabledSkills, findSkill, findSkillFile, loadSkill, renderSkillFile, type InstalledSkill, type Skill } from '../skills/skills';
 import { listInstalledSkills } from '../skills/store';
 import { ipRegion } from '../shared/ip-region';
 import { userRegion, type UserRegion } from '../shared/region';
@@ -111,6 +111,9 @@ const RESEARCH_NOTE_CHARS = 1200;
 const EXTRACT_WHOLE_CHARS = 6000;
 /** Replay pictures kept for one task. */
 const MAX_FRAMES = 60;
+/** A check that passes by itself is given this long before the user is asked: this many looks, this far apart. */
+const CAPTCHA_GRACE_LOOKS = 3;
+const CAPTCHA_GRACE_MS = 1000;
 /** From this many web searches in one turn on, the assistant is told to stop rephrasing and read. */
 const SEARCH_NUDGE_AFTER = 3;
 /** Coming to the same page this many times in one turn gets a note. */
@@ -464,6 +467,21 @@ export class AgentRunner {
     }
   }
 
+  /**
+   * Whether a check that was seen on the page is still there a few seconds
+   * later. Many pass by themselves ("Just a moment…", a box that ticks itself):
+   * the user is asked only for one that stays.
+   */
+  private async captchaStays(tabId: number): Promise<boolean> {
+    for (let look = 0; look < CAPTCHA_GRACE_LOOKS; look++) {
+      await sleep(CAPTCHA_GRACE_MS);
+      if (this.stopped) throw new StopError();
+      const blockers = await this.ctl.call(tabId, 'detectBlockers').catch(() => undefined);
+      if (blockers && !blockers.captcha) return false;
+    }
+    return true;
+  }
+
   /** Resolves once the CAPTCHA is gone from the tab (the user solved it). */
   private watchCaptcha(tabId: number) {
     return async (isDone: () => boolean): Promise<WaitResponse | undefined> => {
@@ -491,9 +509,12 @@ export class AgentRunner {
   private chosenSkills(names: string[] | undefined): string {
     const chosen = (names ?? []).map((name) => this.skill(name)).filter((skill) => skill !== undefined);
     if (chosen.length === 0) return '';
-    // Their text is in the conversation: load_skill need not bring it again.
-    for (const skill of chosen) this.loadedSkills.add(skill.name);
-    return `The user chose ${chosen.length > 1 ? 'these skills' : 'this skill'} for the request:\n${chosen.map(renderSkill).join('\n')}`;
+    // Their text is in the conversation, with the skills they build on: load_skill need not bring it again.
+    // Each message is written the same way whatever came before it, so the conversation's start stays cached.
+    const fresh = new Set(chosen.map((skill) => skill.name));
+    const text = chosen.map((skill) => loadSkill(skill, this.settings, this.installedSkills, fresh)).join('\n');
+    for (const name of fresh) this.loadedSkills.add(name);
+    return `The user chose ${chosen.length > 1 ? 'these skills' : 'this skill'} for the request:\n${text}`;
   }
 
   /** Stored history plus a note about the tab the user is looking at. */
@@ -1177,7 +1198,7 @@ export class AgentRunner {
     try {
       snapshot = await view();
       if (snapshot.blockers.captcha) {
-        await this.waitFor({ kind: 'handoff', reason: 'captcha', site: hostOf(url) }, this.watchCaptcha(info.id));
+        if (await this.captchaStays(info.id)) await this.waitFor({ kind: 'handoff', reason: 'captcha', site: hostOf(url) }, this.watchCaptcha(info.id));
         await this.ctl.waitForSettle();
         snapshot = await view();
       }
@@ -1317,8 +1338,7 @@ export class AgentRunner {
         if (!skill) throw new ActionError(`There is no skill called "${str('name')}". The skills are: ${this.skills().map((s) => s.name).join(', ') || 'none'}.`);
         action.target = skill.name;
         // Loaded once: its text stays in the conversation.
-        action.result = this.loadedSkills.has(skill.name) ? `The skill "${skill.name}" is loaded already; its instructions are above.` : renderSkill(skill);
-        this.loadedSkills.add(skill.name);
+        action.result = this.loadedSkills.has(skill.name) ? `The skill "${skill.name}" is loaded already; its instructions are above.` : loadSkill(skill, this.settings, this.installedSkills, this.loadedSkills);
         return 'continue';
       }
       case 'read_skill_file': {
@@ -1382,6 +1402,7 @@ export class AgentRunner {
         this.opens.set(address, (this.opens.get(address) ?? 0) + 1);
         if (action.tool === 'navigate') await this.ctl.navigate(url);
         else {
+          // It comes to the front only for a user who is looking at the assistant's tab.
           const tabId = await this.ctl.openTab(url);
           await this.ctl.switchTo(tabId, false);
           await this.ctl.waitForSettle();
@@ -1794,7 +1815,7 @@ export class AgentRunner {
   /** One page read in a background tab that is closed again; for sites the assistant already has access to. */
   private async readInTab(url: string): Promise<{ title: string; content: string }> {
     if (!(await hasHostAccess(url))) throw new ActionError(`The assistant has no access to ${hostOf(url)}. Open the page in the tab (navigate) to ask for it.`);
-    const tabId = await this.ctl.openTab(url, { active: false, scratch: true });
+    const tabId = await this.ctl.openTab(url, { show: false, scratch: true });
     try {
       await this.ctl.waitForSettle(tabId);
       const page = await this.ctl.pageMarkdown(tabId);
@@ -1945,13 +1966,19 @@ export class AgentRunner {
       const response = await this.waitFor({ kind: 'permission', origin: originPattern(url), url });
       if (response.kind !== 'permission' || !response.granted) return 'The user did not allow access to the search engine.';
     }
-    const tabId = await this.ctl.openTab(url, { active: false, scratch: true });
+    const tabId = await this.ctl.openTab(url, { show: false, scratch: true });
+    // The tab that is put back in front after a CAPTCHA was shown there.
+    let back: number | undefined;
     try {
       await this.ctl.waitForSettle(tabId);
       const blockers = await this.ctl.call(tabId, 'detectBlockers');
-      if (blockers.captcha) {
-        await browser.tabs.update(tabId, { active: true });
-        await this.waitFor({ kind: 'handoff', reason: 'captcha', site: hostOf(url) }, this.watchCaptcha(tabId));
+      if (blockers.captcha && (await this.captchaStays(tabId))) {
+        // Shown to a user who is following; one who is elsewhere gets the notification, which leads to this tab.
+        if (await this.ctl.followed()) {
+          back = (await this.ctl.frontTab())?.id;
+          await browser.tabs.update(tabId, { active: true });
+        }
+        await this.waitFor({ kind: 'handoff', reason: 'captcha', site: hostOf(url), tabId }, this.watchCaptcha(tabId));
         await this.ctl.waitForSettle(tabId);
       }
       const results = await this.ctl.call(tabId, 'readSearchResults', this.settings.search.engine);
@@ -1959,8 +1986,8 @@ export class AgentRunner {
       return this.untrusted('search_results', { source: SEARCH_LABELS.browser }, formatSearchResults(query, results), 'search', url);
     } finally {
       await this.ctl.closeTab(tabId).catch(() => undefined);
-      const current = await this.ctl.currentTab().catch(() => undefined);
-      if (current?.id !== undefined) await browser.tabs.update(current.id, { active: true }).catch(() => undefined);
+      // Only when the search tab was brought to the front: otherwise the user's tabs are left as they are.
+      if (back !== undefined) await browser.tabs.update(back, { active: true }).catch(() => undefined);
     }
   }
 }

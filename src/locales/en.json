@@ -566,7 +566,17 @@
       "open": "Opening {{site}}",
       "read": "Reading the page",
       "act": "Working on {{site}}",
-      "actHere": "Working on the page"
+      "actHere": "Working on the page",
+      "readSite": "Reading {{site}}",
+      "look": "Looking at the screen",
+      "skill": "Using a skill: {{name}}",
+      "skillFile": "Reading the skill's notes",
+      "report": "Writing up this stage",
+      "watch": "Setting up a watch",
+      "next": "Thinking about the next step…",
+      "writing": "Writing…",
+      "ask": "Asking you",
+      "handOff": "Waiting for you"
     },
     "summary": {
       "searches_one": "{{count}} search",
@@ -845,6 +855,57 @@
       "tooLarge": "The file is larger than 20 MB.",
       "name": "The skill needs a name."
     },
-    "rename": "Its name is not in the Agent Skills form. Rename it to use it."
+    "rename": "Its name is not in the Agent Skills form. Rename it to use it.",
+    "names": {
+      "buying-guide": {
+        "label": "Buying guide",
+        "description": "Which brand and model, where you live"
+      },
+      "travel-compare": {
+        "label": "Flights and hotels",
+        "description": "Total price, bags, fees, cancellation"
+      },
+      "terms-review": {
+        "label": "Read the terms",
+        "description": "Renewals, refunds, what you agree to"
+      },
+      "fact-check": {
+        "label": "Fact-check",
+        "description": "Claims against original sources"
+      },
+      "long-read": {
+        "label": "Close reading",
+        "description": "Claims, evidence and limits of a long text"
+      },
+      "news-perspectives": {
+        "label": "Other coverage",
+        "description": "How outlets report the same story"
+      },
+      "form-filling": {
+        "label": "Fill in a form",
+        "description": "With your details; shown before sending"
+      },
+      "cancel-subscription": {
+        "label": "Cancel a subscription",
+        "description": "Finds the way out; you confirm"
+      },
+      "data-extraction": {
+        "label": "Collect data",
+        "description": "Lists and results into one table"
+      },
+      "job-posting": {
+        "label": "Job posting",
+        "description": "Requirements, pay, warning signs"
+      },
+      "docs-lookup": {
+        "label": "Look up the docs",
+        "description": "The answer for your version, with an example"
+      },
+      "github-thread": {
+        "label": "Issue or pull request",
+        "description": "The problem, the state, the next step"
+      }
+    },
+    "uses": "Uses: {{names}}"
   }
 }

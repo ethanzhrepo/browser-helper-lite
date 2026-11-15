@@ -574,7 +574,17 @@
       "open": "Abriendo {{site}}",
       "read": "Leyendo la página",
       "act": "Trabajando en {{site}}",
-      "actHere": "Trabajando en la página"
+      "actHere": "Trabajando en la página",
+      "readSite": "Leyendo {{site}}",
+      "look": "Mirando la pantalla",
+      "skill": "Habilidad: {{name}}",
+      "skillFile": "Leyendo las notas de la habilidad",
+      "report": "Redactando esta etapa",
+      "watch": "Preparando una vigilancia",
+      "next": "Pensando el siguiente paso…",
+      "writing": "Escribiendo…",
+      "ask": "Te pregunta",
+      "handOff": "Te espera"
     },
     "summary": {
       "searches_one": "{{count}} búsqueda",
@@ -858,6 +868,57 @@
       "tooLarge": "El archivo supera los 20 MB.",
       "name": "La habilidad necesita un nombre."
     },
-    "rename": "Su nombre no sigue el formato Agent Skills. Cámbialo para usarla."
+    "rename": "Su nombre no sigue el formato Agent Skills. Cámbialo para usarla.",
+    "names": {
+      "buying-guide": {
+        "label": "Guía de compra",
+        "description": "Qué marca y modelo, donde vives"
+      },
+      "travel-compare": {
+        "label": "Vuelos y hoteles",
+        "description": "Precio total, equipaje, tasas, cancelación"
+      },
+      "terms-review": {
+        "label": "Leer las condiciones",
+        "description": "Renovación, reembolsos, a qué te comprometes"
+      },
+      "fact-check": {
+        "label": "Verificar datos",
+        "description": "Las afirmaciones frente a las fuentes originales"
+      },
+      "long-read": {
+        "label": "Lectura a fondo",
+        "description": "Tesis, pruebas y límites de un texto largo"
+      },
+      "news-perspectives": {
+        "label": "Otros medios",
+        "description": "Cómo cuentan los medios la misma noticia"
+      },
+      "form-filling": {
+        "label": "Rellenar un formulario",
+        "description": "Con tus datos; lo ves antes de enviar"
+      },
+      "cancel-subscription": {
+        "label": "Cancelar una suscripción",
+        "description": "Encuentra la salida; tú confirmas"
+      },
+      "data-extraction": {
+        "label": "Recopilar datos",
+        "description": "Listas y resultados en una tabla"
+      },
+      "job-posting": {
+        "label": "Oferta de empleo",
+        "description": "Requisitos, sueldo, señales de alerta"
+      },
+      "docs-lookup": {
+        "label": "Consultar la documentación",
+        "description": "La respuesta para tu versión, con ejemplo"
+      },
+      "github-thread": {
+        "label": "Incidencia o pull request",
+        "description": "El problema, el estado, el siguiente paso"
+      }
+    },
+    "uses": "Usa: {{names}}"
   }
 }

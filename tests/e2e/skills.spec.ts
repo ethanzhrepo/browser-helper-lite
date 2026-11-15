@@ -69,6 +69,20 @@ function assistant(messages: ChatMessage[]): Reply {
     if (!used('load_skill')) return say('Getting the skill.', 'load_skill', { name: 'reputation' });
     return say(`Loaded: ${results.includes('<skill name="reputation">') ? 'yes' : 'no'}. Only reads: ${results.includes('Do not like, follow, comment') ? 'yes' : 'no'}.`);
   }
+  // A skill that builds on others: they come with it, and its file for the country is read whatever the case.
+  if (request.includes('SK-GUIDE')) {
+    if (!used('load_skill')) return say('Getting the skill.', 'load_skill', { name: 'buying-guide' });
+    if (!used('read_skill_file')) return say('Where to look.', 'read_skill_file', { skill: 'buying-guide', path: 'references/sources/CN.md' });
+    if ((history.match(/- load_skill /g)?.length ?? 0) < 2) return say('The other skill.', 'load_skill', { name: 'reputation' });
+    return say(
+      [
+        `With it: ${['reputation', 'compare-prices'].filter((name) => results.includes(`<skill name="${name}">`)).join(', ') || 'none'}.`,
+        `Leads: ${results.includes('"buying-guide" builds on the skills below, loaded with it.') ? 'buying-guide' : 'nobody'}.`,
+        `China: ${results.includes('smzdm.com') && !results.includes('rtings.com') ? 'only its own file' : 'not read'}.`,
+        `Again: ${results.includes('The skill "reputation" is loaded already') ? 'not sent twice' : 'sent twice'}.`,
+      ].join(' '),
+    );
+  }
   // A picture on another server, never read in this turn.
   if (request.includes('SK-PIC')) return say(`Here it is: ![Green charger](http://pics.shop.test:${new URL(origin).port}/pic/green-late.png)`);
   // A skill with a file: loaded, then its file read.
@@ -305,6 +319,10 @@ test.describe.serial('skills, product pictures, grouped tabs and forums', () => 
     expect(systemPrompt()).toContain('- compare-prices:');
     expect(JSON.stringify(server.chatRequests.at(-1)!.messages)).toContain('There is no skill called');
     await patchSettings(panel, (settings) => ({ ...settings, skills: { off: [] } }));
+
+    // The buying guide brings the skills it builds on, and reads the one file of the user's country.
+    await ask(panel, 'SK-GUIDE which robot vacuum?');
+    await expect(panel.getByTestId('assistant-message').last()).toContainText('With it: reputation, compare-prices. Leads: buying-guide. China: only its own file. Again: not sent twice.', { timeout: 20_000 });
     await site.close();
     await panel.close();
   });
@@ -315,6 +333,14 @@ test.describe.serial('skills, product pictures, grouped tabs and forums', () => 
     await expect(options.getByTestId('builtin-skills').getByTestId('skill-row')).toHaveCount(18);
     await expect(options.getByTestId('builtin-skills')).toContainText('Compare prices');
     await expect(options.getByTestId('builtin-skills')).toContainText('reputation');
+    // Every built-in skill has a title in the user's language next to its name, and says which skills it builds on.
+    const guide = options.locator('[data-testid="skill-row"][data-skill="buying-guide"]');
+    await expect(guide).toContainText('Buying guide buying-guide');
+    await expect(guide).toContainText('Which brand and model, where you live');
+    await guide.locator('summary').click();
+    await expect(guide.getByTestId('skill-uses')).toHaveText('Uses: compare-prices, reputation');
+    await expect(options.locator('[data-testid="skill-row"][data-skill="terms-review"]')).toContainText('Read the terms terms-review');
+    await expect(options.locator('[data-testid="skill-row"][data-skill="fact-check"]').getByTestId('skill-uses')).toHaveCount(0);
 
     // Not a skill file: said so, and nothing is installed.
     await options.getByTestId('skill-file').setInputFiles({ name: 'notes.md', mimeType: 'text/markdown', buffer: Buffer.from('Just some notes.') });
@@ -356,7 +382,18 @@ test.describe.serial('skills, product pictures, grouped tabs and forums', () => 
 
     // In the panel: after a slash, by its name; it goes with the request.
     const { site, panel } = await openSiteAndPanel(context, extensionId, `${server.origin}/plain.html`);
+    // A built-in skill is found by its title or its name, and shown with both.
+    await panel.getByTestId('composer-input').fill('/flights');
+    await expect(panel.getByTestId('skill-option')).toHaveText(/^Flights and hotels\s*travel-compare/);
+    await panel.getByTestId('composer-input').fill('/terms');
+    await expect(panel.getByTestId('skill-option')).toHaveText(/^Read the terms\s*terms-review\s*Renewals, refunds, what you agree to$/);
+    await panel.getByTestId('composer-input').fill('/fact-ch');
+    await expect(panel.getByTestId('skill-option')).toContainText('Fact-check');
+    await panel.getByTestId('skill-option').click();
+    await expect(panel.getByTestId('skill-chip')).toHaveText('/Fact-check');
+    await panel.getByTestId('skill-chip').getByRole('button').click();
     await panel.getByTestId('composer-input').fill('/forum-c');
+    await expect(panel.getByTestId('skill-option')).toHaveText(/^forum-check\s*Use when the user asks what the charger forum says about a product\.$/);
     await panel.getByTestId('skill-option').click();
     await expect(panel.getByTestId('skill-chip')).toHaveText('/forum-check');
     await ask(panel, 'SK-USE which complaints?');

@@ -21,6 +21,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
+import { activityLabel, elapsedLabel } from '../../src/agent/activity';
 import { commandFrom, commandName, outlineOf } from '../../src/agent/outline';
 import { ALL_SITES_PATTERN, requestHostAccess } from '../../src/permissions/hosts';
 import { newId } from '../../src/storage/db';
@@ -96,23 +97,19 @@ const STATUS_STYLE: Record<AgentTask['status'], { icon: typeof Check; tone: stri
 };
 
 const OPENING = new Set(['navigate', 'open_tab', 'read_url']);
-const READING = new Set(['read_page', 'extract', 'look', 'view_page']);
 
-/**
- * What the run is doing, in words a person cares about: what it searches for,
- * which site it is on. Waiting, clicking and scrolling are all "working on
- * the site"; the steps themselves are under the details.
- */
-export function activityLabel(t: TFunction, task: AgentTask): string {
-  const step = task.steps.at(-1);
-  const action = step?.actions.at(-1);
-  if (!action) return t('agent.thinking');
-  if (action.tool === 'web_search') return t('agent.activity.search', { query: clip(String(action.args.query ?? ''), 50) });
-  if (action.tool === 'research_pages') return t('agent.activity.research', { progress: action.target ?? '' }).trim();
-  const site = OPENING.has(action.tool) ? hostOf(action.args.url) : hostOf(step?.url);
-  if (OPENING.has(action.tool) && site) return t('agent.activity.open', { site });
-  if (READING.has(action.tool)) return t('agent.activity.read');
-  return site ? t('agent.activity.act', { site }) : t('agent.activity.actHere');
+/** How long the run has been going, counted up every second while it works. */
+function Elapsed({ since }: { since: number }) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+  return (
+    <span className="shrink-0 font-mono text-[11px] tabular-nums text-faint" data-testid="run-elapsed">
+      {elapsedLabel(since, now)}
+    </span>
+  );
 }
 
 /** A finished run in a few words: how often it searched and how many sites it used. */
@@ -221,16 +218,26 @@ export function AgentRunView({ task, request, onSend }: {
         <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${status.tone}`}>
           <StatusIcon className={`h-3.5 w-3.5 ${status.spin ? 'animate-spin' : ''}`} strokeWidth={2.25} />
         </span>
-        <span className="shrink-0 font-semibold tracking-tight">{t(`agent.status.${task.status}`)}</span>
+        {/* While it works, the line says what it is doing; the turning icon says that it is working. */}
+        {task.status === 'running' ? (
+          <span className="min-w-0 flex-1 truncate font-medium tracking-tight" data-testid="run-activity" title={about}>
+            {about}
+          </span>
+        ) : (
+          <span className="shrink-0 font-semibold tracking-tight">{t(`agent.status.${task.status}`)}</span>
+        )}
         {active && task.stage && (
           <span className="shrink-0 rounded-full bg-accent-soft px-2 py-0.5 text-[11px] font-medium text-accent" data-testid="run-stage">
             {task.stage.step ? `${task.stage.step}${task.stage.of ? `/${task.stage.of}` : ''} ` : ''}
             {task.stage.name}
           </span>
         )}
-        <span className="min-w-0 flex-1 truncate text-xs text-muted" data-testid="run-activity">
-          {about}
-        </span>
+        {task.status !== 'running' && (
+          <span className="min-w-0 flex-1 truncate text-xs text-muted" data-testid="run-activity">
+            {about}
+          </span>
+        )}
+        {task.status === 'running' && <Elapsed since={task.createdAt} />}
         <ChevronDown className={`h-4 w-4 shrink-0 text-faint transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
       {thought && !open && <p className="-mt-1 line-clamp-2 px-3 pb-2.5 pl-[46px] text-xs leading-relaxed text-muted">{thought}</p>}

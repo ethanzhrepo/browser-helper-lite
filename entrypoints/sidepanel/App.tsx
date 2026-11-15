@@ -14,6 +14,7 @@ import { useTabConversation } from '../../src/chat/useTabConversation';
 import { isRestrictedUrl, requestHostAccess } from '../../src/permissions/hosts';
 import type { AgentMode, ContextKind, ContextSnapshot, ErrorInfo, Locale, MessageImage, MessageRecord, SavedCommand } from '../../src/shared/types';
 import { enabledSkills, type Skill } from '../../src/skills/skills';
+import { skillTitle } from '../../src/skills/titles';
 import { useInstalledSkills } from '../../src/skills/useInstalledSkills';
 
 /** Skills reached by a slash command of their own (/prices…): the slash menu lists those once. */
@@ -594,7 +595,7 @@ export function App() {
               command={command}
               onRemoveCommand={() => setCommand(undefined)}
               skills={enabledSkills(settings, installedSkills).filter((skill) => !COMMAND_SKILLS.has(skill.name))}
-              onSkill={(skill: Skill) => setPicked((previous) => [...previous.filter((p) => p.name !== skill.name), { name: skill.name, label: skill.name }])}
+              onSkill={(skill: Skill) => setPicked((previous) => [...previous.filter((p) => p.name !== skill.name), { name: skill.name, label: skillTitle(t, skill).label }])}
               picked={picked}
               onRemovePicked={(name) => setPicked((previous) => previous.filter((p) => p.name !== name))}
               onMention={applyMention}

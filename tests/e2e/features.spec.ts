@@ -39,7 +39,25 @@ const BUSY_HTML = `<!doctype html><title>Busy</title><body style="margin:0;backg
 
 const stockPage = (state: string) => `<!doctype html><title>65W charger</title><h1>65W charger</h1><p id="stock">${state}</p>`;
 /** Served as they are at the moment of the request, so a test can change what a page says. */
-const pages: Record<string, string> = { '/red.html': RED_HTML, '/buttons.html': BUTTONS_HTML, '/long.html': LONG_HTML, '/product.html': PRODUCT_HTML, '/stock.html': stockPage('Out of stock'), '/busy.html': BUSY_HTML };
+
+// Pages that load a CAPTCHA. Most never ask anything of a person.
+/** reCAPTCHA v3 or the invisible kind: a badge in the corner, a button the check is tied to, and the puzzle's frame parked off screen. */
+const BADGE_HTML = `<!doctype html><title>Gotenda catalogue</title><h1>Routers</h1><p>AX12 Pro: 499 yuan.</p>
+<form><button class="g-recaptcha" data-sitekey="k" data-callback="go" type="button">Subscribe</button>
+<textarea name="g-recaptcha-response" style="display:none"></textarea></form>
+<div class="grecaptcha-badge" style="position:fixed;bottom:14px;right:0;width:256px;height:60px;box-shadow:gray 0 0 5px"><iframe title="reCAPTCHA" width="256" height="60" src="/recaptcha/api2/anchor?ar=1&k=k&size=invisible"></iframe></div>
+<div style="visibility:hidden;position:absolute;top:-10000px"><iframe title="recaptcha challenge expires in two minutes" style="width:400px;height:580px" src="/recaptcha/api2/bframe?k=k"></iframe></div>
+<div class="h-captcha" data-sitekey="k" data-size="invisible" style="width:300px;height:70px"></div>`;
+/** A box to tick. Ticking it fills in the answer; the box stays where it is. */
+const CHECKBOX_HTML = `<!doctype html><title>Gotenda sign-up</title><h1>Sign up</h1><p>Members get 10% off.</p>
+<form><div class="g-recaptcha" data-sitekey="k"><div style="width:304px;height:78px"><div><iframe title="reCAPTCHA" width="304" height="78" src="/recaptcha/api2/anchor?ar=1&k=k&size=normal"></iframe></div>
+<textarea id="answer" name="g-recaptcha-response" style="display:none"></textarea></div></div></form>
+<button id="tick" onclick="document.getElementById('answer').value = 'passed'">I'm not a robot</button>`;
+/** A "checking your browser" page that passes by itself after a moment. */
+const MOMENT_HTML = `<!doctype html><title>Just a moment…</title><div id="challenge-form" style="width:300px;height:80px">Checking your browser</div><p id="content" hidden>Opening hours: 9 to 6.</p>
+<script>setTimeout(() => { document.title = 'Gotenda store'; document.getElementById('challenge-form').remove(); document.getElementById('content').hidden = false; }, 2500);</script>`;
+
+const pages: Record<string, string> = { '/badge.html': BADGE_HTML, '/checkbox.html': CHECKBOX_HTML, '/moment.html': MOMENT_HTML, '/red.html': RED_HTML, '/buttons.html': BUTTONS_HTML, '/long.html': LONG_HTML, '/product.html': PRODUCT_HTML, '/stock.html': stockPage('Out of stock'), '/busy.html': BUSY_HTML };
 
 function assistant(messages: ChatMessage[]): Reply {
   const { request, history, results } = readTurn(messages);
@@ -104,6 +122,13 @@ function assistant(messages: ChatMessage[]): Reply {
     }
     if (waits < (request.includes('LONG') ? 6 : 1)) return say('Checking the reviews.', 'wait', { seconds: 3 });
     return say(`## Pick\n\nCable B. Reported: ${results.includes('Shown to the user as the next part of your answer') ? 'yes' : 'no'}.`);
+  }
+  // A page with a CAPTCHA on it: read like any other, unless it asks something of a person.
+  if (request.includes('FT-CAPTCHA')) {
+    // Looking at the page is where a check that needs a person is noticed.
+    if (!used('view_page')) return say('Looking at the page.', 'view_page');
+    if (!used('read_page')) return say('Reading the page.', 'read_page');
+    return say(`Read: ${/AX12 Pro: 499 yuan|Members get 10% off|Opening hours: 9 to 6/.exec(results)?.[0] ?? 'nothing'}.`);
   }
   // What the user adds while the assistant works.
   if (request.includes('FT-ADDED')) return say(/The user adds, while you are working:\s*FT-ADDED not Cable A/.test(request) ? 'Understood: Cable A is out. Cable B it is.' : 'unexpected');
@@ -735,5 +760,37 @@ test.describe.serial('research, tables, pictures and reading aloud', () => {
     await expect(side.getByTestId('assistant-message').last().getByRole('heading', { name: 'Candidates' })).toBeVisible();
     await opened.site.close();
     await side.close();
+  });
+
+  test('a CAPTCHA badge in the corner is no reason to stop; a box to tick is, until it is ticked', async () => {
+    // reCAPTCHA v3 and the invisible kinds: a badge, a hidden puzzle frame, a button tied to the check. Nobody has to do anything.
+    const badge = await openSiteAndPanel(context, extensionId, `${server.origin}/badge.html`);
+    await ask(badge.panel, 'FT-CAPTCHA what does the router cost?');
+    await expect(badge.panel.getByTestId('assistant-message').last()).toContainText('Read: AX12 Pro: 499 yuan.', { timeout: 20_000 });
+    await expect(badge.panel.getByTestId('handoff-card')).toHaveCount(0);
+    await badge.site.close();
+    await badge.panel.close();
+
+    // A box to tick on screen: the user is asked, and the task goes on once it is ticked, although the box is still there.
+    const box = await openSiteAndPanel(context, extensionId, `${server.origin}/checkbox.html`);
+    await ask(box.panel, 'FT-CAPTCHA what do members get?');
+    await expect(box.panel.getByTestId('handoff-card')).toContainText('Please solve the verification', { timeout: 20_000 });
+    await box.site.click('#tick');
+    await expect(box.panel.getByTestId('assistant-message').last()).toContainText('Read: Members get 10% off.', { timeout: 20_000 });
+    expect(await box.site.locator('.g-recaptcha iframe').count()).toBe(1);
+    await box.site.close();
+    await box.panel.close();
+
+    // A check that passes by itself within a few seconds is waited for; the user is not asked.
+    const moment = await openSiteAndPanel(context, extensionId, `${server.origin}/moment.html`);
+    let asked = false;
+    void moment.panel.getByTestId('handoff-card').waitFor({ timeout: 15_000 }).then(() => (asked = true)).catch(() => undefined);
+    // Loaded again, so the check is on the page when the assistant first looks.
+    await moment.site.reload();
+    await ask(moment.panel, 'FT-CAPTCHA when is it open?');
+    await expect(moment.panel.getByTestId('assistant-message').last()).toContainText('Read: Opening hours: 9 to 6.', { timeout: 20_000 });
+    expect(asked).toBe(false);
+    await moment.site.close();
+    await moment.panel.close();
   });
 });

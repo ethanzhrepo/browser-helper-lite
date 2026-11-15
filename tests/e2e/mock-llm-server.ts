@@ -260,6 +260,14 @@ export function scriptedAssistant(messages: ChatMessage[]): Reply {
   }
 
   if (request.includes('TEST-STOP')) return say('Waiting.', 'wait', { seconds: 1 });
+  // A search in a tab of its own, then a page opened in a new tab and read there.
+  if (request.includes('TEST-TABS')) {
+    const origin = /url="(https?:\/\/[^/"]+)/.exec(request)?.[1] ?? '';
+    if (!used('web_search')) return say('Searching.', 'web_search', { query: 'cable guide' });
+    if (!used('open_tab')) return say('Opening the guide.', 'open_tab', { url: `${origin}/review.html` });
+    if (!used('read_page')) return say('Reading it.', 'read_page');
+    return say(`The guide says: ${/Braided cables last longer/.exec(results)?.[0] ?? 'nothing'}.`);
+  }
 
   // Plays a model that falls for the page's hidden instructions; the extension must stop it.
   if (request.includes('TEST-INJECT')) {
