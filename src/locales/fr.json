@@ -55,7 +55,8 @@
       "reviews": "Résumer les avis",
       "flaws": "À quoi faire attention avant d'acheter",
       "deal": "Est-ce une bonne affaire ?",
-      "reputation": "Ce qu'on en dit"
+      "reputation": "Ce qu'on en dit",
+      "trust": "Boutique fiable ?"
     },
     "tip": "/ pour les commandes · @ pour joindre une page, une sélection ou un onglet",
     "body": "Posez une question sur cette page, ou confiez-moi une tâche dans vos onglets.",
@@ -156,6 +157,11 @@
       "label": "Réputation",
       "description": "Tests et avis des utilisateurs",
       "prompt": "Que dit-on de ce produit ? Regarde les tests et ce que rapportent les utilisateurs sur les forums et les réseaux sociaux. Dis-moi ce qui plaît et ce qui est reproché, avec les liens vers les sources."
+    },
+    "trust": {
+      "label": "Boutique fiable ?",
+      "description": "Arnaques, vendeur, signalements",
+      "prompt": "Puis-je faire confiance à cette boutique ? Vérifie le site et le vendeur : son adresse, ses coordonnées et ses conditions de retour, les moyens de paiement, et ce que d'autres en disent. Dis-moi à quel point tu es sûr."
     }
   },
   "message": {
@@ -324,7 +330,18 @@
   "language": {
     "title": "Langue",
     "description": "Langue de l'interface. Les réponses suivent la langue dans laquelle vous écrivez.",
-    "auto": "Comme le navigateur ({{language}})"
+    "auto": "Comme le navigateur ({{language}})",
+    "region": {
+      "title": "Pays ou région",
+      "hint": "Pour les prix, les boutiques, la livraison et les conseils d'achat ; le modèle en est informé à chaque demande. En automatique, l'extension demande à api.country.is (ou à Cloudflare s'il ne répond pas) le pays de votre adresse IP, au plus toutes les 12 heures. Ce service voit votre adresse IP. Choisissez un pays, ou de ne rien dire au modèle, et rien n'est demandé.",
+      "auto": "Automatique ({{country}}, d'après votre adresse IP)",
+      "autoUnknown": "Automatique (d'après votre adresse IP)",
+      "none": "Ne pas le dire au modèle",
+      "found": "Votre adresse IP est en {{country}}.",
+      "looking": "Recherche du pays de votre adresse IP…",
+      "notFound": "Le pays de votre adresse IP n'est pas connu : rien n'est dit au modèle.",
+      "refresh": "Chercher à nouveau"
+    }
   },
   "data": {
     "title": "Données",

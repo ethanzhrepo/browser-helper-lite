@@ -6,6 +6,7 @@ export default defineConfig({
   define: {
     __ENABLE_CDP_DRIVER__: 'true',
     __AUTO_UPDATE_CHECK__: 'false',
+    __IP_REGION_LOOKUP__: 'false',
   },
   test: {
     include: ['tests/unit/**/*.test.ts'],

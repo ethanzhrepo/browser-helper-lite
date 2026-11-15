@@ -39,6 +39,18 @@ export const DEFAULT_SOCIAL_SITES: readonly string[] = [
   'hupu.com',
   'coolapk.com',
   'nga.cn',
+  'mobile01.com',
+  'ptt.cc',
+  'lihkg.com',
+  '5ch.net',
+  'ppomppu.co.kr',
+  'clien.net',
+  'redflagdeals.com',
+  'hotukdeals.com',
+  'mydealz.de',
+  'dealabs.com',
+  'chollometro.com',
+  'ozbargain.com.au',
 ];
 
 /** How many different pages of one social site a request looks at, unless the user chose another number. */

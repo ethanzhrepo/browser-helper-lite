@@ -53,6 +53,7 @@ const settingsSchema = z.looseObject({
   connections: z.array(connectionSchema),
   slots: z.record(z.string(), slotSchema).optional(),
   language: z.enum(['auto', 'zh-CN', 'en', 'fr', 'es']).optional(),
+  region: z.string().regex(/^(auto|none|[A-Z]{2})$/).optional(),
   agent: z
     .looseObject({
       mode: z.enum(['query', 'auto', 'manual']).optional(),

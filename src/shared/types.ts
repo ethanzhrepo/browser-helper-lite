@@ -130,6 +130,8 @@ export interface Settings {
   connections: Connection[];
   slots: Partial<Record<Capability, SlotAssignment>>;
   language: LanguageSetting;
+  /** Where the user is, for prices, shops and delivery: 'auto' (from the browser's language), 'none' (not told to the model) or an ISO country code (see region.ts). */
+  region: string;
   agent: AgentSettings;
   search: SearchSettings;
   voice: VoiceSettings;

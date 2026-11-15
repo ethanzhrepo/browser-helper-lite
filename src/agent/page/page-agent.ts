@@ -805,7 +805,11 @@ export function createPageAgent(): PageAgentApi {
       // Put the caret at the end so typed text is appended.
       if ((el instanceof HTMLInputElement && isEditable(el)) || el instanceof HTMLTextAreaElement) {
         const end = el.value.length;
-        el.setSelectionRange(end, end);
+        try {
+          el.setSelectionRange(end, end);
+        } catch {
+          // Email, number and date fields have no selection to set (the call throws); the caret stays where the browser puts it.
+        }
       }
       return { ok: true, value: true };
     },

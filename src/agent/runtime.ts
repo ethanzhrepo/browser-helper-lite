@@ -24,6 +24,8 @@ import { actionKind, classifyAction, downloadRisk, formSubmission } from './risk
 import { cachedInstructions, cacheOptions, withBreakpoint } from '../providers/caching';
 import { enabledSkills, findSkill, findSkillFile, renderSkill, renderSkillFile, type InstalledSkill, type Skill } from '../skills/skills';
 import { listInstalledSkills } from '../skills/store';
+import { ipRegion } from '../shared/ip-region';
+import { userRegion, type UserRegion } from '../shared/region';
 import { saveShot } from '../storage/db';
 import { clampSeconds, WATCH_DAYS, type Watch } from '../watch/watch';
 import { cropPreview, thumbnail } from './screenshot';
@@ -207,6 +209,8 @@ export class AgentRunner {
   private readonly loadedSkills = new Set<string>();
   /** The skills the user installed, as they were when the turn started. */
   private installedSkills: InstalledSkill[] = [];
+  /** Where the user is, as the model is told (see region.ts). */
+  private region: UserRegion | undefined;
   /** A click held back because it repeated the one before on a button that adds or sends something (see elementAction). */
   private heldRepeat: string | undefined;
   /** How often this turn has come to each page, to notice going back and forth. */
@@ -299,6 +303,8 @@ export class AgentRunner {
       this.ctl.init(this.settings.agent.useCdp);
       this.main = await resolveModelRef(this.settings, this.task.model);
       this.installedSkills = await listInstalledSkills().catch(() => []);
+      // The country of the IP address is looked up only when the user left it to "Automatic".
+      this.region = userRegion(this.settings.region, this.settings.region === 'auto' ? await ipRegion().catch(() => undefined) : undefined);
       this.messages = await this.initialMessages();
       this.update();
       await this.loop();
@@ -937,6 +943,7 @@ export class AgentRunner {
           chatOnly,
           readUrl: readsThroughDeepSeek(this.settings.search),
           skills: this.skills(),
+          region: this.region,
         }),
       ),
       messages,

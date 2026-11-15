@@ -1,4 +1,4 @@
-import { parseSkillFile, type Skill } from './format';
+import { parseSkillFile, type Skill, type SkillFile } from './format';
 
 /**
  * The skills that come with the extension, one folder each under
@@ -7,9 +7,37 @@ import { parseSkillFile, type Skill } from './format';
  * commands.ts).
  */
 const FILES = import.meta.glob('./builtin/*/SKILL.md', { query: '?raw', import: 'default', eager: true }) as Record<string, string>;
+/** The other files of their folders (references/, assets/), read when the instructions point to them. */
+const OTHER_FILES = import.meta.glob(['./builtin/*/**/*.{md,txt,json,csv}', '!./builtin/*/SKILL.md'], { query: '?raw', import: 'default', eager: true }) as Record<string, string>;
 
-/** The order they are listed in; others follow by name. */
-const ORDER = ['compare-prices', 'review-analysis', 'reputation', 'buying-checks', 'deal-check'];
+/** The order they are listed in (shopping first); others follow by name. */
+const ORDER = [
+  'buying-guide',
+  'compare-prices',
+  'review-analysis',
+  'reputation',
+  'buying-checks',
+  'deal-check',
+  'site-trust',
+  'travel-compare',
+  'terms-review',
+  'fact-check',
+  'long-read',
+  'news-perspectives',
+  'form-filling',
+  'cancel-subscription',
+  'data-extraction',
+  'job-posting',
+  'docs-lookup',
+  'github-thread',
+];
+
+function filesOf(folder: string): SkillFile[] {
+  return Object.entries(OTHER_FILES)
+    .filter(([path]) => path.split('/')[2] === folder)
+    .map(([path, text]) => ({ path: path.split('/').slice(3).join('/'), text }))
+    .sort((a, b) => a.path.localeCompare(b.path));
+}
 
 export const BUILTIN_SKILLS: Skill[] = Object.entries(FILES)
   .map(([path, text]): Skill => {
@@ -17,7 +45,8 @@ export const BUILTIN_SKILLS: Skill[] = Object.entries(FILES)
     const skill = parseSkillFile(text);
     // As the format says: the name is the folder's.
     if (skill.name !== folder) throw new Error(`The built-in skill in ${path} is called "${skill.name}"; it must be called "${folder}".`);
-    return { ...skill, builtin: true };
+    const files = filesOf(folder);
+    return { ...skill, ...(files.length > 0 ? { files } : {}), builtin: true };
   })
   .sort((a, b) => {
     const rank = (name: string) => (ORDER.includes(name) ? ORDER.indexOf(name) : ORDER.length);

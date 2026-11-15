@@ -55,7 +55,8 @@
       "reviews": "Resumir las opiniones",
       "flaws": "Qué mirar antes de comprar",
       "deal": "¿Es una buena oferta?",
-      "reputation": "Qué se dice de él"
+      "reputation": "Qué se dice de él",
+      "trust": "¿Tienda fiable?"
     },
     "tip": "/ para comandos · @ para adjuntar una página, selección o pestaña",
     "body": "Pregunta sobre esta página o encárgame una tarea en tus pestañas.",
@@ -156,6 +157,11 @@
       "label": "Reputación",
       "description": "Pruebas y lo que dicen los usuarios",
       "prompt": "¿Qué se dice de este producto? Mira las pruebas de los analistas y lo que cuentan los usuarios en foros y redes sociales. Dime qué gusta y de qué se quejan, con enlaces a las fuentes."
+    },
+    "trust": {
+      "label": "¿Tienda fiable?",
+      "description": "Estafas, vendedor, denuncias",
+      "prompt": "¿Puedo fiarme de esta tienda? Revisa la web y el vendedor: su dirección, sus datos de contacto y devoluciones, cómo cobra y qué cuentan otros. Dime lo seguro que estás."
     }
   },
   "message": {
@@ -324,7 +330,18 @@
   "language": {
     "title": "Idioma",
     "description": "Idioma de la interfaz. Las respuestas siguen el idioma en que escribes.",
-    "auto": "Como el navegador ({{language}})"
+    "auto": "Como el navegador ({{language}})",
+    "region": {
+      "title": "País o región",
+      "hint": "Para precios, tiendas, envíos y consejos de compra; se le indica al modelo en cada petición. En automático, la extensión pregunta a api.country.is (o a Cloudflare si no responde) el país de tu dirección IP, como mucho cada 12 horas. Ese servicio ve tu dirección IP. Si eliges un país, o no decírselo al modelo, no se consulta nada.",
+      "auto": "Automático ({{country}}, según tu dirección IP)",
+      "autoUnknown": "Automático (según tu dirección IP)",
+      "none": "No decírselo al modelo",
+      "found": "Tu dirección IP está en {{country}}.",
+      "looking": "Buscando el país de tu dirección IP…",
+      "notFound": "No se sabe el país de tu dirección IP: no se le indica ninguno al modelo.",
+      "refresh": "Volver a buscar"
+    }
   },
   "data": {
     "title": "Datos",

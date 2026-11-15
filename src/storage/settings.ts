@@ -48,6 +48,7 @@ export function defaultSettings(): Settings {
     connections: [],
     slots: {},
     language: 'auto',
+    region: 'auto',
     agent: DEFAULT_AGENT_SETTINGS,
     search: DEFAULT_SEARCH_SETTINGS,
     voice: DEFAULT_VOICE_SETTINGS,

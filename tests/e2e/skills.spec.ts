@@ -29,6 +29,8 @@ const pages: Record<string, string> = {
   '/product.html': PRODUCT_HTML,
   '/buttons.html': BUTTONS_HTML,
   '/plain.html': '<!doctype html><title>Plain</title><p>A plain page.</p>',
+  // Fields whose type has no text selection: setting one throws.
+  '/fields.html': '<!doctype html><title>Fields</title><form><label>Email <input id="email" type="email"></label> <label>Quantity <input id="quantity" type="number" value="1"></label> <label>Name <input id="name" value="Lin"></label></form>',
   '/other.html': '<!doctype html><title>Other</title><p>Another page.</p>',
   '/third.html': '<!doctype html><title>Third</title><p>A third page.</p>',
   ...Object.fromEntries(Array.from({ length: 12 }, (_, i) => [`/forum/thread-${i + 1}.html`, thread(i + 1)])),
@@ -74,6 +76,14 @@ function assistant(messages: ChatMessage[]): Reply {
     if (!used('load_skill')) return say('Getting the skill.', 'load_skill', { name: 'size-guide' });
     if (!used('read_skill_file')) return say('Reading its table.', 'read_skill_file', { skill: 'size-guide', path: 'references/sizes.md' });
     return say(`Sizes: ${/Charger sizes: (\w+)/.exec(results)?.[1] ?? 'none'}. Files named: ${results.includes('references/sizes.md (1 KB)') ? 'yes' : 'no'}. Scripts: ${results.includes('runs no code') ? 'not run' : 'unknown'}.`);
+  }
+  if (request.includes('SK-TYPE')) {
+    const typed = history.match(/- type /g)?.length ?? 0;
+    if (!used('view_page')) return say('Looking at the form.', 'view_page');
+    if (typed === 0) return say('The email.', 'type', { index: indexOf(view, /\[(\d+)\]<input[^\n]*type="?email/), text: 'lin.chen@example.org' });
+    if (typed === 1) return say('The quantity.', 'type', { index: indexOf(view, /\[(\d+)\]<input[^\n]*type="?number/), text: '20' });
+    if (typed === 2) return say('The name, added to.', 'type', { index: indexOf(view, /\[(\d+)\]<input[^\n]*value="?Lin/), text: ' Chen', clear: false });
+    return say(`Typed. Errors: ${(results.match(/Error:/g) ?? []).length}.`);
   }
   if (request.includes('SK-USE')) return say(request.includes('<skill name="forum-check">') && request.includes('Report the three complaints') ? 'Used forum-check.' : 'No skill came along.');
   if (request.includes('SK-CLICK')) {
@@ -302,7 +312,7 @@ test.describe.serial('skills, product pictures, grouped tabs and forums', () => 
   test('a skill is read before it is installed, used by its name after a slash, changed and removed', async () => {
     const options = await context.newPage();
     await options.goto(`chrome-extension://${extensionId}/options.html#skills`);
-    await expect(options.getByTestId('builtin-skills').getByTestId('skill-row')).toHaveCount(5);
+    await expect(options.getByTestId('builtin-skills').getByTestId('skill-row')).toHaveCount(18);
     await expect(options.getByTestId('builtin-skills')).toContainText('Compare prices');
     await expect(options.getByTestId('builtin-skills')).toContainText('reputation');
 
@@ -462,17 +472,17 @@ test.describe.serial('skills, product pictures, grouped tabs and forums', () => 
     await options.goto(`chrome-extension://${extensionId}/options.html#sites`);
     const card = options.getByTestId('social-sites');
     const sites = card.getByTestId('social-site');
-    await expect(sites).toHaveCount(28);
+    await expect(sites).toHaveCount(40);
     await expect(card.locator('#social-pages')).toHaveValue('8');
     await expect(card.getByTestId('social-restore')).toHaveCount(0);
 
     // A forum of the user's own goes on the list, however it is typed; one that came with the extension is taken off.
     await card.getByTestId('social-new').fill('https://www.MyForum.test/threads');
     await card.getByTestId('social-add').click();
-    await expect(sites).toHaveCount(29);
+    await expect(sites).toHaveCount(41);
     await expect(card).toContainText('myforum.test');
     await card.getByRole('button', { name: 'Delete smzdm.com' }).click();
-    await expect(sites).toHaveCount(28);
+    await expect(sites).toHaveCount(40);
     await card.locator('#social-pages').fill('2');
     await card.locator('#social-pages').blur();
     const stored = () => options.evaluate(async () => (await chrome.storage.local.get('settings:v1'))['settings:v1'].social);
@@ -505,7 +515,7 @@ test.describe.serial('skills, product pictures, grouped tabs and forums', () => 
     // Back to how it came.
     await options.bringToFront();
     await card.getByTestId('social-restore').click();
-    await expect(sites).toHaveCount(28);
+    await expect(sites).toHaveCount(40);
     await expect(card.locator('#social-pages')).toHaveValue('8');
     await expect.poll(stored).toEqual({ added: [], removed: [], pages: 8 });
     await options.close();
@@ -596,5 +606,61 @@ Look up the size in references/sizes.md before answering. Then run scripts/fit.p
     await site.close();
     await panel.close();
     await options.close();
+  });
+
+  test('where the user is goes to the model in one line: the country chosen, or that of the IP address, or nothing', async () => {
+    const { site, panel } = await openSiteAndPanel(context, extensionId, `${server.origin}/plain.html`);
+    /** Asks from the site's tab (the panel, opened as a tab, follows the last other tab) and returns the prompt the model got. */
+    const promptFor = async (text: string) => {
+      const before = server.chatRequests.length;
+      await site.bringToFront();
+      await panel.bringToFront();
+      await ask(panel, text);
+      await expect.poll(() => server.chatRequests.length, { timeout: 20_000 }).toBeGreaterThan(before);
+      await expect(panel.getByTestId('send-button')).toBeVisible({ timeout: 20_000 });
+      return systemPrompt();
+    };
+    // The browser speaks en-US, which says nothing of where the user is; no address was looked up: nothing is said.
+    expect(await promptFor('hello')).not.toContain('The user is in');
+
+    // The country of the IP address, as the look-up keeps it (this build looks nothing up itself).
+    await panel.evaluate(async () => chrome.storage.local.set({ 'region:ip': { code: 'CA', at: Date.now() } }));
+    expect(await promptFor('hello again')).toContain('The user is in Canada (CA), going by their IP address, which a VPN or a trip abroad can move');
+
+    const options = await context.newPage();
+    await options.goto(`chrome-extension://${extensionId}/options.html#language`);
+    const region = options.getByTestId('region');
+    const savedRegion = () => options.evaluate(async () => (await chrome.storage.local.get('settings:v1'))['settings:v1'].region);
+    await expect(region).toHaveValue('auto');
+    await expect(region.locator('option[value="auto"]')).toHaveText('Automatic (Canada, from your IP address)');
+    await expect(options.getByTestId('region-ip')).toContainText('Your IP address is in Canada.');
+    await screenshot(options, 'feature-region');
+    await region.selectOption('JP');
+    await expect.poll(savedRegion).toBe('JP');
+    await expect(options.getByTestId('region-ip')).toHaveCount(0);
+    expect(await promptFor('in Japan')).toContain('The user is in Japan (JP). Unless they say otherwise, prices, shops, delivery and availability are for there, in its currency.');
+
+    await options.bringToFront();
+    await region.selectOption('none');
+    await expect.poll(savedRegion).toBe('none');
+    expect(await promptFor('and now')).not.toContain('The user is in');
+    await options.bringToFront();
+    await region.selectOption('auto');
+    await expect.poll(savedRegion).toBe('auto');
+    await panel.evaluate(async () => chrome.storage.local.remove('region:ip'));
+    await options.close();
+    await site.close();
+    await panel.close();
+  });
+
+  test('typing works in email and number fields, which have no text selection to set', async () => {
+    const { site, panel } = await openSiteAndPanel(context, extensionId, `${server.origin}/fields.html`);
+    await ask(panel, 'SK-TYPE fill these in');
+    await expect(panel.getByTestId('assistant-message').last()).toContainText('Typed. Errors: 0.', { timeout: 30_000 });
+    await expect(site.locator('#email')).toHaveValue('lin.chen@example.org');
+    await expect(site.locator('#quantity')).toHaveValue('20');
+    await expect(site.locator('#name')).toHaveValue('Lin Chen');
+    await site.close();
+    await panel.close();
   });
 });

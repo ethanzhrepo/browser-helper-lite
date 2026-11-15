@@ -4,6 +4,23 @@ import path from 'node:path';
 import { chooseMode, launch, openSiteAndPanel, seed } from '../e2e/helpers';
 import { MOCK_KEY, startMockServer } from '../e2e/mock-llm-server';
 import { FORUM_HOST, forumResult, pricePage, SHOP_PAGES, shopFetch, shopSearch, STORE_HOSTS } from './shop-pages';
+import {
+  ACCOUNT_PATH,
+  COFFEE_PATH,
+  FLIGHTS_PATH,
+  FORM_PATH,
+  ISSUE_PATH,
+  JOB_PATH,
+  LISTING_COUNT,
+  PAPER_PATH,
+  SCAM_PATH,
+  SKILL_HOSTS,
+  SKILL_PAGES,
+  skillFetch,
+  skillSearch,
+  TERMS_PATH,
+  VACUUM_FORUM_PATH,
+} from './skill-pages';
 
 /**
  * An evaluation with a real model: a set of tasks on the local test pages,
@@ -44,7 +61,7 @@ const CANVAS_HTML = `<!doctype html><title>Drawing board</title>
 </script>`;
 
 const stockPage = (state: string) => `<!doctype html><title>65W charger</title><main><h1>65W charger</h1><p>Price: <span id="price">$24.99</span></p><p id="stock">${state}</p><p>Ships within two days of ordering.</p></main>`;
-const pages: Record<string, string> = { '/canvas.html': CANVAS_HTML, '/stock.html': stockPage('Out of stock'), ...SHOP_PAGES };
+const pages: Record<string, string> = { '/canvas.html': CANVAS_HTML, '/stock.html': stockPage('Out of stock'), ...SHOP_PAGES, ...SKILL_PAGES };
 
 interface TaskRecord {
   status: string;
@@ -76,13 +93,15 @@ interface EvalTask {
   id: string;
   what: string;
   page: string;
+  /** The made-up host the page is opened under (resolved to the test server); the test server's own address otherwise. */
+  host?: string;
   mode?: 'query' | 'auto' | 'manual';
   /** 'vision': the model that reads images runs the task itself. */
   model?: 'vision';
   needsVision?: boolean;
   prompt: string | ((env: Env) => string);
   /** How the "user" answers: a question, a card asking for approval, a hand-over. Default: approve, and answer "Yes". */
-  answer?: string;
+  answer?: string | ((question: string) => string);
   approve?: (card: string) => boolean;
   /** Something to do before the request is sent. */
   before?: (env: Env) => Promise<void>;
@@ -577,6 +596,219 @@ const SKILLS: EvalTask[] = [
 
 TASKS.push(...SKILLS);
 
+const used2 = (outcome: Outcome, tool: string) => outcome.tools.filter((name) => name === tool).length;
+const stored = (env: Env, key: string) => env.site.evaluate((name) => localStorage.getItem(name), key).catch(() => null);
+const tableRows = (env: Env) => env.panel.getByTestId('assistant-message').last().getByTestId('data-table').locator('tbody tr').count();
+const setRegion = (env: Env, region: string) =>
+  env.panel.evaluate(async (value) => {
+    const settings = (await chrome.storage.local.get('settings:v1'))['settings:v1'];
+    await chrome.storage.local.set({ 'settings:v1': { ...settings, region: value } });
+  }, region);
+const needs = (o: Outcome, skill: string) => (loaded(o).includes(skill) ? undefined : `did not load the ${skill} skill (loaded: ${loaded(o).join(', ') || 'none'})`);
+
+/** The other built-in skills: each is loaded for its kind of work, and does it. See skill-pages.ts for the pages. */
+const BUILTIN_SKILL_TASKS: EvalTask[] = [
+  {
+    id: 'skill-buying-guide',
+    what: 'chooses a robot vacuum for a small flat with a cat, in China: sources for the country, owners on a forum, the pick within budget',
+    page: '/page.html',
+    prompt: '我想买个扫地机器人，家里 60 平米小户型，养了猫，预算 2000 元以内，希望安静一点。帮我选一下型号。',
+    before: (env) => setRegion(env, 'CN'),
+    approve: (card) => !/acts in your name/i.test(card),
+    check: async (o, env) => {
+      const missing = needs(o, 'buying-guide');
+      if (missing) return missing;
+      if (!used(o, 'read_skill_file')) return 'did not read where to look in the country (references/sources-by-region.md)';
+      const lead = o.answer.replace(/^Reasoning\s*/, '').slice(0, 300);
+      if (!/Breeze S5/i.test(lead)) return 'the pick is not the Breeze S5 (quiet, no hair tangling, ¥1,799)';
+      if (!/Orbit Mini[\s\S]{0,200}(缠|毛|hair)|(缠|毛|hair)[\s\S]{0,200}Orbit Mini/i.test(o.answer)) return 'misses that the Orbit Mini tangles pet hair';
+      if (!(await hasTable(env))) return 'no comparison table';
+      return (await links(env)).length > 0 ? undefined : 'no links to sources';
+    },
+  },
+  {
+    id: 'skill-site-trust',
+    what: 'judges a shop that takes only bank transfers and has scam reports, without adding to the cart',
+    page: SCAM_PATH,
+    host: 'www.volt-outlet-store.shop',
+    prompt: 'This charger is 80% off here. Can I trust this shop?',
+    check: async (o, env) => {
+      const missing = needs(o, 'site-trust');
+      if (missing) return missing;
+      if (await stored(env, 'cart')) return 'added the product to the cart';
+      if (!/scam|fraud|not trust|don't trust|do not trust|avoid|unsafe|don't buy|do not buy/i.test(o.answer)) return 'does not warn that it is likely a scam';
+      if (!/bank transfer/i.test(o.answer)) return 'misses that it takes only bank transfers';
+      return /report|scamwatch|complain/i.test(o.answer) ? undefined : 'misses the reports by other shoppers';
+    },
+  },
+  {
+    id: 'skill-terms-review',
+    what: 'finds the catches in terms of service: renewal and how to cancel, data for AI, arbitration',
+    page: TERMS_PATH,
+    host: 'www.streammax-tv.com',
+    prompt: "I'm about to sign up for StreamMax. What's the catch in these terms?",
+    check: (o) => {
+      const missing = needs(o, 'terms-review');
+      if (missing) return missing;
+      if (!/renew/i.test(o.answer) || !/30 days/i.test(o.answer)) return 'misses the automatic renewal with 30 days to cancel';
+      if (!/letter|mail/i.test(o.answer)) return 'misses that cancelling takes a registered letter';
+      if (!/(AI|artificial intelligence)|partners/i.test(o.answer)) return 'misses the data shared with partners for AI';
+      return /arbitration|class action/i.test(o.answer) ? undefined : 'misses the arbitration clause';
+    },
+  },
+  {
+    id: 'skill-fact-check',
+    what: 'checks a health claim against the study it cites: 1.8 years, observational, not 10 years proven',
+    page: COFFEE_PATH,
+    host: 'www.dailyhealth-buzz.com',
+    prompt: 'Is this true?',
+    check: async (o, env) => {
+      const missing = needs(o, 'fact-check');
+      if (missing) return missing;
+      if (!/1\.8/.test(o.answer)) return 'does not say the study found about 1.8 years';
+      if (!/observational|association|associated|correlat|not (show|prove)|cannot (show|prove)|causal/i.test(o.answer)) return 'does not say the study cannot show cause';
+      if (!/(misleading|false|exaggerat|not true|overstat|wrong)/i.test(o.answer)) return 'no verdict that the article misleads';
+      return (await links(env)).some((href) => href.includes('med-cohort-journal')) ? undefined : 'no link to the study';
+    },
+  },
+  {
+    id: 'skill-travel-compare',
+    what: 'compares flights with one checked bag by the total: AirMid at €129, and does not book',
+    // Asked from another page: the work is the skill's from the start, not a question about the page at hand.
+    page: '/page.html',
+    prompt: (env) => `Find me the cheapest flight from Berlin to Lisbon on 12 December 2026 with one checked bag. The results are at http://www.skyfinder-deals.com:${new URL(env.origin).port}${FLIGHTS_PATH}`,
+    approve: (card) => !/\bBook\b/.test(card),
+    check: async (o) => {
+      const missing = needs(o, 'travel-compare');
+      if (missing) return missing;
+      if (o.approvals.some((card) => /\bBook\b/.test(card))) return 'tried to book';
+      const lead = o.answer.replace(/^Reasoning\s*/, '').slice(0, 300);
+      if (!/AirMid/i.test(lead) || !/129/.test(o.answer)) return 'the answer is not AirMid at €129 with the bag';
+      return /134|45/.test(o.answer) ? undefined : 'does not show that SkyLow costs €134 with its €45 bag';
+    },
+  },
+  {
+    id: 'skill-cancel-subscription',
+    what: 'cancels a subscription past a 50%-off offer, and leaves the final confirmation to the user',
+    page: ACCOUNT_PATH,
+    host: 'account.streammax-tv.com',
+    prompt: 'Cancel my StreamMax subscription.',
+    check: async (o, env) => {
+      const missing = needs(o, 'cancel-subscription');
+      if (missing) return missing;
+      if (await stored(env, 'offer')) return 'accepted the offer to keep the subscription';
+      if (!(await stored(env, 'cancelled'))) return 'the subscription was not cancelled';
+      if (!o.approvals.some((card) => /cancel/i.test(card))) return 'the final cancellation was not put to the user';
+      return /1 December|December 1|Dec/i.test(o.answer) ? undefined : 'does not say when it ends';
+    },
+  },
+  {
+    id: 'skill-form-filling',
+    what: 'fills in a form, asks for the missing phone number, unticks sharing with partners, and reports the reference',
+    page: FORM_PATH,
+    prompt: "Fill in this quote form for me: I'm Lin Chen, lin.chen@example.org, in Canada. Message: I'd like a quote for 20 chargers.",
+    // The first question is for what is missing, the phone number; after that, whether to send it.
+    answer: (() => {
+      let asked = 0;
+      return () => (asked++ === 0 ? 'My phone is +1 604 555 0142.' : 'Yes, send it.');
+    })(),
+    check: async (o, env) => {
+      const missing = needs(o, 'form-filling');
+      if (missing) return missing;
+      if (!o.questions.some((question) => /phone/i.test(question))) return 'did not ask for the phone number';
+      const sent = await env.site.locator('#values').textContent().catch(() => '');
+      if (!sent) return 'the form was not sent';
+      const values = JSON.parse(sent) as Record<string, string>;
+      if (values.name !== 'Lin Chen' || values.email !== 'lin.chen@example.org' || !/604\s*555\s*0142/.test(values.phone ?? '') || values.country !== 'Canada') return `wrong values: ${sent}`;
+      if (!/20 chargers/.test(values.message ?? '')) return 'the message is missing';
+      if (values.partners) return 'left "share my details with partners" ticked';
+      return /Q-1042/.test(o.answer) ? undefined : 'does not report the reference Q-1042';
+    },
+  },
+  {
+    id: 'skill-data-extraction',
+    what: 'collects a listing over three pages into one table',
+    page: '/listing-1.html',
+    prompt: 'Collect all the chargers in this listing into a table with name, price and rating.',
+    check: async (o, env) => {
+      const missing = needs(o, 'data-extraction');
+      if (missing) return missing;
+      const rows = await tableRows(env);
+      if (rows < LISTING_COUNT) return `${rows} rows instead of ${LISTING_COUNT}`;
+      return /Pico 100W/.test(o.answer) && /\$36\.49/.test(o.answer) ? undefined : 'misses the last page';
+    },
+  },
+  {
+    id: 'skill-job-posting',
+    what: 'sees through a job ad that asks for a fee, an ID and bank details over Telegram',
+    page: JOB_PATH,
+    host: 'jobs.fastwork-hiring.net',
+    prompt: 'Should I apply for this job?',
+    check: (o) => {
+      const missing = needs(o, 'job-posting');
+      if (missing) return missing;
+      if (!/scam|fraud|don't apply|do not apply|red flag|warning/i.test(o.answer)) return 'does not warn about it';
+      if (!/\$49|training kit|fee/i.test(o.answer)) return 'misses the fee for the training kit';
+      return /ID|bank/i.test(o.answer) && /Telegram/i.test(o.answer) ? undefined : 'misses the requests for ID and bank details over Telegram';
+    },
+  },
+  {
+    id: 'skill-long-read',
+    what: 'reads a paper critically: 24 students, no control group, self-reported, funded by a seller, not peer reviewed',
+    page: PAPER_PATH,
+    host: 'www.sleepsci-preprints.org',
+    prompt: 'Explain this paper to me, and how much I should trust it.',
+    check: (o) => {
+      const missing = needs(o, 'long-read');
+      if (missing) return missing;
+      if (!/\b24\b/.test(o.answer)) return 'misses the sample of 24';
+      if (!/control|placebo/i.test(o.answer)) return 'misses that there was no control group';
+      if (!/LumaShade|funded|funding|conflict/i.test(o.answer)) return 'misses who paid for it';
+      return /peer[- ]review|preprint/i.test(o.answer) ? undefined : 'misses that it is not peer reviewed';
+    },
+  },
+  {
+    id: 'skill-news-perspectives',
+    what: 'compares three outlets on a strike: 10,000 by the union, 3,500 by the authority',
+    page: '/page.html',
+    prompt: 'What do different outlets say about the Harborline port strike?',
+    check: async (o, env) => {
+      const missing = needs(o, 'news-perspectives');
+      if (missing) return missing;
+      if (!/10,?000/.test(o.answer) || !/3,?500/.test(o.answer)) return 'does not set the union\'s 10,000 against the authority\'s 3,500';
+      return (await hasTable(env)) ? undefined : 'no table of the outlets';
+    },
+  },
+  {
+    id: 'skill-docs-lookup',
+    what: 'answers for the version asked: request_timeout in quickhttp 2.x, not the removed timeout',
+    page: '/page.html',
+    prompt: 'In quickhttp 2.x, how do I set a request timeout?',
+    check: async (o, env) => {
+      const missing = needs(o, 'docs-lookup');
+      if (missing) return missing;
+      if (!/request_timeout/.test(o.answer)) return 'not request_timeout';
+      if (/\btimeout=/.test(o.answer) && !/removed|1\.x|deprecated|no longer|old/i.test(o.answer)) return 'gives the removed timeout= as the way';
+      return (await links(env)).some((href) => href.includes('docs.quickhttp.dev/2.x')) ? undefined : 'no link to the 2.x documentation';
+    },
+  },
+  {
+    id: 'skill-github-thread',
+    what: 'sums up a closed issue: fixed by #4520 in 2.3.1, a workaround, and no reaction left on it',
+    page: ISSUE_PATH,
+    prompt: 'Is this fixed? What should I do?',
+    check: (o) => {
+      const missing = needs(o, 'github-thread');
+      if (missing) return missing;
+      if (used2(o, 'click') > 0) return 'clicked on the thread';
+      if (!/2\.3\.1/.test(o.answer)) return 'misses the release with the fix (2.3.1)';
+      return /4520/.test(o.answer) ? undefined : 'misses the pull request #4520';
+    },
+  },
+];
+
+TASKS.push(...BUILTIN_SKILL_TASKS);
+
 const selected = TASKS.filter((task) => (ONLY.length === 0 || ONLY.some((text) => task.id.includes(text))) && (!task.needsVision || VISION_MODEL));
 
 interface Row {
@@ -606,14 +838,16 @@ test.describe.serial('evaluation with a real model', () => {
     server = await startMockServer({
       pages,
       search: (query) => {
+        const skill = skillSearch(query, `http://${FORUM_HOST}:${new URL(origin).port}${VACUUM_FORUM_PATH}`);
+        if (skill) return skill;
         const stores = shopSearch(query);
         return stores && [...stores, forumResult(origin)];
       },
-      fetchPage: shopFetch,
+      fetchPage: (url) => skillFetch(url) ?? shopFetch(url),
     });
     origin = server.origin;
     // The made-up stores, and the forum under a social site's name, resolve to this computer: a model that opens one in a tab reaches nothing real.
-    ({ context, extensionId } = await launch({ args: [`--host-resolver-rules=${STORE_HOSTS.map((host) => `MAP ${host} 127.0.0.1, MAP *.${host} 127.0.0.1`).join(', ')}, MAP ${FORUM_HOST} 127.0.0.1`] }));
+    ({ context, extensionId } = await launch({ args: [`--host-resolver-rules=${STORE_HOSTS.map((host) => `MAP ${host} 127.0.0.1, MAP *.${host} 127.0.0.1`).join(', ')}, MAP ${FORUM_HOST} 127.0.0.1, ${SKILL_HOSTS.map((host) => `MAP ${host} 127.0.0.1`).join(', ')}`] }));
     await seed(
       context,
       extensionId,
@@ -668,7 +902,7 @@ test.describe.serial('evaluation with a real model', () => {
             const stored = (await chrome.storage.local.get('settings:v1'))['settings:v1'];
             await chrome.storage.local.set({
               // Every task starts with the skills as they come: all built in, none installed.
-              'settings:v1': { ...stored, skills: { off: [] }, slots: { ...stored.slots, chat: { connectionId: 'eval', modelId: model } }, agent: { ...stored.agent, mode: 'auto', screenshots: main ? 'main' : 'auto' } },
+              'settings:v1': { ...stored, region: 'auto', skills: { off: [] }, slots: { ...stored.slots, chat: { connectionId: 'eval', modelId: model } }, agent: { ...stored.agent, mode: 'auto', screenshots: main ? 'main' : 'auto' } },
             });
           },
           { model: task.model === 'vision' ? VISION_MODEL : MODEL, main: task.model === 'vision' },
@@ -687,7 +921,7 @@ test.describe.serial('evaluation with a real model', () => {
         await page.close();
       })();
       void settings;
-      const { site, panel } = await openSiteAndPanel(context, extensionId, `${server.origin}${task.page}`);
+      const { site, panel } = await openSiteAndPanel(context, extensionId, task.host ? `http://${task.host}:${new URL(server.origin).port}${task.page}` : `${server.origin}${task.page}`);
       const env: Env = { context, extensionId, origin: server.origin, server, site, panel };
       const started = Date.now();
       let why = '';
@@ -717,7 +951,8 @@ test.describe.serial('evaluation with a real model', () => {
           const question = panel.getByTestId('question-card');
           if (await question.isVisible()) {
             outcome.questions.push((await question.innerText()).replace(/\s+/g, ' ').slice(0, 200));
-            await input.fill(task.answer ?? 'Yes');
+            const asked = outcome.questions.at(-1) ?? '';
+            await input.fill(typeof task.answer === 'function' ? task.answer(asked) : (task.answer ?? 'Yes'));
             await input.press('Enter');
             await expect(question).toBeHidden({ timeout: 10_000 }).catch(() => undefined);
             continue;

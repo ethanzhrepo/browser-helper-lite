@@ -106,6 +106,7 @@ export default defineConfig({
       __ENABLE_CDP_DRIVER__: JSON.stringify(enableCdpDriver),
       // Test builds never look for updates: tests must not depend on the network.
       __AUTO_UPDATE_CHECK__: JSON.stringify(!e2eGrantAllHosts),
+      __IP_REGION_LOOKUP__: JSON.stringify(!e2eGrantAllHosts),
     },
   }),
 });

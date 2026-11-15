@@ -8,13 +8,16 @@ import { capturePage, captureSelection, isProductPage, type ActiveTab } from '..
 import { takePanelRequest, watchPanelRequests } from '../../src/browser/panel-requests';
 import { captureRegion, pickRegion } from '../../src/browser/region';
 import { openPanel, panelTabOf } from '../../src/browser/side-panel';
-import { SLASH_COMMANDS, type SlashCommand } from '../../src/chat/commands';
+import { SHOPPING_SKILLS, SLASH_COMMANDS, type SlashCommand } from '../../src/chat/commands';
 import { useConversation } from '../../src/chat/useConversation';
 import { useTabConversation } from '../../src/chat/useTabConversation';
 import { isRestrictedUrl, requestHostAccess } from '../../src/permissions/hosts';
 import type { AgentMode, ContextKind, ContextSnapshot, ErrorInfo, Locale, MessageImage, MessageRecord, SavedCommand } from '../../src/shared/types';
 import { enabledSkills, type Skill } from '../../src/skills/skills';
 import { useInstalledSkills } from '../../src/skills/useInstalledSkills';
+
+/** Skills reached by a slash command of their own (/prices…): the slash menu lists those once. */
+const COMMAND_SKILLS = new Set(Object.values(SHOPPING_SKILLS));
 import { deriveTitle, newId, renameConversation, truncateConversation } from '../../src/storage/db';
 import { DEFAULT_VOICE_SETTINGS, updateSettings } from '../../src/storage/settings';
 import { linkTab, unlinkTab } from '../../src/storage/tab-conversations';
@@ -580,7 +583,7 @@ export function App() {
               }}
               command={command}
               onRemoveCommand={() => setCommand(undefined)}
-              skills={enabledSkills(settings, installedSkills).filter((skill) => !skill.builtin)}
+              skills={enabledSkills(settings, installedSkills).filter((skill) => !COMMAND_SKILLS.has(skill.name))}
               onSkill={(skill: Skill) => setPicked((previous) => [...previous.filter((p) => p.name !== skill.name), { name: skill.name, label: skill.name }])}
               picked={picked}
               onRemovePicked={(name) => setPicked((previous) => previous.filter((p) => p.name !== name))}

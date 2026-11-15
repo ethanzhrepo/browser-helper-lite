@@ -54,7 +54,8 @@
       "reviews": "Summarize the reviews",
       "flaws": "What to watch out for before buying",
       "deal": "Is this a good deal?",
-      "reputation": "What people say about it"
+      "reputation": "What people say about it",
+      "trust": "Can I trust this shop?"
     },
     "tip": "/ for commands · @ to attach a page, selection or tab",
     "body": "Ask about this page, or give me a task to do in your tabs.",
@@ -155,6 +156,11 @@
       "label": "Reputation",
       "description": "Tests, and what owners say",
       "prompt": "What do people say about this product? Look at reviewers' tests and at what owners report on forums and social media. Tell me what they like and what they complain about, with links to the sources."
+    },
+    "trust": {
+      "label": "Can I trust this shop?",
+      "description": "Scam signs, seller, reports",
+      "prompt": "Can I trust this shop? Check the site and the seller: its address, its contact and return details, how it takes payment, and what others report about it. Tell me how sure you are."
     }
   },
   "message": {
@@ -321,7 +327,18 @@
   "language": {
     "title": "Language",
     "description": "Interface language. Replies follow the language you write in.",
-    "auto": "Match the browser ({{language}})"
+    "auto": "Match the browser ({{language}})",
+    "region": {
+      "title": "Country or region",
+      "hint": "For prices, shops, delivery and buying advice; the model is told it with each request. With Automatic, the extension asks api.country.is (or Cloudflare, when that does not answer) for the country of your IP address, at most every 12 hours. That service sees your IP address. Choose a country, or not to tell the model, and nothing is looked up.",
+      "auto": "Automatic ({{country}}, from your IP address)",
+      "autoUnknown": "Automatic (from your IP address)",
+      "none": "Do not tell the model",
+      "found": "Your IP address is in {{country}}.",
+      "looking": "Looking up your IP address…",
+      "notFound": "The country of your IP address is not known: the model is not told one.",
+      "refresh": "Look up again"
+    }
   },
   "data": {
     "title": "Data",
