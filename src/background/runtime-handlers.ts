@@ -21,7 +21,7 @@ import type {
   TranscribeResult,
 } from '../shared/protocol';
 import { ENABLE_CDP_DRIVER } from '../shared/build-flags';
-import { clearConversations } from '../storage/db';
+import { clearConversations, db } from '../storage/db';
 import { getApiKey, loadSettings } from '../storage/settings';
 import { stopAllTasks } from './agent-service';
 import { isExtensionPage } from './trust';
@@ -75,6 +75,7 @@ async function clearData(request: DataClearRequest): Promise<DataClearResult> {
     await clearConversations();
     if (request.scope === 'everything') {
       await clearWatches();
+      await db.skills.clear();
       await browser.storage.local.clear();
       await browser.storage.session.clear();
       // Site access granted at runtime goes too; access a build declares itself cannot be removed.

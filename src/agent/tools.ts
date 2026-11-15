@@ -125,21 +125,32 @@ const loadSkillTool = tool({
   inputSchema: z.object({ name: z.string().describe('The skill\'s name, as listed') }),
 });
 
+/** Offered when a skill comes with files besides its instructions. */
+const readSkillFileTool = tool({
+  description: 'Read a file that comes with a skill (a reference, a template, data), when the skill\'s instructions point to it. The file list is in what load_skill returned.',
+  inputSchema: z.object({
+    skill: z.string().describe('The skill\'s name'),
+    path: z.string().describe('The file\'s path in the skill\'s folder, e.g. references/sizes.md'),
+    offset: z.number().int().min(0).optional().describe('Where to go on reading a long file, as the previous read said'),
+  }),
+});
+
 /** Offered only when pages can be read through DeepSeek's Fetch API. */
 const readUrlTool = tool({
   description:
-    'Read a public web page by its address without opening it, and get its text. Use it for search results, articles and documentation you only need to read. It does not see pages behind the user\'s login and cannot interact: open those in the tab instead.',
+    'Read a public web page by its address without opening it, and get its text. Use it for search results, articles and documentation you only need to read. It does not see pages behind the user\'s login and cannot interact: open those in the tab instead. Forums and social media are not read this way either: open them in the tab.',
   inputSchema: z.object({ url }),
 });
 
 /** The tools for a task: the search tool described for the provider that will run it, and `read_url` when DeepSeek reads pages. */
-export function toolsFor(search: { provider: string; deepseekFetch?: boolean }, { skills = false } = {}) {
+export function toolsFor(search: { provider: string; deepseekFetch?: boolean }, { skills = false, skillFiles = false } = {}) {
   const deepseek = search.provider === 'deepseek';
   return {
     ...assistantTools,
     ...(deepseek ? { web_search: searchTool(SEARCH_DESCRIPTION + DEEPSEEK_SEARCH_SYNTAX) } : {}),
     ...(deepseek && search.deepseekFetch ? { read_url: readUrlTool } : {}),
     ...(skills ? { load_skill: loadSkillTool } : {}),
+    ...(skills && skillFiles ? { read_skill_file: readSkillFileTool } : {}),
   };
 }
 
@@ -147,7 +158,7 @@ export function toolsFor(search: { provider: string; deepseekFetch?: boolean }, 
 export const ELEMENT_TOOLS = new Set<string>(['click', 'type', 'hover', 'select_option']);
 
 /** Tools that only read; they never take over the tab. */
-export const READING_TOOLS = new Set<string>(['read_page', 'view_page', 'extract', 'look', 'web_search', 'read_url', 'research_pages', 'watch_page', 'load_skill', 'ask_user']);
+export const READING_TOOLS = new Set<string>(['read_page', 'view_page', 'extract', 'look', 'web_search', 'read_url', 'research_pages', 'watch_page', 'load_skill', 'read_skill_file', 'ask_user']);
 
 /** Tools after which the model gets a fresh page view. */
 export const VIEW_AFTER = new Set<string>([

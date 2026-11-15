@@ -3,6 +3,7 @@ import { monotonicFactory } from 'ulid';
 import type { ReplyPicture } from '../agent/pictures';
 import { ACTIVE_STATUSES, type AgentTask, type StepShot } from '../agent/types';
 import type { ConversationRecord, MessageRecord } from '../shared/types';
+import type { InstalledSkill } from '../skills/skills';
 import type { Watch } from '../watch/watch';
 
 class HelperDatabase extends Dexie {
@@ -15,6 +16,8 @@ class HelperDatabase extends Dexie {
   watches!: Table<Watch, string>;
   /** Small copies of the pictures shown in replies (see pictures.ts). */
   pictures!: Table<ReplyPicture, string>;
+  /** Skills the user installed or wrote, by name (see skills/store.ts). */
+  skills!: Table<InstalledSkill, string>;
 
   constructor() {
     super('browser-helper');
@@ -31,6 +34,9 @@ class HelperDatabase extends Dexie {
     });
     this.version(4).stores({
       pictures: 'id, conversationId',
+    });
+    this.version(5).stores({
+      skills: 'name',
     });
   }
 }

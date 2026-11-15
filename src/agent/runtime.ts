@@ -22,7 +22,8 @@ import { buildAssistantSystemPrompt, currentTabNote, formatView, newTextNote, OU
 import type { TargetInfo } from './page/types';
 import { actionKind, classifyAction, downloadRisk, formSubmission } from './risk';
 import { cachedInstructions, cacheOptions, withBreakpoint } from '../providers/caching';
-import { enabledSkills, findSkill, renderSkill } from '../skills/skills';
+import { enabledSkills, findSkill, findSkillFile, renderSkill, renderSkillFile, type InstalledSkill, type Skill } from '../skills/skills';
+import { listInstalledSkills } from '../skills/store';
 import { saveShot } from '../storage/db';
 import { clampSeconds, WATCH_DAYS, type Watch } from '../watch/watch';
 import { cropPreview, thumbnail } from './screenshot';
@@ -204,6 +205,8 @@ export class AgentRunner {
   private readonly socialPages = new Map<string, Set<string>>();
   /** Skills whose instructions are in this turn's conversation already. */
   private readonly loadedSkills = new Set<string>();
+  /** The skills the user installed, as they were when the turn started. */
+  private installedSkills: InstalledSkill[] = [];
   /** A click held back because it repeated the one before on a button that adds or sends something (see elementAction). */
   private heldRepeat: string | undefined;
   /** How often this turn has come to each page, to notice going back and forth. */
@@ -295,6 +298,7 @@ export class AgentRunner {
     try {
       this.ctl.init(this.settings.agent.useCdp);
       this.main = await resolveModelRef(this.settings, this.task.model);
+      this.installedSkills = await listInstalledSkills().catch(() => []);
       this.messages = await this.initialMessages();
       this.update();
       await this.loop();
@@ -458,9 +462,18 @@ export class AgentRunner {
 
   // ---- Conversation ----
 
+  /** The skills the assistant is told about in this turn. */
+  private skills(): Skill[] {
+    return enabledSkills(this.settings, this.installedSkills);
+  }
+
+  private skill(name: string): Skill | undefined {
+    return findSkill(this.settings, this.installedSkills, name);
+  }
+
   /** The instructions of the skills a request was sent with, as they go with the request; nothing when there are none (any more). */
   private chosenSkills(names: string[] | undefined): string {
-    const chosen = (names ?? []).map((name) => findSkill(this.settings, name)).filter((skill) => skill !== undefined);
+    const chosen = (names ?? []).map((name) => this.skill(name)).filter((skill) => skill !== undefined);
     if (chosen.length === 0) return '';
     // Their text is in the conversation: load_skill need not bring it again.
     for (const skill of chosen) this.loadedSkills.add(skill.name);
@@ -923,11 +936,11 @@ export class AgentRunner {
           mode: this.settings.agent.mode,
           chatOnly,
           readUrl: readsThroughDeepSeek(this.settings.search),
-          skills: enabledSkills(this.settings),
+          skills: this.skills(),
         }),
       ),
       messages,
-      ...(chatOnly ? {} : { tools: toolsFor(this.settings.search, { skills: enabledSkills(this.settings).length > 0 }), toolChoice: atLimit ? ('none' as const) : ('auto' as const) }),
+      ...(chatOnly ? {} : { tools: toolsFor(this.settings.search, { skills: this.skills().length > 0, skillFiles: this.skills().some((skill) => (skill.files ?? []).length > 0) }), toolChoice: atLimit ? ('none' as const) : ('auto' as const) }),
       temperature: this.settings.slots.chat?.temperature,
       providerOptions: cacheOptions(this.main.providerOptions, this.main.connection.vendor, this.task.conversationId),
       abortSignal: this.abort.signal,
@@ -1219,12 +1232,22 @@ export class AgentRunner {
         return 'continue';
       }
       case 'load_skill': {
-        const skill = findSkill(this.settings, str('name'));
-        if (!skill) throw new ActionError(`There is no skill called "${str('name')}". The skills are: ${enabledSkills(this.settings).map((s) => s.name).join(', ') || 'none'}.`);
+        const skill = this.skill(str('name'));
+        if (!skill) throw new ActionError(`There is no skill called "${str('name')}". The skills are: ${this.skills().map((s) => s.name).join(', ') || 'none'}.`);
         action.target = skill.name;
         // Loaded once: its text stays in the conversation.
         action.result = this.loadedSkills.has(skill.name) ? `The skill "${skill.name}" is loaded already; its instructions are above.` : renderSkill(skill);
         this.loadedSkills.add(skill.name);
+        return 'continue';
+      }
+      case 'read_skill_file': {
+        const skill = this.skill(str('skill'));
+        if (!skill) throw new ActionError(`There is no skill called "${str('skill')}". The skills are: ${this.skills().map((s) => s.name).join(', ') || 'none'}.`);
+        const file = findSkillFile(skill, str('path'));
+        const files = (skill.files ?? []).map((f) => f.path);
+        if (!file) throw new ActionError(`The skill "${skill.name}" has no file "${str('path')}". ${files.length > 0 ? `Its files are: ${files.join(', ')}.` : 'It has no files besides its instructions.'}`);
+        action.target = `${skill.name}/${file.path}`;
+        action.result = renderSkillFile(skill, file, args.offset === undefined ? 0 : num('offset'));
         return 'continue';
       }
       case 'watch_page':

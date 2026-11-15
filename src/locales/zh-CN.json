@@ -419,7 +419,8 @@
       "click_at": "在 {{x}}, {{y}} 处点击 {{target}}",
       "research_pages": "调研：{{question}}",
       "watch_page": "盯着 {{site}}：{{condition}}",
-      "load_skill": "使用技能：{{name}}"
+      "load_skill": "使用技能：{{name}}",
+      "read_skill_file": "读取技能文件：{{path}}"
     },
     "directions": {
       "up": "上",
@@ -756,13 +757,14 @@
     "installed": "已安装",
     "installedHint": "你自己写的或安装的技能。输入斜杠加名称来使用。",
     "show": "查看内容",
-    "export": "下载为文件",
+    "export": "下载（zip）",
     "add": {
       "file": "从文件安装",
       "write": "自己写",
-      "address": "技能文件的地址",
-      "addressPlaceholder": "https://…（技能文件，例如 GitHub 上的）",
-      "fetch": "获取"
+      "address": "技能的地址",
+      "addressPlaceholder": "https://github.com/…/skills/名称，或 SKILL.md、zip 的地址",
+      "fetch": "获取",
+      "formats": "技能是一个带 SKILL.md 的文件夹，遵循 Agent Skills 格式。可以选择它的 SKILL.md 或整个文件夹的 zip，也可以填 GitHub 上这个文件夹的地址。"
     },
     "form": {
       "review": "安装前请先读一遍",
@@ -770,26 +772,46 @@
       "change": "修改技能",
       "note": "技能是助手会当作你的话来执行的说明。只安装你读过的。它是文字，不是代码，也不能关掉确认。",
       "name": "名称",
-      "nameHint": "字母、数字和连字符。",
-      "description": "什么时候用",
-      "descriptionHint": "一行。助手始终能看到，并据此决定用不用。",
+      "nameHint": "按 Agent Skills 规范，只能用小写英文字母、数字和连字符，与技能文件夹同名。",
+      "description": "做什么、什么时候用",
+      "descriptionHint": "最多 {{max}} 个字符。助手始终能看到它，并据此决定要不要加载这个技能。",
       "instructions": "内容",
       "instructionsHint": "{{used}} / {{max}} 字符",
       "sites": "提到的网站：{{sites}}",
-      "install": "安装"
+      "install": "安装",
+      "license": "许可证",
+      "compatibility": "运行要求",
+      "allowedTools": "allowed-tools",
+      "allowedToolsNote": "在这里不会预先批准任何操作",
+      "files_other": "{{count}} 个文件",
+      "skipped_other": "{{count}} 个文件未安装",
+      "skippedReason": {
+        "script": "脚本：本扩展不运行任何代码",
+        "binary": "不是文本",
+        "large": "超过 200 KB",
+        "many": "超出 50 个文件或 1 MB 的上限"
+      }
     },
     "errors": {
-      "header": "这不是技能文件：开头要有夹在两行「---」之间的头部（name、description）。",
-      "name": "请填写名称。",
+      "header": "这不是技能：SKILL.md 开头要有夹在两行「---」之间的头部（name、description）。",
       "builtinName": "这是内置技能的名称，请换一个。",
       "taken": "已安装同名技能。",
-      "description": "请用一行说明什么时候用。",
-      "descriptionLong": "说明太长。",
+      "description": "请说明它做什么、什么时候用。",
+      "descriptionLong": "说明超过 1024 个字符。",
       "instructions": "技能没有内容。",
-      "instructionsLong": "内容太长。",
+      "instructionsLong": "内容超过 50000 个字符。",
       "tooMany": "最多安装 {{max}} 个技能。",
       "address": "请输入以 https:// 开头的地址。",
-      "fetch": "文件获取失败。请下载后用「从文件安装」。"
-    }
+      "fetch": "技能获取失败。请下载后用「从文件安装」。",
+      "nameRule": "名称只能用小写英文字母、数字和单个连字符，不能以连字符开头或结尾，最多 64 个字符。",
+      "dirName": "文件夹叫「{{detail}}」，和技能名称不一致。Agent Skills 规范要求两者相同。",
+      "compatibilityLong": "compatibility 字段超过 500 个字符。",
+      "noSkillFile": "没有找到 SKILL.md。",
+      "several": "里面有多个技能（{{detail}}），请一个一个安装。",
+      "archive": "zip 文件读不了。",
+      "tooLarge": "文件超过 20 MB。",
+      "name": "请填写名称。"
+    },
+    "rename": "名称不符合 Agent Skills 规范，改名后才能使用。"
   }
 }

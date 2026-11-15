@@ -114,7 +114,7 @@ function sensitiveField(target: TargetInfo): Classification | undefined {
   return undefined;
 }
 
-const READ_ONLY_TOOLS = new Set(['read_page', 'view_page', 'scroll', 'wait', 'extract', 'look', 'web_search', 'read_url', 'research_pages', 'load_skill', 'hover', 'switch_tab', 'ask_user', 'hand_off']);
+const READ_ONLY_TOOLS = new Set(['read_page', 'view_page', 'scroll', 'wait', 'extract', 'look', 'web_search', 'read_url', 'research_pages', 'load_skill', 'read_skill_file', 'hover', 'switch_tab', 'ask_user', 'hand_off']);
 
 /**
  * A search box whose Enter only runs a search. A page names its fields as it

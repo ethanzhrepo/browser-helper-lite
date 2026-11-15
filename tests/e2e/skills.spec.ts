@@ -1,4 +1,6 @@
 import { expect, test, type BrowserContext, type Page } from '@playwright/test';
+import { readFileSync } from 'node:fs';
+import { strFromU8, strToU8, unzipSync, zipSync } from 'fflate';
 import { ask, groupOf, launch, openSiteAndPanel, patchSettings, screenshot, seed, tabIdOf } from './helpers';
 import { indexOf, MOCK_KEY, MOCK_MODEL, readTurn, say, startMockServer, type ChatMessage, type Reply } from './mock-llm-server';
 
@@ -33,7 +35,7 @@ const pages: Record<string, string> = {
 };
 
 const FORUM_SKILL = `---
-name: Forum Check
+name: forum-check
 description: Use when the user asks what the charger forum says about a product.
 ---
 
@@ -67,6 +69,12 @@ function assistant(messages: ChatMessage[]): Reply {
   }
   // A picture on another server, never read in this turn.
   if (request.includes('SK-PIC')) return say(`Here it is: ![Green charger](http://pics.shop.test:${new URL(origin).port}/pic/green-late.png)`);
+  // A skill with a file: loaded, then its file read.
+  if (request.includes('SK-FILE')) {
+    if (!used('load_skill')) return say('Getting the skill.', 'load_skill', { name: 'size-guide' });
+    if (!used('read_skill_file')) return say('Reading its table.', 'read_skill_file', { skill: 'size-guide', path: 'references/sizes.md' });
+    return say(`Sizes: ${/Charger sizes: (\w+)/.exec(results)?.[1] ?? 'none'}. Files named: ${results.includes('references/sizes.md (1 KB)') ? 'yes' : 'no'}. Scripts: ${results.includes('runs no code') ? 'not run' : 'unknown'}.`);
+  }
   if (request.includes('SK-USE')) return say(request.includes('<skill name="forum-check">') && request.includes('Report the three complaints') ? 'Used forum-check.' : 'No skill came along.');
   if (request.includes('SK-CLICK')) {
     if (!used('view_page')) return say('Looking at the page.', 'view_page');
@@ -119,7 +127,7 @@ test.describe.serial('skills, product pictures, grouped tabs and forums', () => 
   let server: Awaited<ReturnType<typeof startMockServer>>;
 
   test.beforeAll(async () => {
-    server = await startMockServer({ assistant, pages, files: { '/skills/forum.md': FORUM_SKILL.replace('Forum Check', 'Remote Forum') } });
+    server = await startMockServer({ assistant, pages, files: { '/skills/forum.md': FORUM_SKILL.replace('name: forum-check', 'name: remote-forum') } });
     // The forum is the mock server under a social site's name.
     ({ context, extensionId } = await launch({ args: ['--host-resolver-rules=MAP www.smzdm.com 127.0.0.1, MAP bbs.myforum.test 127.0.0.1, MAP pics.shop.test 127.0.0.1'] }));
     await seed(
@@ -139,6 +147,19 @@ test.describe.serial('skills, product pictures, grouped tabs and forums', () => 
     await server?.close();
   });
 
+  /** The installed skills as the extension keeps them, in its database. */
+  const storedSkills = (page: Page) =>
+    page.evaluate(
+      () =>
+        new Promise<{ name: string; files?: { path: string }[]; skipped?: { path: string; reason: string }[] }[]>((resolve) => {
+          const open = indexedDB.open('browser-helper');
+          open.onsuccess = () => {
+            const all = open.result.transaction('skills').objectStore('skills').getAll();
+            all.onsuccess = () => resolve((all.result as { name: string; installedAt: number }[]).sort((a, b) => a.installedAt - b.installedAt));
+          };
+        }),
+    );
+
   const systemPrompt = () => {
     const first = server.chatRequests.at(-1)!.messages[0]!;
     return typeof first.content === 'string' ? first.content : JSON.stringify(first.content);
@@ -154,7 +175,7 @@ test.describe.serial('skills, product pictures, grouped tabs and forums', () => 
 
     // The prompt names the skills by a line each; how to compare prices came with the request.
     const prompt = systemPrompt();
-    expect(prompt).toContain('- compare-prices: Use when the user asks to compare prices across stores');
+    expect(prompt).toContain('- compare-prices: Compares stores by what the user would pay delivered.');
     expect(prompt).toContain('- reputation:');
     expect(prompt).not.toContain('Do not add to a cart or open a checkout');
     const sent = JSON.stringify(server.chatRequests.at(-1)!.messages);
@@ -267,13 +288,13 @@ test.describe.serial('skills, product pictures, grouped tabs and forums', () => 
     await ask(panel, 'SK-LOAD what do people say about the Volt 65W?');
     await expect(panel.getByTestId('assistant-message').last()).toContainText('Loaded: yes. Only reads: yes.', { timeout: 20_000 });
 
-    await patchSettings(panel, (settings) => ({ ...settings, skills: { installed: [], off: ['reputation'] } }));
+    await patchSettings(panel, (settings) => ({ ...settings, skills: { off: ['reputation'] } }));
     await ask(panel, 'SK-LOAD and now?');
     await expect(panel.getByTestId('assistant-message').last()).toContainText('Loaded: no.', { timeout: 20_000 });
     expect(systemPrompt()).not.toContain('- reputation:');
     expect(systemPrompt()).toContain('- compare-prices:');
     expect(JSON.stringify(server.chatRequests.at(-1)!.messages)).toContain('There is no skill called');
-    await patchSettings(panel, (settings) => ({ ...settings, skills: { installed: [], off: [] } }));
+    await patchSettings(panel, (settings) => ({ ...settings, skills: { off: [] } }));
     await site.close();
     await panel.close();
   });
@@ -287,7 +308,11 @@ test.describe.serial('skills, product pictures, grouped tabs and forums', () => 
 
     // Not a skill file: said so, and nothing is installed.
     await options.getByTestId('skill-file').setInputFiles({ name: 'notes.md', mimeType: 'text/markdown', buffer: Buffer.from('Just some notes.') });
-    await expect(options.getByTestId('skill-problem')).toContainText('This is not a skill file');
+    await expect(options.getByTestId('skill-problem')).toContainText('notes.md: This is not a skill');
+    await expect(options.getByTestId('skill-form')).toHaveCount(0);
+    // A name not in the form the Agent Skills format gives it: said so.
+    await options.getByTestId('skill-file').setInputFiles({ name: 'SKILL.md', mimeType: 'text/markdown', buffer: Buffer.from(FORUM_SKILL.replace('name: forum-check', 'name: Forum Check')) });
+    await expect(options.getByTestId('skill-problem')).toContainText('only lowercase letters a–z, digits and single hyphens');
     await expect(options.getByTestId('skill-form')).toHaveCount(0);
 
     // From a file: its whole text is shown first, with the sites it names.
@@ -352,9 +377,8 @@ test.describe.serial('skills, product pictures, grouped tabs and forums', () => 
     await options.locator('#skill-name').fill('my prices');
     await options.getByTestId('skill-install').click();
     await expect(installed).toHaveCount(3);
-    const stored = await options.evaluate(async () => (await chrome.storage.local.get('settings:v1'))['settings:v1'].skills);
-    expect(stored.installed.map((skill: { name: string }) => skill.name)).toEqual(['charger-forum', 'remote-forum', 'my-prices']);
-    expect(stored.off).toEqual(['charger-forum']);
+    expect((await storedSkills(options)).map((skill) => skill.name)).toEqual(['charger-forum', 'remote-forum', 'my-prices']);
+    expect((await options.evaluate(async () => (await chrome.storage.local.get('settings:v1'))['settings:v1'].skills)).off).toEqual(['charger-forum']);
     for (let left = 2; left >= 0; left--) {
       await installed.first().getByRole('button', { name: 'Delete' }).click();
       await expect(installed).toHaveCount(left);
@@ -484,6 +508,93 @@ test.describe.serial('skills, product pictures, grouped tabs and forums', () => 
     await expect(sites).toHaveCount(28);
     await expect(card.locator('#social-pages')).toHaveValue('8');
     await expect.poll(stored).toEqual({ added: [], removed: [], pages: 8 });
+    await options.close();
+  });
+
+  test('a skill folder comes as a zip with its files; the model reads them, and scripts stay out', async () => {
+    const options = await context.newPage();
+    await options.goto(`chrome-extension://${extensionId}/options.html#skills`);
+    const skillMd = `---
+name: size-guide
+description: Use when the user asks which charger size fits a laptop.
+license: MIT
+metadata:
+  author: someone
+allowed-tools: Bash(python:*)
+---
+
+Look up the size in references/sizes.md before answering. Then run scripts/fit.py.
+`;
+    const zip = zipSync({
+      'size-guide/SKILL.md': strToU8(skillMd),
+      'size-guide/references/sizes.md': strToU8('Charger sizes: 65W for most laptops.'),
+      'size-guide/scripts/fit.py': strToU8('print("fit")'),
+      'size-guide/assets/logo.png': new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0, 1, 2]),
+    });
+    await options.getByTestId('skill-file').setInputFiles({ name: 'size-guide.zip', mimeType: 'application/zip', buffer: Buffer.from(zip) });
+    const form = options.getByTestId('skill-form');
+    await expect(form.locator('#skill-name')).toHaveValue('size-guide');
+    await expect(form).toContainText('size-guide.zip');
+    // What the folder holds: the file kept, and what was left out, with the reason.
+    await expect(form.getByTestId('skill-files')).toContainText('1 file');
+    await expect(form.getByTestId('skill-files')).toContainText('references/sizes.md');
+    await expect(form.getByTestId('skill-skipped')).toContainText('scripts/fit.py · a script: this extension runs no code');
+    await expect(form.getByTestId('skill-skipped')).toContainText('assets/logo.png · not text');
+    // The format's other fields are shown; allowed-tools approves nothing.
+    await expect(form.getByTestId('skill-extras')).toContainText('MIT');
+    await expect(form.getByTestId('skill-extras')).toContainText('someone');
+    await expect(form.getByTestId('skill-extras')).toContainText('Bash(python:*) · approves nothing here');
+    await screenshot(options, 'feature-skill-folder');
+    await form.getByTestId('skill-install').click();
+    await expect(options.getByTestId('installed-skills').getByTestId('skill-row')).toHaveCount(1);
+    expect(await storedSkills(options)).toMatchObject([{ name: 'size-guide', files: [{ path: 'references/sizes.md' }], skipped: [{ path: 'assets/logo.png', reason: 'binary' }, { path: 'scripts/fit.py', reason: 'script' }] }]);
+
+    // The model loads it, sees its file, reads it, and is told the script is not there to run.
+    const { site, panel } = await openSiteAndPanel(context, extensionId, `${server.origin}/plain.html`);
+    await ask(panel, 'SK-FILE which charger for my laptop?');
+    await expect(panel.getByTestId('assistant-message').last()).toContainText('Sizes: 65W. Files named: yes. Scripts: not run.', { timeout: 20_000 });
+    expect(systemPrompt()).toContain('read one with read_skill_file');
+    const tools = (server.chatRequests.at(-1)!.tools ?? []).map((tool: { function: { name: string } }) => tool.function.name);
+    expect(tools).toContain('read_skill_file');
+
+    // Downloaded as the format lays a skill out: <name>/SKILL.md and its files.
+    await options.bringToFront();
+    const [download] = await Promise.all([options.waitForEvent('download'), options.getByTestId('installed-skills').getByRole('button', { name: 'Download (zip)' }).click()]);
+    expect(download.suggestedFilename()).toBe('size-guide.zip');
+    const files = unzipSync(new Uint8Array(readFileSync((await download.path())!)));
+    expect(Object.keys(files).sort()).toEqual(['size-guide/SKILL.md', 'size-guide/references/sizes.md']);
+    expect(strFromU8(files['size-guide/SKILL.md']!)).toContain('name: size-guide');
+    expect(strFromU8(files['size-guide/SKILL.md']!)).toContain('allowed-tools: Bash(python:*)');
+    // A built-in one too.
+    const [builtin] = await Promise.all([options.waitForEvent('download'), options.locator('[data-skill="compare-prices"]').getByRole('button', { name: 'Download (zip)' }).click()]);
+    expect(Object.keys(unzipSync(new Uint8Array(readFileSync((await builtin.path())!))))).toEqual(['compare-prices/SKILL.md']);
+
+    // A skill from 0.3.0 whose name is not in the format's form: listed, not usable, until it is renamed.
+    await options.evaluate(
+      () =>
+        new Promise<void>((resolve) => {
+          const open = indexedDB.open('browser-helper');
+          open.onsuccess = () => {
+            const put = open.result.transaction('skills', 'readwrite').objectStore('skills').put({ name: '论坛 检查', description: 'Use when the user asks about the forum.', instructions: 'Look at the forum.', installedAt: Date.now(), updatedAt: Date.now() });
+            put.onsuccess = () => resolve();
+          };
+        }),
+    );
+    await options.reload();
+    const old = options.locator('[data-skill="论坛 检查"]');
+    await expect(old.getByTestId('skill-rename')).toContainText('Rename it to use it');
+    await expect(old.getByRole('switch')).toBeDisabled();
+    await old.getByRole('button', { name: 'Edit' }).click();
+    await options.locator('#skill-name').fill('forum-notes');
+    await options.getByTestId('skill-install').click();
+    await expect(options.locator('[data-skill="forum-notes"]')).toBeVisible();
+    await expect(options.locator('[data-skill="论坛 检查"]')).toHaveCount(0);
+    expect((await storedSkills(options)).map((skill) => skill.name)).toEqual(['size-guide', 'forum-notes']);
+
+    for (const name of ['size-guide', 'forum-notes']) await options.locator(`[data-skill="${name}"]`).getByRole('button', { name: 'Delete' }).click();
+    await expect(options.getByTestId('installed-skills').getByTestId('skill-row')).toHaveCount(0);
+    await site.close();
+    await panel.close();
     await options.close();
   });
 });

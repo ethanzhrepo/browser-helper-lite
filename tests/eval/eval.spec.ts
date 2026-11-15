@@ -469,10 +469,20 @@ TASKS.push(...SHOPPING);
 const loaded = (outcome: Outcome) => (outcome.task?.steps ?? []).flatMap((step) => step.actions.filter((action) => action.tool === 'load_skill' && action.status !== 'error').map((action) => String(action.args.name)));
 const pictures = (env: Env) => env.panel.getByTestId('assistant-message').last().getByTestId('reply-picture').count();
 const links = (env: Env) => env.panel.getByTestId('assistant-message').last().locator('a[href]').evaluateAll((anchors) => anchors.map((anchor) => (anchor as HTMLAnchorElement).href));
+/** Installs skills (in the extension's database, as the settings page does) and turns some off (in the settings). */
 const setSkills = (env: Env, skills: { installed: { name: string; description: string; instructions: string }[]; off: string[] }) =>
-  env.panel.evaluate(async (value) => {
+  env.panel.evaluate(async ({ installed, off }) => {
+    await new Promise<void>((resolve) => {
+      const open = indexedDB.open('browser-helper');
+      open.onsuccess = () => {
+        const store = open.result.transaction('skills', 'readwrite').objectStore('skills');
+        store.clear();
+        for (const [index, skill] of installed.entries()) store.put({ ...skill, installedAt: index, updatedAt: index });
+        store.transaction.oncomplete = () => resolve();
+      };
+    });
     const stored = (await chrome.storage.local.get('settings:v1'))['settings:v1'];
-    await chrome.storage.local.set({ 'settings:v1': { ...stored, skills: value } });
+    await chrome.storage.local.set({ 'settings:v1': { ...stored, skills: { off } } });
   }, skills);
 
 /** Skills: loaded when the work is theirs, left alone when it is not, and followed. */
@@ -658,10 +668,21 @@ test.describe.serial('evaluation with a real model', () => {
             const stored = (await chrome.storage.local.get('settings:v1'))['settings:v1'];
             await chrome.storage.local.set({
               // Every task starts with the skills as they come: all built in, none installed.
-              'settings:v1': { ...stored, skills: { installed: [], off: [] }, slots: { ...stored.slots, chat: { connectionId: 'eval', modelId: model } }, agent: { ...stored.agent, mode: 'auto', screenshots: main ? 'main' : 'auto' } },
+              'settings:v1': { ...stored, skills: { off: [] }, slots: { ...stored.slots, chat: { connectionId: 'eval', modelId: model } }, agent: { ...stored.agent, mode: 'auto', screenshots: main ? 'main' : 'auto' } },
             });
           },
           { model: task.model === 'vision' ? VISION_MODEL : MODEL, main: task.model === 'vision' },
+        );
+        // None installed.
+        await page.evaluate(
+          () =>
+            new Promise<void>((resolve) => {
+              const open = indexedDB.open('browser-helper');
+              open.onsuccess = () => {
+                const clear = open.result.transaction('skills', 'readwrite').objectStore('skills').clear();
+                clear.onsuccess = () => resolve();
+              };
+            }),
         );
         await page.close();
       })();

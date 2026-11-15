@@ -56,6 +56,7 @@ export function actionLabel(t: TFunction, action: AgentAction): string {
     seconds: String(a.seconds ?? ''),
     condition: clip(String(a.condition ?? ''), 120),
     name: String(a.name ?? ''),
+    path: String(a.path ?? ''),
     site: hostOf(a.url),
     x: String(Math.round(Number(a.x ?? 0))),
     y: String(Math.round(Number(a.y ?? 0))),

@@ -14,6 +14,7 @@ import { useTabConversation } from '../../src/chat/useTabConversation';
 import { isRestrictedUrl, requestHostAccess } from '../../src/permissions/hosts';
 import type { AgentMode, ContextKind, ContextSnapshot, ErrorInfo, Locale, MessageImage, MessageRecord, SavedCommand } from '../../src/shared/types';
 import { enabledSkills, type Skill } from '../../src/skills/skills';
+import { useInstalledSkills } from '../../src/skills/useInstalledSkills';
 import { deriveTitle, newId, renameConversation, truncateConversation } from '../../src/storage/db';
 import { DEFAULT_VOICE_SETTINGS, updateSettings } from '../../src/storage/settings';
 import { linkTab, unlinkTab } from '../../src/storage/tab-conversations';
@@ -65,6 +66,7 @@ export function App() {
   const [tabContexts, setTabContexts] = useState<ContextSnapshot[]>([]);
   /** Parts of the page marked to ask about. */
   const [images, setImages] = useState<MessageImage[]>([]);
+  const installedSkills = useInstalledSkills();
   /** Skills chosen for the request in the box, with what to call them on the chip. */
   const [picked, setPicked] = useState<{ name: string; label: string }[]>([]);
   /** The saved command the request in the box was started from. */
@@ -578,7 +580,7 @@ export function App() {
               }}
               command={command}
               onRemoveCommand={() => setCommand(undefined)}
-              skills={enabledSkills(settings).filter((skill) => !skill.builtin)}
+              skills={enabledSkills(settings, installedSkills).filter((skill) => !skill.builtin)}
               onSkill={(skill: Skill) => setPicked((previous) => [...previous.filter((p) => p.name !== skill.name), { name: skill.name, label: skill.name }])}
               picked={picked}
               onRemovePicked={(name) => setPicked((previous) => previous.filter((p) => p.name !== name))}

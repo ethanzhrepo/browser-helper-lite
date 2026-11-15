@@ -1,4 +1,4 @@
-import { neutralizeControlTokens, redactSensitive } from '../agent/injection';
+import { escapeTrustedTags, neutralizeControlTokens, redactSensitive } from '../agent/injection';
 import type { ContextSnapshot, MessageRecord } from '../shared/types';
 
 export interface ChatTurn {
@@ -13,7 +13,7 @@ function escapeAttribute(value: string): string {
 export function renderContext(context: ContextSnapshot): string {
   // Escape our tag so page text cannot end its block or open a fake one; card
   // numbers, keys and chat control tokens never reach the model (§8.2).
-  const body = neutralizeControlTokens(redactSensitive(context.content)).replace(/<(\/?)context\b/gi, '&lt;$1context');
+  const body = escapeTrustedTags(neutralizeControlTokens(redactSensitive(context.content))).replace(/<(\/?)context\b/gi, '&lt;$1context');
   const attributes = [
     `type="${context.kind}"`,
     `title="${escapeAttribute(neutralizeControlTokens(context.title.replace(/\s+/g, ' ').trim().slice(0, 200)))}"`,
@@ -48,7 +48,8 @@ export function buildHistory(messages: MessageRecord[], note?: (message: Message
       turn = { role: 'user', content: extra ? `${renderUserMessage(message)}\n\n${extra}` : renderUserMessage(message) };
     }
     if (message.role === 'assistant' && (message.status === 'done' || (message.status === 'aborted' && message.content.trim()))) {
-      turn = { role: 'assistant', content: message.content };
+      // A reply may quote a page; a skill block in it is not one.
+      turn = { role: 'assistant', content: escapeTrustedTags(message.content) };
     }
     if (!turn) continue;
     const previous = turns.at(-1);

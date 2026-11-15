@@ -112,6 +112,14 @@ export function neutralizeControlTokens(text: string): string {
   return text.replace(/<\|([a-z_]+)\|>/gi, '<$1>').replace(/\[(\/?)INST\]/g, '($1INST)').replace(/<<(\/?)SYS>>/g, '($1SYS)');
 }
 
+/** Tags the prompt trusts: the extension writes them, and data from the web must never hold one. */
+const TRUSTED_TAGS = /<(\/?)(skill_file|skill)\b/gi;
+
+/** Escapes the tags the prompt trusts (skill blocks), so that text from a page cannot pose as one. */
+export function escapeTrustedTags(text: string): string {
+  return text.replace(TRUSTED_TAGS, '&lt;$1$2');
+}
+
 /** Random id that marks where untrusted data really ends; a page cannot guess it. */
 export function newBoundary(): string {
   const bytes = new Uint8Array(6);
@@ -121,11 +129,13 @@ export function newBoundary(): string {
 
 /**
  * Wraps untrusted text in `<tag id="…">…</tag id="…">`. Any `<tag` inside is
- * escaped, so the content cannot close the block early or open a fake one.
- * Card numbers and credentials are hidden first.
+ * escaped, so the content cannot close the block early or open a fake one,
+ * and so is `<skill`: the prompt trusts skill blocks, which only the
+ * extension writes (see escapeTrustedTags). Card numbers and credentials are
+ * hidden first.
  */
 export function wrapUntrusted(tag: string, boundary: string, attributes: Record<string, string>, body: string): string {
-  const escaped = neutralizeControlTokens(redactSensitive(body)).replace(new RegExp(`<(/?)${tag}\\b`, 'gi'), '&lt;$1' + tag);
+  const escaped = escapeTrustedTags(neutralizeControlTokens(redactSensitive(body))).replace(new RegExp(`<(/?)${tag}\\b`, 'gi'), '&lt;$1' + tag);
   const attrs = Object.entries(attributes)
     .map(([key, value]) => ` ${key}="${redactSensitive(value).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;')}"`)
     .join('');

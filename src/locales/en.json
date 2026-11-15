@@ -426,7 +426,8 @@
       "click_at": "Click {{target}} at {{x}}, {{y}}",
       "research_pages": "Research: {{question}}",
       "watch_page": "Watch {{site}}: {{condition}}",
-      "load_skill": "Use the skill: {{name}}"
+      "load_skill": "Use the skill: {{name}}",
+      "read_skill_file": "Reading {{path}}"
     },
     "directions": {
       "up": "up",
@@ -767,13 +768,14 @@
     "installed": "Installed",
     "installedHint": "Skills you wrote or installed. Type a slash and the name to use one.",
     "show": "Show the instructions",
-    "export": "Download as a file",
+    "export": "Download (zip)",
     "add": {
       "file": "From a file",
       "write": "Write one",
-      "address": "Address of a skill file",
-      "addressPlaceholder": "https://… (a skill file, e.g. on GitHub)",
-      "fetch": "Fetch"
+      "address": "Address of a skill",
+      "addressPlaceholder": "https://github.com/…/skills/name, or the address of a SKILL.md or a zip",
+      "fetch": "Fetch",
+      "formats": "A skill is a folder with a SKILL.md, in the Agent Skills format. Choose its SKILL.md or a zip of the folder, or give the address of the folder on GitHub."
     },
     "form": {
       "review": "Read it before installing",
@@ -781,26 +783,48 @@
       "change": "Change the skill",
       "note": "A skill is instructions the assistant follows as if they were yours. Install only what you have read. It is text, not code, and cannot turn off approvals.",
       "name": "Name",
-      "nameHint": "Letters, digits and hyphens.",
-      "description": "When to use it",
-      "descriptionHint": "One line. The assistant always sees it, and decides by it.",
+      "nameHint": "Lowercase letters a–z, digits and hyphens, as the Agent Skills format requires. The name of the skill's folder.",
+      "description": "What it does and when to use it",
+      "descriptionHint": "Up to {{max}} characters. The assistant always sees it, and decides by it whether to load the skill.",
       "instructions": "Instructions",
       "instructionsHint": "{{used}} of {{max}} characters",
       "sites": "Sites it names: {{sites}}",
-      "install": "Install"
+      "install": "Install",
+      "license": "License",
+      "compatibility": "Needs",
+      "allowedTools": "allowed-tools",
+      "allowedToolsNote": "approves nothing here",
+      "files_one": "{{count}} file",
+      "files_other": "{{count}} files",
+      "skipped_one": "{{count}} file not installed",
+      "skipped_other": "{{count}} files not installed",
+      "skippedReason": {
+        "script": "a script: this extension runs no code",
+        "binary": "not text",
+        "large": "larger than 200 KB",
+        "many": "over the limit of 50 files or 1 MB"
+      }
     },
     "errors": {
-      "header": "This is not a skill file: it must start with a header (name, description) between two lines of \"---\".",
-      "name": "The skill needs a name.",
+      "header": "This is not a skill: a SKILL.md starts with a header (name, description) between two lines of \"---\".",
       "builtinName": "A built-in skill has this name. Choose another.",
       "taken": "A skill with this name is installed already.",
-      "description": "Say when to use it, in one line.",
-      "descriptionLong": "The description is too long.",
+      "description": "Say what it does and when to use it.",
+      "descriptionLong": "The description is longer than 1024 characters.",
       "instructions": "The skill has no instructions.",
-      "instructionsLong": "The instructions are too long.",
+      "instructionsLong": "The instructions are longer than 50,000 characters.",
       "tooMany": "No more than {{max}} skills can be installed.",
       "address": "Enter an address that starts with https://.",
-      "fetch": "The file could not be fetched. Download it and use \"From a file\"."
-    }
+      "fetch": "The skill could not be fetched. Download it and use \"From a file\".",
+      "nameRule": "The name may hold only lowercase letters a–z, digits and single hyphens, and not start or end with a hyphen (at most 64 characters).",
+      "dirName": "The folder is called \"{{detail}}\", but the skill's name is different. In the Agent Skills format they are the same.",
+      "compatibilityLong": "The compatibility field is longer than 500 characters.",
+      "noSkillFile": "No SKILL.md found.",
+      "several": "This holds several skills ({{detail}}). Install them one at a time.",
+      "archive": "The zip file could not be read.",
+      "tooLarge": "The file is larger than 20 MB.",
+      "name": "The skill needs a name."
+    },
+    "rename": "Its name is not in the Agent Skills form. Rename it to use it."
   }
 }

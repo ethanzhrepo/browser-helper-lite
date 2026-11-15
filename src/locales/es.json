@@ -433,7 +433,8 @@
       "click_at": "Pulsar {{target}} en {{x}}, {{y}}",
       "research_pages": "Investigar: {{question}}",
       "watch_page": "Vigilar {{site}}: {{condition}}",
-      "load_skill": "Usar la habilidad: {{name}}"
+      "load_skill": "Usar la habilidad: {{name}}",
+      "read_skill_file": "Leyendo {{path}}"
     },
     "directions": {
       "up": "arriba",
@@ -778,13 +779,14 @@
     "installed": "Instaladas",
     "installedHint": "Las habilidades que escribiste o instalaste. Escribe una barra y el nombre para usar una.",
     "show": "Ver las instrucciones",
-    "export": "Descargar como archivo",
+    "export": "Descargar (zip)",
     "add": {
       "file": "Desde un archivo",
       "write": "Escribir una",
-      "address": "Dirección de un archivo de habilidad",
-      "addressPlaceholder": "https://… (un archivo de habilidad, p. ej. en GitHub)",
-      "fetch": "Obtener"
+      "address": "Dirección de una habilidad",
+      "addressPlaceholder": "https://github.com/…/skills/nombre, o la dirección de un SKILL.md o un zip",
+      "fetch": "Obtener",
+      "formats": "Una habilidad es una carpeta con un SKILL.md, en formato Agent Skills. Elige su SKILL.md o un zip de la carpeta, o da la dirección de la carpeta en GitHub."
     },
     "form": {
       "review": "Léela antes de instalarla",
@@ -792,26 +794,50 @@
       "change": "Cambiar la habilidad",
       "note": "Una habilidad son instrucciones que el asistente sigue como si fueran tuyas. Instala solo lo que hayas leído. Es texto, no código, y no puede desactivar las aprobaciones.",
       "name": "Nombre",
-      "nameHint": "Letras, dígitos y guiones.",
-      "description": "Cuándo usarla",
-      "descriptionHint": "Una línea. El asistente siempre la ve y decide por ella.",
+      "nameHint": "Letras minúsculas a–z, dígitos y guiones, como exige el formato Agent Skills. El nombre de la carpeta de la habilidad.",
+      "description": "Qué hace y cuándo usarla",
+      "descriptionHint": "Hasta {{max}} caracteres. El asistente siempre la ve y decide por ella si cargar la habilidad.",
       "instructions": "Instrucciones",
       "instructionsHint": "{{used}} de {{max}} caracteres",
       "sites": "Sitios que nombra: {{sites}}",
-      "install": "Instalar"
+      "install": "Instalar",
+      "license": "Licencia",
+      "compatibility": "Requisitos",
+      "allowedTools": "allowed-tools",
+      "allowedToolsNote": "no aprueba nada aquí",
+      "files_one": "{{count}} archivo",
+      "files_many": "{{count}} archivos",
+      "files_other": "{{count}} archivos",
+      "skipped_one": "{{count}} archivo no instalado",
+      "skipped_many": "{{count}} archivos no instalados",
+      "skipped_other": "{{count}} archivos no instalados",
+      "skippedReason": {
+        "script": "un script: esta extensión no ejecuta código",
+        "binary": "no es texto",
+        "large": "más de 200 KB",
+        "many": "por encima de 50 archivos o 1 MB"
+      }
     },
     "errors": {
-      "header": "No es un archivo de habilidad: debe empezar con un encabezado (name, description) entre dos líneas de «---».",
-      "name": "La habilidad necesita un nombre.",
+      "header": "No es una habilidad: un SKILL.md empieza con un encabezado (name, description) entre dos líneas de «---».",
       "builtinName": "Una habilidad integrada tiene este nombre. Elige otro.",
       "taken": "Ya hay instalada una habilidad con este nombre.",
-      "description": "Di en una línea cuándo usarla.",
-      "descriptionLong": "La descripción es demasiado larga.",
+      "description": "Di qué hace y cuándo usarla.",
+      "descriptionLong": "La descripción supera los 1024 caracteres.",
       "instructions": "La habilidad no tiene instrucciones.",
-      "instructionsLong": "Las instrucciones son demasiado largas.",
+      "instructionsLong": "Las instrucciones superan los 50 000 caracteres.",
       "tooMany": "No se pueden instalar más de {{max}} habilidades.",
       "address": "Escribe una dirección que empiece por https://.",
-      "fetch": "No se pudo obtener el archivo. Descárgalo y usa «Desde un archivo»."
-    }
+      "fetch": "No se pudo obtener la habilidad. Descárgala y usa «Desde un archivo».",
+      "nameRule": "El nombre solo puede tener letras minúsculas a–z, dígitos y guiones simples, sin guion al principio ni al final (64 caracteres como máximo).",
+      "dirName": "La carpeta se llama «{{detail}}», pero la habilidad tiene otro nombre. En el formato Agent Skills son iguales.",
+      "compatibilityLong": "El campo compatibility supera los 500 caracteres.",
+      "noSkillFile": "No se encontró ningún SKILL.md.",
+      "several": "Contiene varias habilidades ({{detail}}). Instálalas de una en una.",
+      "archive": "No se pudo leer el archivo zip.",
+      "tooLarge": "El archivo supera los 20 MB.",
+      "name": "La habilidad necesita un nombre."
+    },
+    "rename": "Su nombre no sigue el formato Agent Skills. Cámbialo para usarla."
   }
 }

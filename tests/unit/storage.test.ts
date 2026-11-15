@@ -23,6 +23,7 @@ import {
   searchMessages,
   truncateConversation,
 } from '../../src/storage/db';
+import { installSkill, listInstalledSkills } from '../../src/skills/store';
 import {
   deleteConnection,
   getApiKey,
@@ -271,23 +272,37 @@ describe('backups', () => {
   });
 
   it('keeps installed skills and the pictures of replies, and erases the pictures with their conversation', async () => {
-    const skill = { name: 'forum-check', description: 'Use when the user asks what the forum says.', instructions: 'Search the forum.' };
-    await updateSettings((s) => ({ ...s, skills: { installed: [skill], off: ['deal-check'] } }));
+    const skill = { name: 'forum-check', description: 'Use when the user asks what the forum says.', instructions: 'Search the forum.', files: [{ path: 'references/a.md', text: 'A' }] };
+    await db.skills.clear();
+    await installSkill(skill);
+    await updateSettings((s) => ({ ...s, skills: { off: ['deal-check'] } }));
     const conversation = await createConversation('Chargers');
     await appendMessage({ conversationId: conversation.id, role: 'user', content: 'Compare', status: 'done', skills: ['compare-prices'] });
     const picture = { id: `${conversation.id} https://cdn.shop.test/volt.jpg`, conversationId: conversation.id, url: 'https://cdn.shop.test/volt.jpg', image: 'AAAA', mediaType: 'image/webp', width: 200, height: 160, at: 1 };
     await savePicture(picture);
     const backup = parseBackup(JSON.stringify(await buildBackup({ includeKeys: false })));
     expect(backup.pictures).toEqual([picture]);
+    expect(backup.skills).toMatchObject([skill]);
+    // Installed skills go with the settings, also without the conversations.
+    expect((await buildBackup({ includeKeys: false, includeConversations: false })).skills).toMatchObject([skill]);
 
     await clearConversations();
     expect(await db.pictures.count()).toBe(0);
     fakeBrowser.reset();
-    expect((await loadSettings()).skills).toEqual({ installed: [], off: [] });
-    await restoreBackup(backup);
-    expect((await loadSettings()).skills).toEqual({ installed: [skill], off: ['deal-check'] });
+    await db.skills.clear();
+    expect((await loadSettings()).skills).toEqual({ off: [] });
+    expect(await restoreBackup(backup)).toMatchObject({ skills: 1 });
+    expect((await loadSettings()).skills).toEqual({ off: ['deal-check'] });
+    expect(await listInstalledSkills()).toMatchObject([skill]);
     expect(await db.pictures.toArray()).toEqual([picture]);
     expect((await getMessages(conversation.id))[0]!.skills).toEqual(['compare-prices']);
+
+    // A backup of 0.3.0 had its skills in the settings: they go to the database, also one whose name waits to be renamed.
+    await db.skills.clear();
+    const old = { ...backup, skills: undefined, settings: { ...backup.settings!, skills: { installed: [{ name: 'forum-check', description: 'd', instructions: 'i' }, { name: '论坛', description: 'd', instructions: 'i' }], off: [] } } };
+    expect(await restoreBackup(parseBackup(JSON.stringify(old)))).toMatchObject({ skills: 2 });
+    expect((await listInstalledSkills()).map((s) => s.name)).toEqual(['forum-check', '论坛']);
+    expect((await loadSettings()).skills).toEqual({ off: [] });
 
     // A file with something else where the picture should be is not a backup.
     expect(() => parseBackup(JSON.stringify({ ...backup, pictures: [{ ...picture, image: '<svg onload=alert(1)>' }] }))).toThrow();

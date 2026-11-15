@@ -433,7 +433,8 @@
       "click_at": "Cliquer sur {{target}} en {{x}}, {{y}}",
       "research_pages": "Recherche approfondie : {{question}}",
       "watch_page": "Surveiller {{site}} : {{condition}}",
-      "load_skill": "Utiliser la compétence : {{name}}"
+      "load_skill": "Utiliser la compétence : {{name}}",
+      "read_skill_file": "Lecture de {{path}}"
     },
     "directions": {
       "up": "le haut",
@@ -778,13 +779,14 @@
     "installed": "Installées",
     "installedHint": "Les compétences que vous avez écrites ou installées. Tapez une barre oblique et le nom pour en utiliser une.",
     "show": "Afficher les instructions",
-    "export": "Télécharger en fichier",
+    "export": "Télécharger (zip)",
     "add": {
       "file": "Depuis un fichier",
       "write": "En écrire une",
-      "address": "Adresse d'un fichier de compétence",
-      "addressPlaceholder": "https://… (un fichier de compétence, p. ex. sur GitHub)",
-      "fetch": "Récupérer"
+      "address": "Adresse d'une compétence",
+      "addressPlaceholder": "https://github.com/…/skills/nom, ou l'adresse d'un SKILL.md ou d'un zip",
+      "fetch": "Récupérer",
+      "formats": "Une compétence est un dossier avec un SKILL.md, au format Agent Skills. Choisissez son SKILL.md ou un zip du dossier, ou donnez l'adresse du dossier sur GitHub."
     },
     "form": {
       "review": "À lire avant d'installer",
@@ -792,26 +794,50 @@
       "change": "Modifier la compétence",
       "note": "Une compétence, ce sont des instructions que l'assistant suit comme si elles venaient de vous. N'installez que ce que vous avez lu. C'est du texte, pas du code, et elle ne peut pas désactiver les approbations.",
       "name": "Nom",
-      "nameHint": "Lettres, chiffres et traits d'union.",
-      "description": "Quand l'utiliser",
-      "descriptionHint": "Une ligne. L'assistant la voit toujours et décide d'après elle.",
+      "nameHint": "Lettres minuscules a–z, chiffres et traits d'union, comme l'exige le format Agent Skills. Le nom du dossier de la compétence.",
+      "description": "Ce qu'elle fait et quand l'utiliser",
+      "descriptionHint": "Jusqu'à {{max}} caractères. L'assistant la voit toujours et décide d'après elle de charger la compétence.",
       "instructions": "Instructions",
       "instructionsHint": "{{used}} caractères sur {{max}}",
       "sites": "Sites cités : {{sites}}",
-      "install": "Installer"
+      "install": "Installer",
+      "license": "Licence",
+      "compatibility": "Prérequis",
+      "allowedTools": "allowed-tools",
+      "allowedToolsNote": "n'approuve rien ici",
+      "files_one": "{{count}} fichier",
+      "files_many": "{{count}} fichiers",
+      "files_other": "{{count}} fichiers",
+      "skipped_one": "{{count}} fichier non installé",
+      "skipped_many": "{{count}} fichiers non installés",
+      "skipped_other": "{{count}} fichiers non installés",
+      "skippedReason": {
+        "script": "un script : cette extension n'exécute aucun code",
+        "binary": "ce n'est pas du texte",
+        "large": "plus de 200 Ko",
+        "many": "au-delà de 50 fichiers ou 1 Mo"
+      }
     },
     "errors": {
-      "header": "Ce n'est pas un fichier de compétence : il doit commencer par un en-tête (name, description) entre deux lignes « --- ».",
-      "name": "Donnez un nom à la compétence.",
+      "header": "Ce n'est pas une compétence : un SKILL.md commence par un en-tête (name, description) entre deux lignes « --- ».",
       "builtinName": "Une compétence intégrée porte ce nom. Choisissez-en un autre.",
       "taken": "Une compétence de ce nom est déjà installée.",
-      "description": "Dites en une ligne quand l'utiliser.",
-      "descriptionLong": "La description est trop longue.",
+      "description": "Dites ce qu'elle fait et quand l'utiliser.",
+      "descriptionLong": "La description dépasse 1024 caractères.",
       "instructions": "La compétence n'a pas d'instructions.",
-      "instructionsLong": "Les instructions sont trop longues.",
+      "instructionsLong": "Les instructions dépassent 50 000 caractères.",
       "tooMany": "{{max}} compétences installées au maximum.",
       "address": "Saisissez une adresse qui commence par https://.",
-      "fetch": "Le fichier n'a pas pu être récupéré. Téléchargez-le et utilisez « Depuis un fichier »."
-    }
+      "fetch": "La compétence n'a pas pu être récupérée. Téléchargez-la et utilisez « Depuis un fichier ».",
+      "nameRule": "Le nom ne peut contenir que des lettres minuscules a–z, des chiffres et des traits d'union simples, sans trait d'union au début ni à la fin (64 caractères au plus).",
+      "dirName": "Le dossier s'appelle « {{detail}} », mais la compétence porte un autre nom. Au format Agent Skills, ils sont identiques.",
+      "compatibilityLong": "Le champ compatibility dépasse 500 caractères.",
+      "noSkillFile": "Aucun SKILL.md trouvé.",
+      "several": "Il contient plusieurs compétences ({{detail}}). Installez-les une par une.",
+      "archive": "Le fichier zip est illisible.",
+      "tooLarge": "Le fichier dépasse 20 Mo.",
+      "name": "Donnez un nom à la compétence."
+    },
+    "rename": "Son nom n'est pas au format Agent Skills. Renommez-la pour l'utiliser."
   }
 }

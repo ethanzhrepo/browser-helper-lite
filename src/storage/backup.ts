@@ -5,7 +5,18 @@ import { MAX_SOCIAL_PAGES, MAX_SOCIAL_SITES } from '../agent/social';
 import { ACTIVE_STATUSES, type AgentTask, type StepShot } from '../agent/types';
 import { normalizeBaseURL } from '../providers/vendors';
 import type { ConversationRecord, MessageRecord, Settings } from '../shared/types';
-import { MAX_INSTALLED_SKILLS, SKILL_DESCRIPTION_CHARS, SKILL_INSTRUCTION_CHARS, SKILL_NAME_CHARS } from '../skills/skills';
+import {
+  MAX_INSTALLED_SKILLS,
+  MAX_SKILL_FILES,
+  SKILL_COMPATIBILITY_CHARS,
+  SKILL_DESCRIPTION_CHARS,
+  SKILL_FILE_BYTES,
+  SKILL_INSTRUCTION_CHARS,
+  SKILL_NAME_CHARS,
+  type InstalledSkill,
+  type LegacySkill,
+} from '../skills/skills';
+import { keepLegacySkills, listInstalledSkills, restoreSkills } from '../skills/store';
 import { MAX_KDF_ITERATIONS, MIN_KDF_ITERATIONS, seal, unseal, type Sealed } from './backup-crypto';
 import { db } from './db';
 import { loadSecrets, loadSettings, replaceSettings, withDefaults } from './settings';
@@ -55,8 +66,9 @@ const settingsSchema = z.looseObject({
   sitePolicies: z.record(z.string(), z.enum(['blocked', 'readOnly', 'confirmEach', 'confirmRisky', 'auto'])).optional(),
   skills: z
     .object({
-      installed: z.array(z.object({ name: z.string().min(1).max(SKILL_NAME_CHARS), description: z.string().max(SKILL_DESCRIPTION_CHARS), instructions: z.string().max(SKILL_INSTRUCTION_CHARS) })).max(MAX_INSTALLED_SKILLS),
       off: z.array(z.string().max(SKILL_NAME_CHARS)).max(200),
+      // Saved by 0.3.0, which kept installed skills in the settings.
+      installed: z.array(z.object({ name: z.string().min(1).max(SKILL_NAME_CHARS), description: z.string().max(SKILL_DESCRIPTION_CHARS), instructions: z.string().max(SKILL_INSTRUCTION_CHARS) })).max(MAX_INSTALLED_SKILLS).optional(),
     })
     .optional(),
   social: z
@@ -150,6 +162,22 @@ const taskSchema = z.looseObject({
   updatedAt: z.number(),
 });
 
+/** An installed skill as a backup holds it; restoring checks it again as an installed one (see restoreSkills). */
+const installedSkillSchema = z.object({
+  name: z.string().min(1).max(SKILL_NAME_CHARS),
+  description: z.string().max(SKILL_DESCRIPTION_CHARS),
+  instructions: z.string().max(SKILL_INSTRUCTION_CHARS),
+  license: z.string().max(500).optional(),
+  compatibility: z.string().max(SKILL_COMPATIBILITY_CHARS).optional(),
+  metadata: z.record(z.string().max(64), z.string().max(1000)).optional(),
+  allowedTools: z.string().max(1000).optional(),
+  files: z.array(z.object({ path: z.string().min(1).max(300), text: z.string().max(SKILL_FILE_BYTES) })).max(MAX_SKILL_FILES).optional(),
+  skipped: z.array(z.object({ path: z.string().max(300), reason: z.enum(['script', 'binary', 'large', 'many']) })).max(500).optional(),
+  installedAt: z.number(),
+  updatedAt: z.number(),
+  source: z.string().max(2000).optional(),
+});
+
 const pictureSchema = z.object({
   id: z.string().min(1),
   conversationId: z.string().min(1),
@@ -188,6 +216,7 @@ const backupSchema = z.object({
   tasks: z.array(taskSchema).optional(),
   shots: z.array(shotSchema).optional(),
   pictures: z.array(pictureSchema).optional(),
+  skills: z.array(installedSkillSchema).max(MAX_INSTALLED_SKILLS).optional(),
 });
 
 const encryptedSchema = z.object({
@@ -226,6 +255,8 @@ export interface Backup {
   shots?: StepShot[];
   /** The pictures shown in replies. */
   pictures?: ReplyPicture[];
+  /** The skills the user installed or wrote, with their files. */
+  skills?: InstalledSkill[];
 }
 
 export async function buildBackup({ includeKeys, includeConversations = true }: { includeKeys: boolean; includeConversations?: boolean }): Promise<Backup> {
@@ -236,6 +267,9 @@ export async function buildBackup({ includeKeys, includeConversations = true }: 
     settings: await loadSettings(),
     ...(includeKeys ? { secrets: await loadSecrets() } : {}),
   };
+  // Installed skills go with the settings.
+  const skills = await listInstalledSkills();
+  if (skills.length > 0) backup.skills = skills;
   if (!includeConversations) return backup;
   const conversations = (await db.conversations.toArray()).filter((c) => !c.deletedAt);
   const kept = new Set(conversations.map((c) => c.id));
@@ -297,6 +331,8 @@ export interface RestoreSummary {
   settings: boolean;
   keys: number;
   conversations: number;
+  /** Installed skills taken from the backup. */
+  skills: number;
 }
 
 /**
@@ -308,12 +344,16 @@ export interface RestoreSummary {
  * another server and have your key sent there.
  */
 export async function restoreBackup(backup: Backup): Promise<RestoreSummary> {
-  const summary: RestoreSummary = { settings: false, keys: 0, conversations: 0 };
+  const summary: RestoreSummary = { settings: false, keys: 0, conversations: 0, skills: 0 };
+  let legacySkills: LegacySkill[] = [];
 
   if (backup.settings) {
     const current = await loadSettings();
     const stored = await loadSecrets();
     const next = withDefaults(backup.settings);
+    // A backup of 0.3.0 has its installed skills in the settings; they go to the database (see below).
+    legacySkills = next.skills.installed ?? [];
+    next.skills = { off: next.skills.off };
     const secrets: Record<string, string> = {};
     const sameAddress = (a: string, b: string) => normalizeBaseURL(a).toLowerCase() === normalizeBaseURL(b).toLowerCase();
     for (const connection of next.connections) {
@@ -330,6 +370,8 @@ export async function restoreBackup(backup: Backup): Promise<RestoreSummary> {
     await replaceSettings(next, secrets);
     summary.settings = true;
   }
+  // Each skill is checked as one being installed would be; one that is not in shape is left out.
+  summary.skills = (await restoreSkills(backup.skills ?? [])) + (await keepLegacySkills(legacySkills));
 
   const conversations = backup.conversations ?? [];
   if (conversations.length > 0) {
