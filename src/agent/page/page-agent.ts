@@ -2,7 +2,7 @@ import { browser } from 'wxt/browser';
 import { parseKeyCombo } from '../keys';
 import { matchOption } from '../select';
 import { challengeShown } from '../../browser/captcha';
-import { isTransparentColor } from '../../browser/visibility';
+import { isInvisibleOpacity, isTransparentColor } from '../../browser/visibility';
 import type {
   OverlayState,
   PageAgentApi,
@@ -115,10 +115,19 @@ function labelText(el: Element): string {
  */
 function submitterOf(form: HTMLFormElement | null): Element | null {
   if (!form) return null;
-  const own = form.querySelector('button[type="submit"], button:not([type]), input[type="submit"], input[type="image"]');
+  const own = form.querySelector(
+    'button[type="submit"]:not(:disabled), button:not([type]):not(:disabled), input[type="submit"]:not(:disabled), input[type="image"]:not(:disabled)',
+  );
+  if (own) return own;
   // getAttribute: a field named "id" would shadow form.id.
   const id = form.getAttribute('id');
-  return own ?? (id ? document.querySelector(`[form="${CSS.escape(id)}"][type="submit"]`) : null);
+  if (!id) return null;
+  const root = form.getRootNode();
+  if (!(root instanceof Document || root instanceof ShadowRoot)) return null;
+  const escaped = CSS.escape(id);
+  return root.querySelector(
+    `button[form="${escaped}"][type="submit"]:not(:disabled), button[form="${escaped}"]:not([type]):not(:disabled), input[form="${escaped}"][type="submit"]:not(:disabled), input[form="${escaped}"][type="image"]:not(:disabled)`,
+  );
 }
 
 function submitterText(form: HTMLFormElement | null): string | undefined {
@@ -485,7 +494,7 @@ export function createPageAgent(): PageAgentApi {
         else if (node instanceof Element && INLINE_TAGS.has(node.tagName) && node.tagName !== 'A') {
           const style = getComputedStyle(node);
           // Hidden or unreadable inline text (a common place to hide instructions for AI) is left out.
-          const invisible = style.visibility === 'hidden' || style.opacity === '0' || unreadableText(style);
+          const invisible = style.visibility === 'hidden' || isInvisibleOpacity(style.opacity) || unreadableText(style);
           if (style.display === 'none' || invisible || isInteractive(node, style)) {
             if (invisible) folded.add(node);
             out += ' ';
@@ -528,7 +537,7 @@ export function createPageAgent(): PageAgentApi {
       if (style.display === 'none') return;
       const isSvg = el.namespaceURI === 'http://www.w3.org/2000/svg';
       const rect = topRect(el);
-      const transparent = hidden || style.opacity === '0';
+      const transparent = hidden || isInvisibleOpacity(style.opacity);
       const visible = !transparent && isTopVisible(rect) && style.visibility !== 'hidden';
 
       const interactive = visible && (!inInteractive || el instanceof HTMLInputElement || el instanceof HTMLSelectElement || el instanceof HTMLTextAreaElement) && isInteractive(el, style);
@@ -668,7 +677,7 @@ export function createPageAgent(): PageAgentApi {
       tag: el.tagName.toLowerCase(),
       type: input?.type ?? (el instanceof HTMLButtonElement ? el.type : undefined),
       role: el.getAttribute('role') ?? undefined,
-      text: elementText(el) || (input && input.type !== 'password' ? input.value : ''),
+      text: elementText(el) || (el instanceof HTMLTextAreaElement ? el.value : input && input.type !== 'password' ? input.value : ''),
       ariaLabel: el.getAttribute('aria-label') ?? undefined,
       // Only real destinations; "#" and javascript: links are buttons in disguise.
       href: el instanceof HTMLAnchorElement && /^(?!#|javascript:)./i.test(el.getAttribute('href') ?? '') ? el.href : undefined,
@@ -711,13 +720,29 @@ export function createPageAgent(): PageAgentApi {
     const x = Math.min(Math.max(rect.left + rect.width / 2, 1), innerWidth - 1);
     const y = Math.min(Math.max(rect.top + rect.height / 2, 1), innerHeight - 1);
     let occludedBy: string | undefined;
+    const hit = document.elementFromPoint(x, y);
     if (el.ownerDocument === document) {
-      const hit = document.elementFromPoint(x, y);
       const label = el instanceof HTMLInputElement ? [...(el.labels ?? [])] : [];
       if (hit && hit !== el && !el.contains(hit) && !hit.contains(el) && !label.some((l) => l.contains(hit))) {
-        occludedBy = describe(hit).slice(0, 120);
+        occludedBy = isOpaqueFrame(hit) ? `a frame from ${frameOrigin(hit)}` : describe(hit).slice(0, 120);
       } else if (hit && isOpaqueFrame(hit) && hit !== frameAtCenter(el)) {
         occludedBy = `a frame from ${frameOrigin(hit)}`;
+      }
+    } else {
+      // Find the outermost hosting frame in the top document and check top-level and inner-frame occlusion.
+      let hostFrame: Element | null = el.ownerDocument.defaultView?.frameElement ?? null;
+      while (hostFrame && hostFrame.ownerDocument !== document) {
+        hostFrame = hostFrame.ownerDocument.defaultView?.frameElement ?? null;
+      }
+      if (hit && hostFrame && hit !== hostFrame && !hostFrame.contains(hit) && !hit.contains(hostFrame)) {
+        occludedBy = isOpaqueFrame(hit) ? `a frame from ${frameOrigin(hit)}` : describe(hit).slice(0, 120);
+      } else {
+        const innerOffset = frameOffset(el.ownerDocument);
+        const innerHit = el.ownerDocument.elementFromPoint(x - innerOffset.x, y - innerOffset.y);
+        const label = el instanceof HTMLInputElement ? [...(el.labels ?? [])] : [];
+        if (innerHit && innerHit !== el && !el.contains(innerHit) && !innerHit.contains(el) && !label.some((l) => l.contains(innerHit))) {
+          occludedBy = isOpaqueFrame(innerHit) ? `a frame from ${frameOrigin(innerHit)}` : describe(innerHit).slice(0, 120);
+        }
       }
     }
     return { ok: true, value: { x, y, occludedBy } };

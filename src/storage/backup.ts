@@ -3,7 +3,7 @@ import { z } from 'zod';
 import type { ReplyPicture } from '../agent/pictures';
 import { MAX_SOCIAL_PAGES, MAX_SOCIAL_SITES } from '../agent/social';
 import { ACTIVE_STATUSES, type AgentTask, type StepShot } from '../agent/types';
-import { normalizeBaseURL } from '../providers/vendors';
+import { isLoopbackHost, normalizeBaseURL } from '../providers/vendors';
 import type { ConversationRecord, MessageRecord, Settings } from '../shared/types';
 import {
   MAX_INSTALLED_SKILLS,
@@ -48,6 +48,17 @@ const savedCommand = z.object({ name: z.string().min(1).max(64), steps: z.array(
 
 const slotSchema = z.object({ connectionId: z.string(), modelId: z.string(), temperature: z.number().optional() });
 
+const safeCustomSearchUrl = z.string().max(1000).refine((value) => {
+  const trimmed = value.trim();
+  if (!trimmed) return true;
+  try {
+    const parsed = new URL(trimmed.replace(/%s/g, 'test'));
+    return parsed.protocol === 'https:' || (parsed.protocol === 'http:' && isLoopbackHost(parsed.hostname));
+  } catch {
+    return false;
+  }
+}, 'Custom search URL must use https (or http on localhost)');
+
 /** Checked where a wrong value could do harm or break the pages; unknown fields pass, older ones are migrated on load. */
 const settingsSchema = z.looseObject({
   connections: z.array(connectionSchema),
@@ -57,11 +68,24 @@ const settingsSchema = z.looseObject({
   agent: z
     .looseObject({
       mode: z.enum(['query', 'auto', 'manual']).optional(),
+      reasoningEffort: z.enum(['auto', 'off', 'low', 'medium', 'high']).optional(),
       useCdp: z.boolean().optional(),
       maxSteps: z.number().int().min(MIN_MAX_STEPS).max(MAX_MAX_STEPS).optional(),
       notifications: z.boolean().optional(),
       screenshots: z.enum(['auto', 'main', 'vision']).optional(),
+      visionStrategy: z.enum(['off', 'auto', 'always']).optional(),
       autoScreenshot: z.boolean().optional(),
+      customSearchUrl: safeCustomSearchUrl.optional(),
+    })
+    .optional(),
+  search: z
+    .looseObject({
+      provider: z.enum(['browser', 'deepseek', 'cloudflare', 'tavily', 'brave', 'exa', 'native']).optional(),
+      engine: z.enum(['google', 'bing', 'duckduckgo', 'custom']).optional(),
+      customUrl: safeCustomSearchUrl.optional(),
+      deepseekQuestion: z.boolean().optional(),
+      deepseekFetch: z.boolean().optional(),
+      fallbackToBrowser: z.boolean().optional(),
     })
     .optional(),
   sitePolicies: z.record(z.string(), z.enum(['blocked', 'readOnly', 'confirmEach', 'confirmRisky', 'auto'])).optional(),
@@ -182,7 +206,7 @@ const installedSkillSchema = z.object({
 const pictureSchema = z.object({
   id: z.string().min(1),
   conversationId: z.string().min(1),
-  url: z.string().max(2000),
+  url: z.string().max(2000).regex(/^https?:\/\//i),
   // Shown as an image: nothing else may be in it. Empty only while it waits for access to its site.
   image: z.string().regex(/^[A-Za-z0-9+/]*={0,2}$/),
   mediaType: z.enum(['image/webp', 'image/jpeg', 'image/png']),
@@ -380,7 +404,8 @@ export async function restoreBackup(backup: Backup): Promise<RestoreSummary> {
     const now = Date.now();
     await db.transaction('rw', db.conversations, db.messages, db.tasks, db.shots, db.pictures, async () => {
       await db.shots.bulkPut((backup.shots ?? []).filter((shot) => ids.has(shot.conversationId)));
-      await db.pictures.bulkPut((backup.pictures ?? []).filter((picture) => ids.has(picture.conversationId)));
+      // Never import pending picture placeholders from an untrusted backup: only already-cached images are restored.
+      await db.pictures.bulkPut((backup.pictures ?? []).filter((picture) => ids.has(picture.conversationId) && !picture.pending && picture.image.length > 0));
       await db.conversations.bulkPut(conversations);
       await db.messages.bulkPut((backup.messages ?? []).filter((m) => ids.has(m.conversationId)));
       await db.tasks.bulkPut(

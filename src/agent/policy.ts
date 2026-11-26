@@ -1,12 +1,16 @@
 import type { AgentMode, SitePolicy } from '../shared/types';
-import type { RiskLevel } from './types';
+import type { RiskLevel, RiskReason } from './types';
+
+const normalizeHost = (hostname: string) => hostname.toLowerCase().replace(/\.+$/, '');
 
 /** Policy for a hostname; a "example.com" entry also covers its subdomains. Undefined when none is set. */
 export function policyFor(hostname: string, policies: Record<string, SitePolicy>): SitePolicy | undefined {
-  const host = hostname.toLowerCase();
+  const host = normalizeHost(hostname);
+  if (!host) return undefined;
   let best: { key: string; policy: SitePolicy } | undefined;
   for (const [key, policy] of Object.entries(policies)) {
-    const k = key.toLowerCase().replace(/^\*\./, '');
+    const k = normalizeHost(key).replace(/^\*\./, '');
+    if (!k) continue;
     if ((host === k || host.endsWith(`.${k}`)) && (!best || k.length > best.key.length)) best = { key: k, policy };
   }
   return best?.policy;
@@ -71,4 +75,73 @@ export function decide(mode: AgentMode, policy: SitePolicy | undefined, risk: Ri
   const site = siteDecision(policy, risk, kind);
   const decision = mode === 'manual' && policy === 'auto' ? site : strictest(modeDecision(mode, risk, kind), site);
   return risk >= 3 ? strictest(decision, 'confirm') : decision;
+}
+
+export interface GuardInput {
+  mode: AgentMode;
+  policy: SitePolicy | undefined;
+  host: string;
+  risk: RiskLevel;
+  kind: ActionKind;
+  reason?: RiskReason;
+  confirm?: boolean;
+  /** On a forum or social site, acting in the user's name (like, vote, follow, post). */
+  social?: boolean;
+  /** Account security, keys, consoles or payments page. */
+  sensitivePage?: boolean;
+  /** The turn already saw prompt injection, and this action changes a page or follows an untrusted link. */
+  injection?: boolean;
+}
+
+export interface GuardOutcome {
+  decision: Decision;
+  risk: RiskLevel;
+  reason: RiskReason;
+  /** Key in allowedThisTask; undefined when actions must be approved one at a time. */
+  allowKey?: string;
+  canAllowSite: boolean;
+}
+
+/**
+ * Full approval decision combining mode/site policy with unconditional
+ * escalations (unseen drawn content, social actions, sensitive pages, and
+ * post-injection caution). Escalations apply even when the base decision is
+ * already `confirm` (e.g. Manual mode or confirmEach/confirmRisky), so
+ * one-by-one approval and injection isolation are never bypassed.
+ */
+export function evaluateGuard(input: GuardInput): GuardOutcome {
+  let decision = decide(input.mode, input.policy, input.risk, input.kind);
+  const fallbackReason: RiskReason = input.mode === 'manual' ? 'manualMode' : 'confirmEach';
+  if (decision === 'deny') {
+    return { decision: 'deny', risk: input.risk, reason: input.reason ?? fallbackReason, canAllowSite: false };
+  }
+
+  const isUnseen = Boolean(input.confirm) || input.reason === 'unseen';
+  const isSocial = Boolean(input.social) && input.kind === 'change';
+  const isSensitive = Boolean(input.sensitivePage) && input.risk >= 1 && input.kind !== 'browse';
+  const isInjection = Boolean(input.injection) && input.risk >= 1;
+
+  if (input.confirm || isSocial || isSensitive || isInjection) decision = 'confirm';
+  const risk = (isSocial ? Math.max(input.risk, 2) : input.risk) as RiskLevel;
+
+  const reason: RiskReason =
+    risk >= 3 && input.reason
+      ? input.reason
+      : isSensitive
+        ? 'sensitivePage'
+        : isInjection
+          ? 'injection'
+          : isUnseen
+            ? 'unseen'
+            : isSocial
+              ? 'social'
+              : (input.reason ?? fallbackReason);
+
+  const oneByOne = risk >= 3 || isSensitive || reason === 'exfiltration' || reason === 'secret';
+  const scopes = [isInjection ? 'injection' : '', isUnseen ? 'unseen' : '', isSocial ? 'social' : ''].filter(Boolean);
+  const allowScope = scopes.length > 0 ? scopes.join('+') : String(risk);
+  const allowKey = oneByOne ? undefined : `${allowScope}|${normalizeHost(input.host)}`;
+  const canAllowSite = !oneByOne && !isInjection && !isUnseen && !isSocial && !['newSite', 'download', 'watch'].includes(reason);
+
+  return { decision, risk, reason, allowKey, canAllowSite };
 }

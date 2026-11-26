@@ -51,9 +51,57 @@ sha256_of() {
 # Prints the download URL of the Chrome zip in a release (GitHub API JSON), then its SHA-256 if GitHub lists one.
 asset_of() {
   awk '
-    /"name": *"[^"]*-chrome\.zip"/ { hit = 1 }
-    hit && /"digest": *"sha256:/ { line = $0; sub(/.*"sha256:/, "", line); sub(/".*/, "", line); digest = line }
-    hit && /"browser_download_url":/ { line = $0; sub(/.*"browser_download_url": *"/, "", line); sub(/".*/, "", line); print line; print digest; exit }
+    { buf = buf $0 "\n" }
+    END {
+      if (!match(buf, /"assets"[ \t\n\r]*:[ \t\n\r]*\[/)) exit
+      s = substr(buf, RSTART + RLENGTH)
+      n = length(s)
+      depth = 0; in_str = 0; esc = 0; obj = ""
+      for (i = 1; i <= n; i++) {
+        c = substr(s, i, 1)
+        if (in_str) {
+          if (esc) esc = 0
+          else if (c == "\\") esc = 1
+          else if (c == "\"") in_str = 0
+          if (depth > 0) obj = obj c
+          continue
+        }
+        if (c == "\"") { in_str = 1; if (depth > 0) obj = obj c; continue }
+        if (c == "{") {
+          obj = (depth == 0 ? "{" : obj "{")
+          depth++
+          continue
+        }
+        if (c == "}") {
+          depth--
+          if (depth >= 0) obj = obj "}"
+          if (depth == 0) {
+            if (obj ~ /"name"[ \t\n\r]*:[ \t\n\r]*"[^"]*-chrome\.zip"/) {
+              url = ""; digest = ""
+              if (match(obj, /"browser_download_url"[ \t\n\r]*:[ \t\n\r]*"[^"]*"/)) {
+                url = substr(obj, RSTART, RLENGTH)
+                sub(/.*:[ \t\n\r]*"/, "", url)
+                sub(/"$/, "", url)
+              }
+              if (match(obj, /"digest"[ \t\n\r]*:[ \t\n\r]*"sha256:[0-9a-fA-F]+"/)) {
+                digest = substr(obj, RSTART, RLENGTH)
+                sub(/.*"sha256:/, "", digest)
+                sub(/"$/, "", digest)
+              }
+              if (url != "") {
+                print url
+                print digest
+                exit
+              }
+            }
+            obj = ""
+          }
+          continue
+        }
+        if (c == "]" && depth == 0) exit
+        if (depth > 0) obj = obj c
+      }
+    }
   ' "$1"
 }
 
@@ -89,6 +137,8 @@ main() {
   need unzip
 
   dir="${BHL_DIR:-$HOME/browser-helper-lite-extension}"
+  while [ "${dir%/}" != "$dir" ] && [ "$dir" != "/" ]; do dir="${dir%/}"; done
+  [ -n "$dir" ] && [ "$dir" != "/" ] || fail "Invalid install folder: ${BHL_DIR:-}"
   version="${BHL_VERSION:-}"
   version="${version#v}"
 

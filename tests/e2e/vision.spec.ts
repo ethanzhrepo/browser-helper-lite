@@ -170,9 +170,8 @@ test.describe.serial('screenshots and clicks by coordinates', () => {
     await options.goto(`chrome-extension://${extensionId}/options.html#agent`);
     await expect(options.getByLabel('Screenshots are read by')).toHaveValue('auto');
     await options.getByLabel('Screenshots are read by').selectOption('vision');
-    // The switch follows the stored setting, so it changes a moment after the click.
-    await options.getByLabel("Look at the screen when text isn't enough").click();
-    await expect.poll(() => options.evaluate(async () => (await chrome.storage.local.get('settings:v1'))['settings:v1'].agent)).toMatchObject({ screenshots: 'vision', autoScreenshot: false });
+    await options.getByLabel('When to look at the screen').selectOption('off');
+    await expect.poll(() => options.evaluate(async () => (await chrome.storage.local.get('settings:v1'))['settings:v1'].agent)).toMatchObject({ screenshots: 'vision', visionStrategy: 'off', autoScreenshot: false });
     await options.close();
   });
 });

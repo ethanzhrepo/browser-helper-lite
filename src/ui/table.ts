@@ -28,11 +28,12 @@ export function sortOrder(rows: string[][], column: number, descending: boolean)
     });
 }
 
-/** Comma-separated values, quoted where needed. A leading =, +, - or @ is kept from running as a formula in a spreadsheet. */
+/** Comma-separated values, quoted where needed. Leading formula triggers (=, +, -, @, tab, CR) are kept from running in a spreadsheet. */
 export function toCsv(rows: string[][]): string {
   const cell = (text: string) => {
-    // A plain number such as -5 or +1.5% stays as it is.
-    const value = /^[=+\-@]/.test(text) && !/^[+-]?[\d.,]+\s?%?$/.test(text) ? `'${text}` : text;
+    // A plain number such as -5 or +1.5% stays as it is; leading tab/CR are always neutralized.
+    const formula = /^[\t\r]/.test(text) || (/^\s*[=+\-@]/.test(text) && !/^ *[+-]?[\d.,]+\s?%?$/.test(text));
+    const value = formula ? `'${text}` : text;
     return /[",\n\r]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
   };
   return rows.map((row) => row.map(cell).join(',')).join('\r\n');

@@ -73,7 +73,9 @@ export function readSkillFolder(entries: FolderEntry[], folder?: string): Skill 
   for (const entry of files) {
     if (entry === main || (root && !entry.path.startsWith(`${root}/`))) continue;
     const path = root ? entry.path.slice(root.length + 1) : entry.path;
-    const sort = sortFile(path, entry.size);
+    if (!path || path.split('/').includes('..')) continue;
+    const size = entry.bytes ? entry.bytes.length : entry.size;
+    const sort = sortFile(path, size);
     if (sort !== 'text') {
       skipped.push({ path, reason: sort });
       continue;
@@ -83,11 +85,11 @@ export function readSkillFolder(entries: FolderEntry[], folder?: string): Skill 
       skipped.push({ path, reason: 'binary' });
       continue;
     }
-    if (kept.length >= MAX_SKILL_FILES || total + entry.size > SKILL_FILES_BYTES) {
+    if (kept.length >= MAX_SKILL_FILES || total + size > SKILL_FILES_BYTES) {
       skipped.push({ path, reason: 'many' });
       continue;
     }
-    total += entry.size;
+    total += size;
     kept.push({ path, text });
   }
   kept.sort((a, b) => a.path.localeCompare(b.path));
@@ -118,6 +120,7 @@ export function unzipFolder(bytes: Uint8Array): FolderEntry[] {
       filter: (file) => {
         count += 1;
         const name = clean(file.name);
+        if (!name || name.split('/').includes('..')) return false;
         // Only what could be kept is unpacked; the rest is listed by name and size.
         const wanted = basename(name) === 'SKILL.md' || sortFile(name.split('/').slice(1).join('/') || name, file.originalSize) === 'text';
         if (!wanted || count > MAX_ENTRIES || unpacked + file.originalSize > MAX_DOWNLOAD_BYTES) return false;
@@ -128,6 +131,12 @@ export function unzipFolder(bytes: Uint8Array): FolderEntry[] {
   } catch {
     throw new SkillError('archive');
   }
+  // Verify actual inflated byte length (zip headers can spoof originalSize).
+  let actualUnpacked = 0;
+  for (const data of Object.values(files)) {
+    actualUnpacked += data.byteLength;
+    if (actualUnpacked > MAX_DOWNLOAD_BYTES) throw new SkillError('tooLarge');
+  }
   const sizes = new Map<string, number>();
   // A second pass that unpacks nothing, for the names and sizes of what was left packed.
   unzipSync(bytes, {
@@ -136,7 +145,7 @@ export function unzipFolder(bytes: Uint8Array): FolderEntry[] {
       return false;
     },
   });
-  return [...sizes].map(([path, size]) => ({ path, size, ...(files[path] ? { bytes: files[path] } : {}) }));
+  return [...sizes].map(([path, size]) => ({ path, size: files[path]?.byteLength ?? size, ...(files[path] ? { bytes: files[path] } : {}) }));
 }
 
 /** Reads a skill from a file the user chose: a SKILL.md, or a zip of the skill's folder. */

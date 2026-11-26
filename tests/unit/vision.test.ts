@@ -1,6 +1,6 @@
 import { APICallError } from 'ai';
 import { describe, expect, it } from 'vitest';
-import { screenSize } from '../../src/agent/screenshot';
+import { COMPACT_SCREEN_EDGE, screenSize } from '../../src/agent/screenshot';
 import { screenshotReason } from '../../src/agent/vision';
 import { rejectsImages, seesImages } from '../../src/providers/vision';
 
@@ -23,6 +23,19 @@ describe('when a page view needs a screenshot', () => {
     expect(screenshotReason({ ...none, unlabeled: 3 }, { elements: 40, textChars: 2000 }, 0)).toBeUndefined();
     expect(screenshotReason({ ...none, pictures: 0.6 }, { elements: 2, textChars: 80 }, 0)).toBe('pictures');
     expect(screenshotReason(none, page, 2)).toBe('errors');
+  });
+
+  it('supports off, auto (including noChange and many unlabeled controls), and always (DOM + compact SoM) strategies', () => {
+    // Off disables automatic screenshots even on canvas pages.
+    expect(screenshotReason({ ...none, drawn: 0.8 }, page, 3, { strategy: 'off', noChange: true, canReadDirectly: true })).toBeUndefined();
+    // Auto triggers on noChange after an interactive action and on pages with >= 8 unlabeled controls (e.g. color swatches).
+    expect(screenshotReason(none, page, 0, { strategy: 'auto', noChange: true })).toBe('noChange');
+    expect(screenshotReason({ ...none, unlabeled: 8 }, { elements: 60, textChars: 2000 }, 0, { strategy: 'auto' })).toBe('icons');
+    // Always attaches a compact screenshot for multimodal models on ordinary pages, while keeping specific triggers first.
+    expect(screenshotReason(none, page, 0, { strategy: 'always', canReadDirectly: true })).toBe('always');
+    expect(screenshotReason({ ...none, drawn: 0.5 }, page, 0, { strategy: 'always', canReadDirectly: true })).toBe('drawn');
+    // Text-only models using a separate vision model do not fire `always` on every ordinary step.
+    expect(screenshotReason(none, page, 0, { strategy: 'always', canReadDirectly: false })).toBeUndefined();
   });
 });
 
@@ -78,5 +91,10 @@ describe('screenshot size', () => {
     // Narrower too: a window 606 pixels wide shows the left part of a page laid out for 1280. A pixel is still a pixel.
     expect(screenSize({ width: 606, height: 620 }, 1)).toEqual({ width: 606, height: 620, scale: 1 });
     expect(screenSize({ width: 1212, height: 1240 }, 2)).toEqual({ width: 606, height: 620, scale: 1 });
+    // Compact SoM screenshots scale to COMPACT_SCREEN_EDGE and keep exact CSS coordinate mapping.
+    const compact = screenSize({ width: 2560, height: 1600 }, 2, COMPACT_SCREEN_EDGE);
+    expect(compact.width).toBe(COMPACT_SCREEN_EDGE);
+    expect(compact.height).toBe(600);
+    expect(Math.round(compact.width * compact.scale)).toBe(1280);
   });
 });

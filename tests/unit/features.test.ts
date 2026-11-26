@@ -375,6 +375,57 @@ describe('watched pages', () => {
     expect(after!.retryAt).toBeGreaterThan(now);
     expect(told).toEqual(['slowed:The charger is in stock']);
   });
+
+  it('probes first, respects retryAt, and rate-limits rapid live watch.changed events', async () => {
+    fast = true;
+    const watch = await start({ everySeconds: 5 });
+    await checkWatch(watch.id, deps);
+    // Live change inside everySeconds cooldown (1s after the first check): waits without calling the model.
+    log = [];
+    stock = 'Still sold out (1)';
+    now += 1000;
+    await checkWatch(watch.id, deps, { reload: false, live: true });
+    expect(log).toEqual(['open', 'probe', 'live:Sold out', 'done']);
+    expect((await db.watches.get(watch.id))!.checks).toBe(1);
+
+    // Live change with unchanged text after cooldown: probes and stops without calling the model.
+    stock = 'Sold out';
+    log = [];
+    now += 6000;
+    await checkWatch(watch.id, deps, { reload: false, live: true });
+    expect(log).toEqual(['open', 'probe', 'live:Sold out', 'done']);
+    expect((await db.watches.get(watch.id))!.checks).toBe(1);
+
+    // Live change after cooldown is allowed; burst of 10 checks triggers slowdown + retryAt.
+    let n = 2;
+    for (let i = 0; i < 9; i++) {
+      now += 30_000;
+      stock = `Still sold out (${n++})`;
+      const updated = await checkWatch(watch.id, deps, { reload: false, live: true });
+      if (i < 2) expect(updated!.checks).toBe(i + 2);
+    }
+    // Seed 10 recent checks within LIVE_WINDOW_MS and verify slowdown kicks in.
+    const current = (await db.watches.get(watch.id))!;
+    await db.watches.put({
+      ...current,
+      rushUntil: now + 60_000,
+      history: Array.from({ length: 10 }, (_, idx) => ({ at: now - (10 - idx) * 1000, met: false, note: `n${idx}` })),
+    });
+    log = [];
+    told = [];
+    stock = 'Mutating constantly';
+    const slowed = await checkWatch(watch.id, deps, { reload: false, live: true });
+    expect(slowed!.retryAt).toBeGreaterThan(now);
+    expect(slowed!.rushUntil).toBeUndefined();
+    expect(told).toEqual(['slowed:The charger is in stock']);
+    expect(log).toEqual(['open', 'probe', 'done']);
+
+    // Subsequent live events while retryAt is active do not even open the session.
+    log = [];
+    now += 10_000;
+    await checkWatch(watch.id, deps, { reload: false, live: true });
+    expect(log).toEqual([]);
+  });
 });
 
 describe('what an action changed', () => {

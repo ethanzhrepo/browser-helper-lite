@@ -84,6 +84,19 @@
       "autoHint": "Works by itself. Asks before payments, deletions and other high-risk steps.",
       "manualHint": "Reads and searches by itself. Asks before every change."
     },
+    "effort": "Thinking effort",
+    "efforts": {
+      "auto": "Auto",
+      "off": "Off",
+      "low": "Low",
+      "medium": "Medium",
+      "high": "High",
+      "autoHint": "Light on simple tasks and routine clicks; deeper when planning, recovering or summarizing.",
+      "offHint": "Fastest. Turns off or minimizes thinking where the model allows it.",
+      "lowHint": "Brief thinking on every step. Good for quick everyday tasks.",
+      "mediumHint": "Balanced thinking on every step.",
+      "highHint": "Deep thinking on every step. Slower, best for hard tasks."
+    },
     "removeAttachment": "Remove attachment",
     "pickRegion": "Ask about a part of the page",
     "regionHint": "Drag to mark what to ask about · Esc to cancel",
@@ -612,6 +625,8 @@
     "maxStepsHint": "{{min}} to {{max}}; {{usual}} unless you change it. A task that goes in circles uses more of your model's tokens with a higher limit.",
     "mode": "Default mode",
     "modeHint": "Also switchable below the message box, even mid-task.",
+    "reasoningEffort": "Thinking effort",
+    "reasoningEffortHint": "Controls how long reasoning models think. Auto stays fast on routine browser steps and helper calls; switchable below the message box even mid-task.",
     "screenshots": "Screenshots are read by",
     "screenshotsHint": "Auto: the current model if it reads images, else the vision model.",
     "screenshotReaders": {
@@ -620,8 +635,13 @@
       "vision": "Vision model"
     },
     "setVisionModel": "Choose a vision model",
-    "autoScreenshot": "Look at the screen when text isn't enough",
-    "autoScreenshotHint": "On canvas pages, unnamed buttons and failed steps. Sends a screenshot to the model; never on sign-in, account or payment pages.",
+    "visionStrategy": "When to look at the screen",
+    "visionStrategyHint": "DOM stays primary for accuracy and safety. Auto adds a screenshot on canvas/icon pages or when an action had no effect; Always adds a compact numbered screenshot to every view with a multimodal model. Never on sign-in, account or payment pages.",
+    "visionStrategies": {
+      "off": "Only when asked (DOM only)",
+      "auto": "Auto (DOM first, screenshot when needed)",
+      "always": "Always (DOM + compact numbered screenshot)"
+    },
     "recordSteps": "Keep pictures for replay",
     "recordStepsHint": "A small screenshot before each step, stored on this device. Not on sign-in, account or payment pages.",
     "commands": {

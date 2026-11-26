@@ -81,10 +81,51 @@ export function normalizeBaseURL(baseURL: string): string {
   return baseURL.trim().replace(/\/+$/, '');
 }
 
-/** localhost, 127.0.0.0/8 and ::1: traffic that never leaves this computer. */
+/** localhost, 127.0.0.0/8, ::1, and IPv4-mapped loopback: traffic that never leaves this computer. */
 export function isLoopbackHost(hostname: string): boolean {
-  const host = hostname.toLowerCase().replace(/^\[|\]$/g, '');
-  return host === 'localhost' || host.endsWith('.localhost') || host === '::1' || /^127(?:\.\d{1,3}){3}$/.test(host);
+  const host = hostname.toLowerCase().replace(/^\[|\]$/g, '').replace(/\.+$/, '');
+  return (
+    host === 'localhost' ||
+    host.endsWith('.localhost') ||
+    host === '::1' ||
+    host === '0:0:0:0:0:0:0:1' ||
+    /^127(?:\.\d{1,3}){3}$/.test(host) ||
+    /^::ffff:127(?:\.\d{1,3}){3}$/.test(host) ||
+    /^::ffff:7f[0-9a-f]{2}:[0-9a-f]{1,4}$/.test(host)
+  );
+}
+
+function isPrivateIpv4(ip: string): boolean {
+  const parts = ip.split('.').map(Number);
+  if (parts.length !== 4 || parts.some((n) => !Number.isInteger(n) || n < 0 || n > 255)) return false;
+  const [a, b] = parts as [number, number, number, number];
+  return (
+    a === 0 ||
+    a === 10 ||
+    a === 127 ||
+    (a === 100 && b >= 64 && b <= 127) ||
+    (a === 169 && b === 254) ||
+    (a === 172 && b >= 16 && b <= 31) ||
+    (a === 192 && b === 168)
+  );
+}
+
+/** Loopback, unspecified, RFC1918 private ranges, link-local/metadata, IPv6 ULA/link-local, and local-only domains. */
+export function isPrivateHost(hostname: string): boolean {
+  const host = hostname.toLowerCase().replace(/^\[|\]$/g, '').replace(/\.+$/, '');
+  if (!host || isLoopbackHost(host)) return true;
+  if (host === '0.0.0.0' || host === '::' || host === '0:0:0:0:0:0:0:0') return true;
+  if (host.endsWith('.local') || host.endsWith('.internal') || host.endsWith('.home.arpa')) return true;
+  const v4MappedDotted = /^::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/.exec(host);
+  if (v4MappedDotted) return isPrivateIpv4(v4MappedDotted[1]!);
+  const v4MappedHex = /^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/.exec(host);
+  if (v4MappedHex) {
+    const hi = Number.parseInt(v4MappedHex[1]!, 16);
+    const lo = Number.parseInt(v4MappedHex[2]!, 16);
+    return isPrivateIpv4(`${(hi >> 8) & 0xff}.${hi & 0xff}.${(lo >> 8) & 0xff}.${lo & 0xff}`);
+  }
+  if (/^\d{1,3}(?:\.\d{1,3}){3}$/.test(host)) return isPrivateIpv4(host);
+  return /^f[cd][0-9a-f]{2}:/.test(host) || /^fe[89ab][0-9a-f]:/.test(host);
 }
 
 /** True when an API key sent to this address would cross the network unencrypted. */

@@ -12,7 +12,7 @@ import { SHOPPING_SKILLS, SLASH_COMMANDS, type SlashCommand } from '../../src/ch
 import { useConversation } from '../../src/chat/useConversation';
 import { useTabConversation } from '../../src/chat/useTabConversation';
 import { isRestrictedUrl, requestHostAccess } from '../../src/permissions/hosts';
-import type { AgentMode, ContextKind, ContextSnapshot, ErrorInfo, Locale, MessageImage, MessageRecord, SavedCommand } from '../../src/shared/types';
+import type { AgentMode, ContextKind, ContextSnapshot, ErrorInfo, Locale, MessageImage, MessageRecord, ReasoningEffort, SavedCommand } from '../../src/shared/types';
 import { enabledSkills, type Skill } from '../../src/skills/skills';
 import { skillTitle } from '../../src/skills/titles';
 import { useInstalledSkills } from '../../src/skills/useInstalledSkills';
@@ -82,6 +82,8 @@ export function App() {
   const speech = useSpeech();
   /** The turn whose reply will be read aloud, and whether its request was spoken. */
   const toSpeak = useRef<{ taskId: string; byVoice: boolean } | undefined>(undefined);
+  /** Prevents duplicate sends while capturing context or dispatching a request. */
+  const sendingRef = useRef(false);
 
   // The request's turn has reported back.
   useEffect(() => {
@@ -277,30 +279,36 @@ export function App() {
   };
 
   const handleSend = async (typed = text, { byVoice = false } = {}) => {
-    const prompt = typed.trim();
-    if (question) return prompt ? answer(prompt) : undefined;
-    // While the assistant works, what is typed goes to the turn under way.
-    if (activeTask && !pendingTaskId) return prompt ? addToTurn(prompt) : undefined;
-    if (!chatSlot || activeTask || pendingTaskId) return;
-    const contexts: ContextSnapshot[] = [];
-    if (includePage && tab) {
-      try {
-        contexts.push(await capturePage(tab.id));
-      } catch (error) {
-        console.error(error);
-        setNotice(t('context.captureFailed'));
-        return;
+    if (sendingRef.current) return;
+    sendingRef.current = true;
+    try {
+      const prompt = typed.trim();
+      if (question) return prompt ? await answer(prompt) : undefined;
+      // While the assistant works, what is typed goes to the turn under way.
+      if (activeTask && !pendingTaskId) return prompt ? await addToTurn(prompt) : undefined;
+      if (!chatSlot || activeTask || pendingTaskId) return;
+      const contexts: ContextSnapshot[] = [];
+      if (includePage && tab) {
+        try {
+          contexts.push(await capturePage(tab.id));
+        } catch (error) {
+          console.error(error);
+          setNotice(t('context.captureFailed'));
+          return;
+        }
       }
+      contexts.push(...tabContexts);
+      if (selection) contexts.push(selection);
+      if (!prompt && contexts.length === 0 && images.length === 0) return;
+      await send(prompt || t('composer.defaultPrompt'), contexts, {
+        byVoice,
+        images,
+        command: command && { name: command.name, steps: command.steps, startUrl: command.startUrl },
+        skills: picked.map((skill) => skill.name),
+      });
+    } finally {
+      sendingRef.current = false;
     }
-    contexts.push(...tabContexts);
-    if (selection) contexts.push(selection);
-    if (!prompt && contexts.length === 0 && images.length === 0) return;
-    await send(prompt || t('composer.defaultPrompt'), contexts, {
-      byVoice,
-      images,
-      command: command && { name: command.name, steps: command.steps, startUrl: command.startUrl },
-      skills: picked.map((skill) => skill.name),
-    });
   };
 
   /** A new reply to the same request, after an error or a stop. */
@@ -345,20 +353,26 @@ export function App() {
 
   /** Empty-state shortcuts: attach what the command needs and send at once. */
   const runQuickAction = async (id: SlashCommand['id']) => {
-    const command = SLASH_COMMANDS.find((c) => c.id === id)!;
-    if (!tab || !(await ensureAccess())) return accessNotice();
+    if (sendingRef.current) return;
+    sendingRef.current = true;
     try {
-      const contexts: ContextSnapshot[] = [];
-      if (command.attach !== 'page') {
-        const snapshot = await captureSelection(tab);
-        if (snapshot) contexts.push(snapshot);
-        else if (command.attach === 'selection') return setNotice(t('context.noSelection'));
+      const command = SLASH_COMMANDS.find((c) => c.id === id)!;
+      if (!tab || !(await ensureAccess())) return accessNotice();
+      try {
+        const contexts: ContextSnapshot[] = [];
+        if (command.attach !== 'page') {
+          const snapshot = await captureSelection(tab);
+          if (snapshot) contexts.push(snapshot);
+          else if (command.attach === 'selection') return setNotice(t('context.noSelection'));
+        }
+        if (contexts.length === 0) contexts.push(await capturePage(tab.id));
+        await send(commandPrompt(id), contexts, { skills: command.skills });
+      } catch (error) {
+        console.error(error);
+        setNotice(t('context.captureFailed'));
       }
-      if (contexts.length === 0) contexts.push(await capturePage(tab.id));
-      await send(commandPrompt(id), contexts, { skills: command.skills });
-    } catch (error) {
-      console.error(error);
-      setNotice(t('context.captureFailed'));
+    } finally {
+      sendingRef.current = false;
     }
   };
 
@@ -576,6 +590,8 @@ export function App() {
             <Composer
               mode={settings.agent.mode}
               onModeChange={(mode: AgentMode) => void updateSettings((s) => ({ ...s, agent: { ...s.agent, mode } }))}
+              effort={settings.agent.reasoningEffort}
+              onEffortChange={(reasoningEffort: ReasoningEffort) => void updateSettings((s) => ({ ...s, agent: { ...s.agent, reasoningEffort } }))}
               placeholder={question ? t('composer.placeholderAnswer') : undefined}
               focusKey={focusKey}
               text={text}

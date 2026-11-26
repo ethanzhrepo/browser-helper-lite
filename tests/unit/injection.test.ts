@@ -13,7 +13,8 @@ import {
   wrapUntrusted,
 } from '../../src/agent/injection';
 import { classifyAction } from '../../src/agent/risk';
-import { isTransparentColor } from '../../src/browser/visibility';
+import { socialHost, socialSite } from '../../src/agent/social';
+import { isInvisibleOpacity, isTransparentColor } from '../../src/browser/visibility';
 
 describe('findInjection', () => {
   it('catches instructions aimed at AI in four languages', () => {
@@ -188,24 +189,41 @@ describe('data leaks and card numbers', () => {
 });
 
 describe('isTransparentColor', () => {
-  it('reads only a fourth component as alpha', () => {
+  it('reads only a fourth component as alpha and treats near-zero alpha/opacity as hidden', () => {
     expect(isTransparentColor('rgb(0, 0, 0)')).toBe(false);
     expect(isTransparentColor('rgb(255, 255, 0)')).toBe(false);
     expect(isTransparentColor('rgba(0, 0, 0, 0)')).toBe(true);
+    expect(isTransparentColor('rgba(0, 0, 0, 0.01)')).toBe(true);
+    expect(isTransparentColor('hsla(0, 0%, 0%, 0.01)')).toBe(true);
     expect(isTransparentColor('rgba(10, 20, 30, 0.5)')).toBe(false);
     expect(isTransparentColor('rgb(0 0 0 / 0%)')).toBe(true);
+    expect(isTransparentColor('rgb(0 0 0 / 1%)')).toBe(true);
+    expect(isTransparentColor('rgb(0 0 0 / 50%)')).toBe(false);
     expect(isTransparentColor('transparent')).toBe(true);
+    expect(isInvisibleOpacity('0')).toBe(true);
+    expect(isInvisibleOpacity('0.01')).toBe(true);
+    expect(isInvisibleOpacity('0.5')).toBe(false);
   });
 });
 
-describe('siteOf', () => {
-  it('reduces hosts to their registrable site', () => {
+describe('siteOf and socialSite', () => {
+  it('reduces hosts to their registrable site, isolating shared hosting and trailing dots', () => {
     expect(siteOf('www.rogers.com')).toBe('rogers.com');
+    expect(siteOf('www.rogers.com..')).toBe('rogers.com');
     expect(siteOf('shop.rogers.com')).toBe('rogers.com');
     expect(siteOf('www.amazon.co.uk')).toBe('amazon.co.uk');
     expect(siteOf('item.taobao.com.cn')).toBe('taobao.com.cn');
+    expect(siteOf('alice.github.io')).toBe('alice.github.io');
+    expect(siteOf('bob.github.io')).toBe('bob.github.io');
+    expect(siteOf('sub.alice.github.io')).toBe('alice.github.io');
+    expect(siteOf('demo.pages.dev')).toBe('demo.pages.dev');
+    expect(siteOf('app.vercel.app')).toBe('app.vercel.app');
+    expect(siteOf('bucket.s3.amazonaws.com')).toBe('bucket.s3.amazonaws.com');
     expect(siteOf('evil.example')).toBe('evil.example');
     expect(siteOf('127.0.0.1')).toBe('127.0.0.1');
     expect(siteOf('localhost')).toBe('localhost');
+    expect(socialSite('reddit.com.')).toBe('reddit.com');
+    expect(socialSite('www.x.com.')).toBe('x.com');
+    expect(socialHost('https://www.Example.com./r/x')).toBe('example.com');
   });
 });

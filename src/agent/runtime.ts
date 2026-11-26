@@ -4,8 +4,9 @@ import { browser } from 'wxt/browser';
 import { capturePage, truncate } from '../browser/page-context';
 import { buildHistory, renderContext } from '../chat/prompt';
 import { hasHostAccess, isRestrictedUrl, originPattern } from '../permissions/hosts';
-import { isLoopbackHost } from '../providers/vendors';
+import { isPrivateHost } from '../providers/vendors';
 import { toErrorInfo } from '../providers/errors';
+import { auxiliaryReasoning, isSimpleRequest, rejectsReasoning, resolveStepReasoning, temperatureFor, type SdkReasoning } from '../providers/reasoning';
 import { rejectsImages, seesImages } from '../providers/vision';
 import { pickSlot, resolveModelRef, type ResolvedModel } from '../providers/resolve';
 import { nativeSearch } from '../search/native';
@@ -14,10 +15,10 @@ import { apiSearch, buildSearchUrl, deepseekFetch, fetchEndpoint, formatSearchRe
 import type { Locale, MessageImage, MessageRecord, SearchProviderId, Settings, SitePolicy } from '../shared/types';
 import { ActionError, AgentBrowser, sleep, unwrap, type GroupStatus, type Screen } from './browser-controller';
 import { keepPicture } from './keep-pictures';
-import { addressesIn, allowedPictures, pictureKey, picturesIn, replyPictures } from './pictures';
+import { addressesIn, allowedPictures, MAX_REPLY_PICTURES, pictureKey, picturesIn, replyPictures } from './pictures';
 import { isSocialAct, SOCIAL_IN_TAB, socialLimitNote, socialPages, socialSite, socialSites } from './social';
 import { containsCardNumber, containsSecret, findInjection, newBoundary, siteOf, urlDataLeak, wrapUntrusted } from './injection';
-import { decide, modeDecision, policyFor, type ActionKind } from './policy';
+import { evaluateGuard, modeDecision, policyFor, type ActionKind } from './policy';
 import { buildAssistantSystemPrompt, currentTabNote, formatView, newTextNote, OUTDATED_VIEW, viewText, type ObservedState } from './prompt';
 import type { TargetInfo } from './page/types';
 import { actionKind, classifyAction, downloadRisk, formSubmission } from './risk';
@@ -35,6 +36,10 @@ import { ELEMENT_TOOLS, READING_TOOLS, toolsFor, VIEW_AFTER } from './tools';
 
 /** Tools that go through the risk check and may need approval. */
 const GUARDED_TOOLS = new Set([...ELEMENT_TOOLS, 'press', 'click_at']);
+/** Routine browser actions whose clean follow-up step can use lighter reasoning under `auto`. */
+const ROUTINE_TOOLS = new Set(['view_page', 'click', 'click_at', 'type', 'select_option', 'press', 'hover', 'scroll', 'wait', 'navigate', 'go_back', 'open_tab', 'switch_tab', 'close_tab']);
+/** Tools that read or switch tabs without mutating the current page (used to detect no-op interactive actions). */
+const NON_MUTATING_TOOLS = new Set([...READING_TOOLS, 'navigate', 'open_tab', 'go_back', 'close_tab']);
 import { ACTIVE_STATUSES, type AgentAction, type AgentStep, type AgentTask, type InjectionWarning, type PauseReason, type RiskReason, type WaitReason, type WaitResponse } from './types';
 
 export interface RunnerDeps {
@@ -142,7 +147,7 @@ function clip(text: string, limit: number): string {
 
 function hostOf(url: string): string {
   try {
-    return new URL(url).hostname;
+    return new URL(url).hostname.toLowerCase().replace(/\.+$/, '');
   } catch {
     return '';
   }
@@ -218,6 +223,16 @@ export class AgentRunner {
   private screen: ShownScreen | undefined;
   /** The current model refused an image in this turn: it gets descriptions instead. */
   private imagesRejected = false;
+  /** The provider rejected reasoning effort parameters in this turn: omit them for the rest of the turn. */
+  private reasoningRejected = false;
+  /** The provider rejected `reasoning: 'none'` (e.g. reasoning-only model): clamp `off` to `'low'` instead. */
+  private reasoningFloorLow = false;
+  /** The reasoning value sent on the most recent main-loop call. */
+  private lastReasoning: SdkReasoning;
+  /** True when the previous tool step was a routine browser action that completed cleanly. */
+  private lastStepRoutine = false;
+  /** Heuristic for whether the user's initial request is lightweight under `auto` effort. */
+  private simpleGoal = false;
   /** The text of the page in the last view, to tell the model what an action changed. */
   private lastView: { page: string; text: string[] } | undefined;
   /** The pages looked at on each forum or social site in this turn (see social.ts). */
@@ -253,6 +268,8 @@ export class AgentRunner {
   private requestWords = new Set<string>();
   /** After an injection attempt: the sites the turn may still go to without asking. */
   private trustedSites: Set<string> | undefined;
+  /** Picture URLs fetched in this turn (across report_progress and the final reply), capped at MAX_REPLY_PICTURES. */
+  private readonly keptPictures = new Set<string>();
   /** Reasoning of the model call in progress, saved with the final answer. */
   reasoning = '';
 
@@ -322,6 +339,12 @@ export class AgentRunner {
       this.ctl.init(this.settings.agent.useCdp);
       this.main = await resolveModelRef(this.settings, this.task.model);
       this.installedSkills = await listInstalledSkills().catch(() => []);
+      const lastUser = this.history.findLast((m) => m.role === 'user');
+      this.simpleGoal = isSimpleRequest(
+        this.task.goal,
+        Boolean(lastUser?.skills?.length || lastUser?.command),
+        Boolean(lastUser?.contexts?.length || lastUser?.images?.length),
+      );
       // The country of the IP address is looked up only when the user left it to "Automatic".
       this.region = userRegion(this.settings.region, this.settings.region === 'auto' ? await ipRegion().catch(() => undefined) : undefined);
       this.messages = await this.initialMessages();
@@ -336,6 +359,7 @@ export class AgentRunner {
         this.task.error = toErrorInfo(error);
       }
     } finally {
+      this.task.thinking = undefined;
       this.task.waiting = undefined;
       this.pendingWait = undefined;
       this.task.groupedTabs = [...this.ctl.groupedTabs];
@@ -661,15 +685,29 @@ export class AgentRunner {
   /**
    * Fetches the pictures the reply shows and keeps small copies with the
    * conversation, for the panel to show (see pictures.ts). Only addresses
-   * that the assistant read; never one on a site the user blocked.
+   * that the assistant read; never after an injection attempt, never on a
+   * blocked site, never on a private/local host unless already part of the
+   * task, and capped across the whole turn.
    */
   private async keepPictures(reply: string): Promise<void> {
-    if (replyPictures(reply).length === 0) return;
+    if (this.task.injection || replyPictures(reply).length === 0) return;
+    const remaining = MAX_REPLY_PICTURES - this.keptPictures.size;
+    if (remaining <= 0) return;
+    const candidates = allowedPictures(reply, this.seenAddresses(), Number.MAX_SAFE_INTEGER)
+      .filter((url) => {
+        const key = pictureKey(url);
+        if (this.keptPictures.has(key)) return false;
+        const host = hostOf(url);
+        if (!host || policyFor(host, this.settings.sitePolicies) === 'blocked') return false;
+        if (isPrivateHost(host) && !this.knownSites.has(siteOf(host))) return false;
+        return true;
+      })
+      .slice(0, remaining);
     const conversationId = this.task.conversationId;
+    for (const url of candidates) this.keptPictures.add(pictureKey(url));
     await Promise.all(
-      allowedPictures(reply, this.seenAddresses()).map(async (url) => {
+      candidates.map(async (url) => {
         try {
-          if (policyFor(hostOf(url), this.settings.sitePolicies) === 'blocked') return;
           await keepPicture(conversationId, url, { signal: this.abort.signal });
         } catch (error) {
           // A reply without its picture is still the reply: the panel shows a link instead.
@@ -699,11 +737,10 @@ export class AgentRunner {
   }
 
   private async readImage(image: string, prompt: string): Promise<string> {
-    const { model, providerOptions } = await this.auxModel(['vision', 'chat']).catch(() => {
+    const resolved = await this.auxModel(['vision', 'chat']).catch(() => {
       throw new ActionError('No vision model is configured. Ask the user to set one under Model roles.');
     });
-    const result = await generateText({
-      model,
+    const result = await this.generateAuxText(resolved, {
       messages: [
         {
           role: 'user',
@@ -713,9 +750,6 @@ export class AgentRunner {
           ],
         },
       ],
-      providerOptions,
-      abortSignal: this.abort.signal,
-      maxRetries: 1,
     }).catch((error: unknown) => {
       if (this.stopped) throw new StopError();
       const detail = error instanceof Error ? error.message : String(error);
@@ -726,25 +760,35 @@ export class AgentRunner {
   }
 
   /**
-   * Adds a screenshot to a page view whose text is not enough (see
+   * Adds a screenshot to a page view according to `visionStrategy` (see
    * screenshotReason). Returns the text to append to the view. Never on pages
    * that ask for credentials or handle accounts and payments: a screenshot
    * cannot be cleaned of what it shows.
    */
-  private async autoScreen(state: ObservedState, callId: string): Promise<string> {
-    if (!this.settings.agent.autoScreenshot || state.page.kind !== 'page') return '';
+  private async autoScreen(state: ObservedState, callId: string, noChange = false): Promise<string> {
+    const strategy = this.settings.agent.visionStrategy;
+    if (strategy === 'off' || state.page.kind !== 'page') return '';
     const { snapshot } = state.page;
     if (isSensitivePage(state.tab.url) || snapshot.blockers.passwordField || snapshot.blockers.oneTimeCodeField) return '';
-    const reason = screenshotReason(snapshot.visual, { elements: snapshot.elementCount, textChars: snapshot.content.length }, this.consecutiveErrors);
     const mode = this.visionMode();
-    if (!reason || mode === 'none') return '';
+    if (mode === 'none') return '';
+    const reason = screenshotReason(
+      snapshot.visual,
+      { elements: snapshot.elementCount, textChars: snapshot.content.length },
+      this.consecutiveErrors,
+      { strategy, noChange, canReadDirectly: mode === 'main' },
+    );
+    if (!reason) return '';
     const page = `${withoutHash(state.tab.url)}|${reason}`;
     if (mode === 'separate' && this.described.has(page)) return '';
-    const shot = await this.ctl.screen({ activate: false }).catch(() => undefined);
+    const shot = await this.ctl.screen({ activate: false, compact: reason === 'always' }).catch(() => undefined);
     if (!shot) return '';
     const step = this.task.steps.length;
     if (mode === 'main') {
       this.screen = { ...shot, callId, step };
+      if (reason === 'always') {
+        return '\n\nA numbered screenshot of the viewport follows these tool results; use element numbers [n] from the DOM view to act.';
+      }
       return `\n\nA screenshot of the viewport follows these tool results, because ${SCREENSHOT_WHY[reason]}.`;
     }
     this.described.add(page);
@@ -925,10 +969,10 @@ export class AgentRunner {
       const atLimit = this.task.steps.length >= this.task.maxSteps;
       const { text, toolCalls, responseMessages } = await this.callModel(atLimit);
 
-      // The user added something while this answer was being written: it is not the answer yet.
+      // The user added something while this answer was being written: discard the unshown draft and continue with the remark.
       if (toolCalls.length === 0 && !atLimit && this.remarks.length > 0) {
-        this.messages.push(...responseMessages);
         this.task.draft = '';
+        this.task.thinking = undefined;
         this.reasoning = '';
         this.update();
         continue;
@@ -941,6 +985,15 @@ export class AgentRunner {
         const parts = [...(this.task.sections ?? []), text.trim()].filter(Boolean);
         const summary = parts.join('\n\n') || this.deps.t('agent.emptyAnswer');
         await this.keepPictures(summary);
+        // A remark may have arrived while finishing up (recording the final frame or fetching pictures).
+        if (toolCalls.length === 0 && !atLimit && this.remarks.length > 0) {
+          this.task.draft = '';
+          this.task.thinking = undefined;
+          this.reasoning = '';
+          this.update();
+          continue;
+        }
+        this.task.thinking = undefined;
         this.task.status = 'done';
         this.task.result = { success: true, summary };
         return;
@@ -955,6 +1008,7 @@ export class AgentRunner {
       };
       this.task.steps.push(step);
       this.task.draft = '';
+      this.task.thinking = undefined;
       this.reasoning = '';
       this.messages.push(...responseMessages);
       this.update();
@@ -979,6 +1033,12 @@ export class AgentRunner {
           await this.fallBackToChat();
           continue;
         }
+        // Some OpenAI-compatible servers or reasoning-only models reject `reasoning_effort` or `'none'`: fall back cleanly.
+        if (!this.reasoningRejected && this.lastReasoning && rejectsReasoning(error)) {
+          if (this.lastReasoning === 'none' && !this.reasoningFloorLow) this.reasoningFloorLow = true;
+          else this.reasoningRejected = true;
+          continue;
+        }
         // Only a guess says this model reads images: when it refuses one, go on without.
         if (this.screen?.callId && rejectsImages(error)) {
           await this.dropImages();
@@ -995,6 +1055,7 @@ export class AgentRunner {
 
   private async streamStep(atLimit: boolean) {
     this.task.draft = '';
+    this.task.thinking = undefined;
     this.reasoning = '';
     const chatOnly = Boolean(this.task.chatOnly);
     const messages = this.renderMessages();
@@ -1004,6 +1065,22 @@ export class AgentRunner {
         content: `You have reached the step limit of ${this.task.maxSteps}. Do not call tools. Give your final answer now: what you found or did, and what is left for the user.`,
       });
     }
+    const desired = this.reasoningRejected
+      ? undefined
+      : resolveStepReasoning({
+          effort: this.settings.agent.reasoningEffort,
+          vendor: this.main.connection.vendor,
+          modelId: this.main.ref.modelId,
+          stepCount: this.task.steps.length,
+          atLimit,
+          chatOnly,
+          consecutiveErrors: this.consecutiveErrors,
+          routineFollowUp: this.lastStepRoutine,
+          complexTask: this.loadedSkills.size > 0 || (this.task.sections?.length ?? 0) > 0,
+          simpleRequest: this.simpleGoal,
+        });
+    const reasoning = desired === 'none' && this.reasoningFloorLow ? 'low' : desired;
+    this.lastReasoning = reasoning;
     const result = streamText({
       model: this.main.model,
       instructions: cachedInstructions(
@@ -1019,7 +1096,8 @@ export class AgentRunner {
       ),
       messages,
       ...(chatOnly ? {} : { tools: toolsFor(this.settings.search, { skills: this.skills().length > 0, skillFiles: this.skills().some((skill) => (skill.files ?? []).length > 0) }), toolChoice: atLimit ? ('none' as const) : ('auto' as const) }),
-      temperature: this.settings.slots.chat?.temperature,
+      ...(reasoning ? { reasoning } : {}),
+      temperature: temperatureFor(this.main.connection.vendor, reasoning, this.settings.slots.chat?.temperature),
       providerOptions: cacheOptions(this.main.providerOptions, this.main.connection.vendor, this.task.conversationId),
       abortSignal: this.abort.signal,
       maxRetries: 1,
@@ -1033,6 +1111,8 @@ export class AgentRunner {
         this.updateDraft();
       } else if (part.type === 'reasoning-delta') {
         this.reasoning += part.text;
+        this.task.thinking = this.reasoning.length > 8000 ? `…${this.reasoning.slice(-8000)}` : this.reasoning;
+        this.updateDraft();
       } else if (part.type === 'error') {
         throw part.error;
       } else if (part.type === 'abort') {
@@ -1046,8 +1126,10 @@ export class AgentRunner {
 
   private async runTools(step: AgentStep, calls: Awaited<ReturnType<AgentRunner['streamStep']>>['toolCalls']): Promise<void> {
     const results: ToolResultPart[] = [];
+    const hadInjection = Boolean(this.task.injection);
     let viewFor: string | undefined;
     let pageChanged = false;
+    let noChange = false;
     const reply = (id: string, toolName: string, value: string) =>
       results.push({ type: 'tool-result', toolCallId: id, toolName, output: { type: 'text', value } });
 
@@ -1111,14 +1193,29 @@ export class AgentRunner {
           if (seen.size >= socialPages(this.settings.social)) again += `\n\nNote from the extension: ${socialLimitNote(site, seen.size)}`;
         }
       }
+      const hadInteractive = step.actions.some((a) => a.status === 'done' && !NON_MUTATING_TOOLS.has(a.tool));
+      const newElements = state.page.kind === 'page' && /(?:^|\n)\*/.test(state.page.snapshot.content);
+      noChange = Boolean(
+        hadInteractive &&
+          state.page.kind === 'page' &&
+          this.lastView?.page === page &&
+          changes.includes('No text changed in the viewport') &&
+          !newElements,
+      );
       this.lastView = state.page.kind === 'page' ? { page, text } : undefined;
       const view = formatView(state, this.boundary, changes);
       // A screenshot from an earlier step shows a page that has moved on.
       if (this.screen && this.screen.step !== this.task.steps.length) this.screen = undefined;
-      const screen = await this.autoScreen(state, viewFor);
+      const screen = await this.autoScreen(state, viewFor, noChange);
       this.views.set(viewFor, this.inspect(view, 'page', state.tab.url) + view + screen + again);
       this.latestViewId = viewFor;
     }
+    const newInjection = !hadInjection && Boolean(this.task.injection);
+    this.lastStepRoutine =
+      !newInjection &&
+      !noChange &&
+      step.actions.length > 0 &&
+      step.actions.every((a) => a.status === 'done' && ROUTINE_TOOLS.has(a.tool));
     this.messages.push({ role: 'tool', content: results });
   }
 
@@ -1573,16 +1670,6 @@ export class AgentRunner {
     const policy = policyFor(host, this.settings.sitePolicies);
     const mode = this.settings.agent.mode;
     const kind: ActionKind = actionKind(action.tool, action.args, target, classification);
-    let decision = decide(mode, policy, classification.risk, kind);
-    let reason: RiskReason | undefined = classification.reason;
-    // Some steps no rule can judge (a click on drawn content): the user does, whatever the mode.
-    if (decision === 'allow' && classification.confirm) decision = 'confirm';
-    // On a forum or social site the assistant reads. What acts in the user's name there (a like, a vote, a follow, a post) waits for the user.
-    if (decision === 'allow' && this.social(tab.url ?? '') && target && kind === 'change' && (classification.risk >= 2 || isSocialAct(target))) {
-      decision = 'confirm';
-      reason = 'social';
-      action.risk = Math.max(classification.risk, 2) as typeof action.risk;
-    }
     // A link to one more page of a social site whose limit for this request is reached.
     const limit = kind === 'browse' && target?.href ? this.socialLimit(target.href) : undefined;
     if (limit) {
@@ -1590,20 +1677,21 @@ export class AgentRunner {
       action.result = limit;
       return 'continue';
     }
-    // Account security, keys, consoles and payments: every change waits for the user, whatever the mode or policy.
-    if (decision === 'allow' && classification.risk >= 1 && kind !== 'browse' && isSensitivePage(tab.url ?? '')) {
-      decision = 'confirm';
-      reason = 'sensitivePage';
-    }
-    // After an injection attempt, changes to pages and links to new sites wait for the user.
-    if (this.task.injection && decision === 'allow' && classification.risk >= 1) {
-      const linkHost = kind === 'browse' && target?.href ? hostOf(target.href) : undefined;
-      if (kind !== 'browse' || (linkHost && !this.isTrustedHost(linkHost))) {
-        decision = 'confirm';
-        reason = 'injection';
-      }
-    }
-    if (decision === 'deny') {
+    const linkHost = kind === 'browse' && target?.href ? hostOf(target.href) : undefined;
+    const guard = evaluateGuard({
+      mode,
+      policy,
+      host,
+      risk: classification.risk,
+      kind,
+      reason: classification.reason,
+      confirm: classification.confirm,
+      social: Boolean(this.social(tab.url ?? '') && target && kind === 'change' && (classification.risk >= 2 || isSocialAct(target))),
+      sensitivePage: isSensitivePage(tab.url ?? ''),
+      injection: Boolean(this.task.injection && (kind !== 'browse' || (linkHost && !this.isTrustedHost(linkHost)))),
+    });
+    action.risk = guard.risk;
+    if (guard.decision === 'deny') {
       action.status = 'rejected';
       action.result =
         modeDecision(mode, classification.risk, kind) === 'deny'
@@ -1611,18 +1699,14 @@ export class AgentRunner {
           : `The user's policy for ${host} (${policy}) does not allow this action.`;
       return 'continue';
     }
-    // Steps on sensitive pages are approved one at a time.
-    // Allowing ordinary steps for the task does not cover clicks on drawn content, nor the other way round.
-    const allowScope = reason === 'injection' || reason === 'unseen' || reason === 'social' ? reason : classification.risk;
-    const allowKey = reason === 'sensitivePage' ? undefined : `${allowScope}|${host}`;
-    if (decision === 'confirm' && !(allowKey && this.allowedThisTask.has(allowKey))) {
+    if (guard.decision === 'confirm' && !(guard.allowKey && this.allowedThisTask.has(guard.allowKey))) {
       const before = { tabId: tab.id, url: withoutHash(tab.url ?? '') };
       action.status = 'awaiting';
       const response = await this.waitFor({
         kind: 'approval',
         actionId: action.id,
-        risk: reason === 'social' ? (Math.max(classification.risk, 2) as typeof classification.risk) : classification.risk,
-        reason: reason ?? (mode === 'manual' ? 'manualMode' : 'confirmEach'),
+        risk: guard.risk,
+        reason: guard.reason,
         site: host,
         target: action.target ?? action.tool,
         tool: action.tool,
@@ -1647,10 +1731,10 @@ export class AgentRunner {
           'The page changed while the user was deciding, so this action was not done. Look at the page again; if the action is still needed, it will be checked again.';
         return 'pageChanged';
       }
-      // High-risk steps are approved one at a time (§8.1).
-      if (choice === 'allowTask' && classification.risk < 3 && allowKey) this.allowedThisTask.add(allowKey);
+      // High-risk and sensitive-page steps are approved one at a time (§8.1).
+      if (choice === 'allowTask' && guard.allowKey) this.allowedThisTask.add(guard.allowKey);
       if (kind === 'browse' && target?.href) this.trustedSites?.add(siteOf(hostOf(target.href)));
-      if (choice === 'allowSite' && classification.risk < 3 && reason !== 'injection' && reason !== 'sensitivePage' && reason !== 'unseen' && reason !== 'social') {
+      if (choice === 'allowSite' && guard.canAllowSite) {
         await this.deps.saveSitePolicy(host, 'auto');
         this.settings = { ...this.settings, sitePolicies: { ...this.settings.sitePolicies, [host]: 'auto' } };
       }
@@ -1679,6 +1763,27 @@ export class AgentRunner {
     return resolveModelRef(this.settings, ref);
   }
 
+  /** Helper model call (extract, research notes, vision reading) with lightweight reasoning and automatic fallback. */
+  private async generateAuxText(
+    resolved: ResolvedModel,
+    params: { instructions?: string; prompt?: string; messages?: ModelMessage[] },
+  ) {
+    const reasoning = auxiliaryReasoning(this.settings.agent.reasoningEffort, resolved.connection.vendor, resolved.ref.modelId);
+    const base = {
+      ...params,
+      model: resolved.model,
+      providerOptions: resolved.providerOptions,
+      abortSignal: this.abort.signal,
+      maxRetries: 1,
+    } as Parameters<typeof generateText>[0];
+    try {
+      return await generateText({ ...base, ...(reasoning ? { reasoning } : {}) });
+    } catch (error) {
+      if (!reasoning || !rejectsReasoning(error)) throw error;
+      return generateText(base);
+    }
+  }
+
   private async extract(query: string): Promise<string> {
     const tab = await this.ctl.currentTab();
     const problem = await this.ensurePageAccess(tab.url ?? '');
@@ -1689,14 +1794,10 @@ export class AgentRunner {
     if (page.markdown.length <= EXTRACT_WHOLE_CHARS) {
       return `${notices}The page is short, so here is all of it; there is no need to read it again.\n${wrapUntrusted('page', this.boundary, { title: clip(page.title, 200), url: page.url }, page.markdown)}`;
     }
-    const { model, providerOptions } = await this.auxModel(['fast', 'chat']);
-    const result = await generateText({
-      model,
+    const resolved = await this.auxModel(['fast', 'chat']);
+    const result = await this.generateAuxText(resolved, {
       instructions: EXTRACT_SYSTEM,
       prompt: `${wrapUntrusted('page', this.boundary, { title: clip(page.title, 200), url: page.url }, clip(page.markdown, 60_000))}\n\nExtract: ${query}`,
-      providerOptions,
-      abortSignal: this.abort.signal,
-      maxRetries: 1,
     });
     this.addUsage(result.usage);
     return notices + wrapUntrusted('extracted', this.boundary, { url: page.url }, clip(result.text.trim() || '(nothing found)', 4000));
@@ -1784,14 +1885,14 @@ export class AgentRunner {
     if (!readsThroughDeepSeek(this.settings.search)) throw new ActionError('Reading pages by address is turned off. Open the page in the tab instead.');
     await this.ensureFetchAccess();
     // What DeepSeek cannot fetch (a page on this computer or network, one it is refused) is read in a background tab where the extension may.
-    const page = await this.fetchPage(url).catch(async (error: unknown) => {
+    const page: { title: string; content: string; hiddenNotice?: string } = await this.fetchPage(url).catch(async (error: unknown) => {
       if (!(error instanceof ActionError) || !(await hasHostAccess(url))) throw error;
       return this.readInTab(url);
     });
     this.rememberHost(url);
     const { text, truncated } = truncate(page.content, READ_PAGE_CHARS);
     const attributes = { title: clip(page.title, 200), url, ...(truncated ? { truncated: 'true' } : {}) };
-    return this.untrusted('page', attributes, text, 'page', url);
+    return (page.hiddenNotice ?? '') + this.untrusted('page', attributes, text, 'page', url);
   }
 
   /** DeepSeek's Fetch API is reached like any other host: asked for once when access is missing. */
@@ -1806,7 +1907,7 @@ export class AgentRunner {
   private async fetchPage(url: string): Promise<{ title: string; content: string }> {
     const parsed = new URL(url);
     if (parsed.username || parsed.password || containsSecret(url)) throw new ActionError('Addresses with a password, key or token in them are not sent to DeepSeek.');
-    if (isLoopbackHost(parsed.hostname)) throw new ActionError('Only public pages can be read this way. Open this one in the tab instead.');
+    if (isPrivateHost(parsed.hostname)) throw new ActionError('Only public pages can be read this way. Open this one in the tab instead.');
     let page;
     try {
       page = await deepseekFetch(url, {
@@ -1826,14 +1927,14 @@ export class AgentRunner {
   }
 
   /** One page read in a background tab that is closed again; for sites the assistant already has access to. */
-  private async readInTab(url: string): Promise<{ title: string; content: string }> {
+  private async readInTab(url: string): Promise<{ title: string; content: string; hiddenNotice?: string }> {
     if (!(await hasHostAccess(url))) throw new ActionError(`The assistant has no access to ${hostOf(url)}. Open the page in the tab (navigate) to ask for it.`);
     const tabId = await this.ctl.openTab(url, { show: false, scratch: true });
     try {
       await this.ctl.waitForSettle(tabId);
       const page = await this.ctl.pageMarkdown(tabId);
-      if (page.hiddenText) this.inspect(page.hiddenText, 'page', url, true);
-      return { title: page.title, content: page.markdown };
+      const hiddenNotice = page.hiddenText ? this.inspect(page.hiddenText, 'page', page.url || url, true) : '';
+      return { title: page.title, content: page.markdown, ...(hiddenNotice ? { hiddenNotice } : {}) };
     } finally {
       await this.ctl.closeTab(tabId).catch(() => undefined);
     }
@@ -1910,7 +2011,7 @@ export class AgentRunner {
     if (list.length === 0 || !question.trim()) throw new ActionError('Give a question and the addresses of the pages to read.');
     const viaDeepSeek = readsThroughDeepSeek(this.settings.search);
     if (viaDeepSeek) await this.ensureFetchAccess();
-    const { model, providerOptions } = await this.auxModel(['fast', 'chat']);
+    const resolved = await this.auxModel(['fast', 'chat']);
     let done = 0;
     const progress = () => {
       action.target = `${done}/${list.length}`;
@@ -1923,23 +2024,19 @@ export class AgentRunner {
         const problem = this.researchProblem(url);
         if (problem) return `- ${url}: not read (${problem}).`;
         // What DeepSeek cannot fetch (a page on this computer or network, one it is refused) is read in a tab where the extension may.
-        const page = viaDeepSeek
+        const page: { title: string; content: string; hiddenNotice?: string } = viaDeepSeek
           ? await this.fetchPage(url).catch(async (error: unknown) => {
               if (!(error instanceof ActionError) || !(await hasHostAccess(url))) throw error;
               return this.readInTab(url);
             })
           : await this.readInTab(url);
         // Checked on the raw page: the model that takes the notes may leave injected text out.
-        const notices = this.inspect(page.content, 'page', url);
+        const notices = (page.hiddenNotice ?? '') + this.inspect(page.content, 'page', url);
         // A page shorter than its notes would be needs no notes.
         if (page.content.length <= RESEARCH_NOTE_CHARS) return notices + wrapUntrusted('source', this.boundary, { title: clip(page.title, 200), url }, page.content.trim() || 'The page is empty.');
-        const result = await generateText({
-          model,
+        const result = await this.generateAuxText(resolved, {
           instructions: EXTRACT_SYSTEM,
           prompt: `${wrapUntrusted('page', this.boundary, { title: clip(page.title, 200), url }, clip(page.content, 60_000))}\n\nExtract: what this page says about "${question}". At most 150 words. Keep numbers, names and dates exactly as written. Reply "Nothing relevant." when the page does not help.`,
-          providerOptions,
-          abortSignal: this.abort.signal,
-          maxRetries: 1,
         });
         this.addUsage(result.usage);
         // Notes leave the page's pictures out; the product's goes along, so the reply can show it.

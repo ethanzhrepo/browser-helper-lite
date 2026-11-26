@@ -165,6 +165,7 @@ function classifyPress(keys: string, target: TargetInfo | undefined): Classifica
     const blocked = sensitiveField(target);
     if (blocked) return blocked;
     if (target.editable && containsCardNumber(`${target.text}${combo.key}`)) return { risk: 3, reason: 'sensitiveField', forbidden: 'payment' };
+    if (target.editable && containsSecret(`${target.text}${combo.key}`)) return { risk: 3, reason: 'secret' };
   }
   if (shortcut) return /^a$/i.test(combo.key) ? { risk: 1 } : { risk: 2, reason: 'submit' };
   if (!target || (combo.key !== 'Enter' && combo.key !== ' ')) return { risk: 1 };
@@ -187,10 +188,11 @@ export function classifyAction(tool: string, args: Record<string, unknown>, targ
     if (blocked) return blocked;
     if (target.frameOrigin) return { risk: 3, reason: 'frame' };
     const text = String(args.text ?? '');
+    const combined = args.clear === false ? `${target.text}${text}` : text;
     // A card number in any field (a page can label its fields however it likes), also when typed in pieces.
-    if (containsCardNumber(args.clear === false ? `${target.text}${text}` : text)) return { risk: 3, reason: 'sensitiveField', forbidden: 'payment' };
-    // Keys and tokens are approved one at a time, whatever the field says it is for.
-    if (containsSecret(text)) return { risk: 3, reason: 'secret' };
+    if (containsCardNumber(combined)) return { risk: 3, reason: 'sensitiveField', forbidden: 'payment' };
+    // Keys and tokens are approved one at a time, whatever the field says it is for, also when typed in pieces.
+    if (containsSecret(combined)) return { risk: 3, reason: 'secret' };
     // Enter in a search box only searches; elsewhere it submits the form, judged by its submit button.
     if (args.submit !== true) return { risk: 1 };
     return target.tag === 'input' || target.isSearchField ? classifySubmit(target) : { risk: 2, reason: 'submit' };

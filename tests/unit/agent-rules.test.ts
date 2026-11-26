@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { parseKeyCombo } from '../../src/agent/keys';
 import type { TargetInfo } from '../../src/agent/page/types';
-import { decide, modeDecision, policyFor, siteDecision } from '../../src/agent/policy';
+import { decide, evaluateGuard, modeDecision, policyFor, siteDecision } from '../../src/agent/policy';
 import { actionKind, classifyAction, formSubmission } from '../../src/agent/risk';
 import { buildSearchUrl } from '../../src/search/search';
 import { DEFAULT_SEARCH_SETTINGS } from '../../src/storage/settings';
@@ -136,12 +136,18 @@ describe('classifyAction', () => {
     expect(classifyAction('type', { index: 1, text: ' 1111' }, field).risk).toBe(1);
   });
 
-  it('asks before typing keys or tokens anywhere', () => {
+  it('asks before typing keys or tokens anywhere, including when split across calls or key presses', () => {
     const field = target({ tag: 'input', editable: true, label: 'input "Coupon"' });
     expect(classifyAction('type', { index: 1, text: 'sk-proj-abcdefghijklmnopqrstuvwxyz012345' }, field)).toMatchObject({ risk: 3, reason: 'secret' });
     expect(classifyAction('type', { index: 1, text: 'ghp_abcdefghijklmnopqrstuvwxyz0123456789' }, field)).toMatchObject({ risk: 3, reason: 'secret' });
     expect(classifyAction('type', { index: 1, text: 'AKIAIOSFODNN7EXAMPLE' }, field)).toMatchObject({ risk: 3, reason: 'secret' });
     expect(classifyAction('type', { index: 1, text: 'task-force meeting notes' }, field).risk).toBe(1);
+    // Split secret via type(clear: false) and single-key press.
+    const partial = target({ tag: 'textarea', editable: true, text: 'sk-proj-abcdefghij' });
+    expect(classifyAction('type', { index: 1, text: 'klmnopqrstuvwxyz012345', clear: false }, partial)).toMatchObject({ risk: 3, reason: 'secret' });
+    expect(classifyAction('type', { index: 1, text: 'klmnopqrstuvwxyz012345' }, partial).risk).toBe(1);
+    const almostFull = target({ tag: 'textarea', editable: true, text: 'sk-proj-abcdefghijklmnopqrs' });
+    expect(classifyAction('press', { keys: 't' }, almostFull)).toMatchObject({ risk: 3, reason: 'secret' });
   });
 
   it('rates clicks and keys that land in another site\'s frame as high risk', () => {
@@ -209,10 +215,13 @@ describe('classifyAction', () => {
 describe('site policies', () => {
   const policies = { 'rogers.com': 'readOnly', 'shop.rogers.com': 'auto', 'bank.example': 'blocked' } as const;
 
-  it('matches subdomains, preferring the most specific entry', () => {
+  it('matches subdomains and trailing-dot FQDNs, preferring the most specific entry', () => {
     expect(policyFor('www.rogers.com', policies)).toBe('readOnly');
-    expect(policyFor('shop.rogers.com', policies)).toBe('auto');
+    expect(policyFor('www.rogers.com.', policies)).toBe('readOnly');
+    expect(policyFor('bank.example.', policies)).toBe('blocked');
+    expect(policyFor('shop.rogers.com..', policies)).toBe('auto');
     expect(policyFor('notrogers.com', policies)).toBeUndefined();
+    expect(policyFor('bank.example', { 'bank.example.': 'blocked' })).toBe('blocked');
   });
 
   it('decides per risk level and kind of action', () => {
@@ -266,6 +275,99 @@ describe('modes', () => {
     expect(decide('manual', 'auto', 3, 'change')).toBe('confirm');
     expect(decide('manual', undefined, 2, 'change')).toBe('confirm');
     expect(decide('auto', 'auto', 3, 'change')).toBe('confirm');
+  });
+});
+
+describe('evaluateGuard escalations', () => {
+  it('enforces one-by-one approval on sensitive pages in Manual, confirmEach and confirmRisky modes', () => {
+    for (const [mode, policy] of [
+      ['manual', undefined],
+      ['auto', 'confirmEach'],
+      ['auto', 'confirmRisky'],
+      ['auto', 'auto'],
+    ] as const) {
+      const outcome = evaluateGuard({
+        mode,
+        policy,
+        host: 'github.com',
+        risk: 2,
+        kind: 'change',
+        reason: 'submit',
+        sensitivePage: true,
+      });
+      expect(outcome, `${mode}/${policy}`).toEqual({
+        decision: 'confirm',
+        risk: 2,
+        reason: 'sensitivePage',
+        allowKey: undefined,
+        canAllowSite: false,
+      });
+    }
+    // L3 destructive on a sensitive page keeps its L3 reason while staying one-by-one.
+    expect(
+      evaluateGuard({ mode: 'manual', policy: undefined, host: 'github.com', risk: 3, kind: 'change', reason: 'destructive', sensitivePage: true }),
+    ).toEqual({
+      decision: 'confirm',
+      risk: 3,
+      reason: 'destructive',
+      allowKey: undefined,
+      canAllowSite: false,
+    });
+  });
+
+  it('isolates post-injection approvals from pre-injection allowTask even in Manual or confirmEach mode', () => {
+    const before = evaluateGuard({ mode: 'manual', policy: undefined, host: 'shop.example', risk: 1, kind: 'change' });
+    expect(before).toMatchObject({ decision: 'confirm', reason: 'manualMode', allowKey: '1|shop.example', canAllowSite: true });
+
+    const afterManual = evaluateGuard({ mode: 'manual', policy: undefined, host: 'shop.example', risk: 1, kind: 'change', injection: true });
+    expect(afterManual).toEqual({
+      decision: 'confirm',
+      risk: 1,
+      reason: 'injection',
+      allowKey: 'injection|shop.example',
+      canAllowSite: false,
+    });
+    expect(afterManual.allowKey).not.toBe(before.allowKey);
+
+    const afterConfirmEach = evaluateGuard({ mode: 'auto', policy: 'confirmEach', host: 'shop.example', risk: 2, kind: 'change', reason: 'submit', injection: true });
+    expect(afterConfirmEach).toEqual({
+      decision: 'confirm',
+      risk: 2,
+      reason: 'injection',
+      allowKey: 'injection|shop.example',
+      canAllowSite: false,
+    });
+  });
+
+  it('applies social escalation and blocks allowSite even in Manual mode', () => {
+    const outcome = evaluateGuard({ mode: 'manual', policy: undefined, host: 'reddit.com', risk: 1, kind: 'change', social: true });
+    expect(outcome).toEqual({
+      decision: 'confirm',
+      risk: 2,
+      reason: 'social',
+      allowKey: 'social|reddit.com',
+      canAllowSite: false,
+    });
+  });
+
+  it('keeps distinct scopes when multiple escalations overlap', () => {
+    const outcome = evaluateGuard({
+      mode: 'manual',
+      policy: undefined,
+      host: 'shop.example.',
+      risk: 2,
+      kind: 'change',
+      reason: 'unseen',
+      confirm: true,
+      injection: true,
+    });
+    expect(outcome).toEqual({
+      decision: 'confirm',
+      risk: 2,
+      reason: 'injection',
+      allowKey: 'injection+unseen|shop.example',
+      canAllowSite: false,
+    });
   });
 });
 

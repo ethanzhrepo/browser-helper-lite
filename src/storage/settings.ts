@@ -24,10 +24,12 @@ const SCHEMA_VERSION = 2;
 
 export const DEFAULT_AGENT_SETTINGS: AgentSettings = {
   mode: 'auto',
+  reasoningEffort: 'auto',
   useCdp: true,
   maxSteps: DEFAULT_MAX_STEPS,
   notifications: true,
   screenshots: 'auto',
+  visionStrategy: 'auto',
   autoScreenshot: true,
   recordSteps: true,
 };
@@ -70,7 +72,7 @@ export function defaultSettings(): Settings {
 }
 
 /** Settings as saved by older versions. */
-type StoredSettings = Partial<Settings> & {
+type StoredSettings = Omit<Partial<Settings>, 'agent' | 'slots'> & {
   agent?: Partial<AgentSettings> & { searchEngine?: SearchSettings['engine']; customSearchUrl?: string };
   slots?: Record<string, unknown>;
 };
@@ -89,12 +91,13 @@ export function withDefaults(stored: StoredSettings | undefined): Settings {
   const { agent: _agentSlot, ...slots } = (stored?.slots ?? {}) as Settings['slots'] & { agent?: unknown };
   // Settings saved before the default step limit went up carry the old default; a limit the user sets after that is kept, whatever it is.
   if ((stored?.schemaVersion ?? 1) < SCHEMA_VERSION && agent.maxSteps === OLD_DEFAULT_MAX_STEPS) agent.maxSteps = DEFAULT_MAX_STEPS;
+  const visionStrategy = agent.visionStrategy ?? (agent.autoScreenshot === false ? 'off' : defaults.agent.visionStrategy);
   return {
     ...defaults,
     ...stored,
     schemaVersion: SCHEMA_VERSION,
     slots,
-    agent: { ...defaults.agent, ...agent },
+    agent: { ...defaults.agent, ...agent, visionStrategy, autoScreenshot: visionStrategy !== 'off' },
     search: {
       ...defaults.search,
       ...legacySearch,
@@ -105,6 +108,19 @@ export function withDefaults(stored: StoredSettings | undefined): Settings {
     skills: { ...defaults.skills, ...stored?.skills },
     social: { ...defaults.social, ...stored?.social },
   };
+}
+
+/** Module-level queues serialize read-modify-write updates so concurrent calls never overwrite each other. */
+let settingsQueue: Promise<unknown> = Promise.resolve();
+let secretsQueue: Promise<unknown> = Promise.resolve();
+
+function enqueue<T>(kind: 'settings' | 'secrets', work: () => Promise<T>): Promise<T> {
+  const prev = kind === 'settings' ? settingsQueue : secretsQueue;
+  const next = prev.then(work, work);
+  const settled = next.catch(() => undefined);
+  if (kind === 'settings') settingsQueue = settled;
+  else secretsQueue = settled;
+  return next;
 }
 
 export async function loadSettings(): Promise<Settings> {
@@ -119,13 +135,17 @@ async function saveSettings(settings: Settings): Promise<Settings> {
 
 /** Replaces the settings and all API keys at once (restoring a backup). */
 export async function replaceSettings(settings: Settings, secrets: Secrets): Promise<Settings> {
-  const next = { ...settings, updatedAt: Date.now() };
-  await browser.storage.local.set({ [SETTINGS_KEY]: next, [SECRETS_KEY]: secrets });
-  return next;
+  return enqueue('settings', () =>
+    enqueue('secrets', async () => {
+      const next = { ...settings, updatedAt: Date.now() };
+      await browser.storage.local.set({ [SETTINGS_KEY]: next, [SECRETS_KEY]: secrets });
+      return next;
+    }),
+  );
 }
 
 export async function updateSettings(mutate: (draft: Settings) => Settings): Promise<Settings> {
-  return saveSettings(mutate(await loadSettings()));
+  return enqueue('settings', async () => saveSettings(mutate(await loadSettings())));
 }
 
 export function watchSettings(listener: (settings: Settings) => void): () => void {
@@ -147,10 +167,12 @@ export async function getApiKey(connectionId: string): Promise<string | undefine
 }
 
 async function writeApiKey(connectionId: string, apiKey: string | undefined): Promise<void> {
-  const secrets = await loadSecrets();
-  if (apiKey) secrets[connectionId] = apiKey;
-  else delete secrets[connectionId];
-  await browser.storage.local.set({ [SECRETS_KEY]: secrets });
+  return enqueue('secrets', async () => {
+    const secrets = await loadSecrets();
+    if (apiKey) secrets[connectionId] = apiKey;
+    else delete secrets[connectionId];
+    await browser.storage.local.set({ [SECRETS_KEY]: secrets });
+  });
 }
 
 export async function hasApiKey(connectionId: string): Promise<boolean> {

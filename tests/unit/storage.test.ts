@@ -78,6 +78,23 @@ describe('settings and secrets', () => {
     expect(settings.slots.fast?.connectionId).toBe('b');
     expect(await getApiKey('a')).toBeUndefined();
   });
+
+  it('serializes concurrent updateSettings and secret writes without losing updates', async () => {
+    await Promise.all([
+      updateSettings((s) => ({ ...s, sitePolicies: { ...s.sitePolicies, 'a.example': 'auto' } })),
+      updateSettings((s) => ({ ...s, sitePolicies: { ...s.sitePolicies, 'b.example': 'blocked' } })),
+      updateSettings((s) => ({ ...s, sitePolicies: { ...s.sitePolicies, 'c.example': 'readOnly' } })),
+      saveSearchKey('tavily', 'tvly-1'),
+      saveSearchKey('brave', 'brv-2'),
+    ]);
+    expect((await loadSettings()).sitePolicies).toEqual({
+      'a.example': 'auto',
+      'b.example': 'blocked',
+      'c.example': 'readOnly',
+    });
+    expect(await getSearchKey('tavily')).toBe('tvly-1');
+    expect(await getSearchKey('brave')).toBe('brv-2');
+  });
 });
 
 describe('settings defaults and migration', () => {
@@ -110,7 +127,20 @@ describe('settings defaults and migration', () => {
       agent: { useCdp: false, maxSteps: 20, notifications: true, searchEngine: 'custom', customSearchUrl: 'https://s.example/?q=%s' },
       slots: { chat: { connectionId: 'a', modelId: 'm' }, agent: { connectionId: 'b', modelId: 'n' } },
     } as never);
-    expect(migrated.agent).toEqual({ mode: 'auto', useCdp: false, maxSteps: 20, notifications: true, screenshots: 'auto', autoScreenshot: true, recordSteps: true });
+    expect(migrated.agent).toEqual({
+      mode: 'auto',
+      reasoningEffort: 'auto',
+      useCdp: false,
+      maxSteps: 20,
+      notifications: true,
+      screenshots: 'auto',
+      visionStrategy: 'auto',
+      autoScreenshot: true,
+      recordSteps: true,
+    });
+    // Older settings with autoScreenshot: false migrate cleanly to visionStrategy: 'off'.
+    expect(withDefaults({ agent: { autoScreenshot: false } }).agent).toMatchObject({ visionStrategy: 'off', autoScreenshot: false });
+    expect(withDefaults({ agent: { visionStrategy: 'always' } }).agent).toMatchObject({ visionStrategy: 'always', autoScreenshot: true });
     expect(migrated.search.engine).toBe('custom');
     expect(migrated.search.customUrl).toBe('https://s.example/?q=%s');
     expect(Object.keys(migrated.slots)).toEqual(['chat']);
@@ -246,10 +276,23 @@ describe('deleting and replacing conversations', () => {
     expect(discarded).toMatchObject({ groupedTabs: [7], steps: [], goal: '' });
   });
 
-  it('replaces a request and what followed it', async () => {
+  it('replaces a request and what followed it, cleaning up orphaned reply pictures', async () => {
     const { conversation, request } = await seedChat();
+    const keptUrl = 'https://cdn.shop.test/kept.jpg';
+    const orphanUrl = 'https://cdn.shop.test/orphan.jpg';
+    const firstReply = await appendMessage({ conversationId: conversation.id, role: 'assistant', content: `![Kept](${keptUrl})`, status: 'done' });
+    const secondRequest = await appendMessage({ conversationId: conversation.id, role: 'user', content: 'Another', status: 'done' });
+    await appendMessage({ conversationId: conversation.id, role: 'assistant', content: `![Orphan](${orphanUrl})`, status: 'done' });
+    await savePicture({ id: `${conversation.id} ${keptUrl}`, conversationId: conversation.id, url: keptUrl, image: 'AAAA', mediaType: 'image/webp', width: 100, height: 100, at: 1 });
+    await savePicture({ id: `${conversation.id} ${orphanUrl}`, conversationId: conversation.id, url: orphanUrl, image: 'BBBB', mediaType: 'image/webp', width: 100, height: 100, at: 2 });
+
+    await truncateConversation(conversation.id, secondRequest.id);
+    expect((await getMessages(conversation.id)).some((m) => m.id === firstReply.id)).toBe(true);
+    expect((await db.pictures.where('conversationId').equals(conversation.id).toArray()).map((p) => p.url)).toEqual([keptUrl]);
+
     await truncateConversation(conversation.id, request.id);
     expect(await getMessages(conversation.id)).toHaveLength(0);
+    expect(await db.pictures.where('conversationId').equals(conversation.id).count()).toBe(0);
     expect(JSON.stringify(await db.messages.toArray())).not.toContain('balance');
   });
 
@@ -321,6 +364,30 @@ describe('backups', () => {
 
     // A file with something else where the picture should be is not a backup.
     expect(() => parseBackup(JSON.stringify({ ...backup, pictures: [{ ...picture, image: '<svg onload=alert(1)>' }] }))).toThrow();
+    expect(() => parseBackup(JSON.stringify({ ...backup, pictures: [{ ...picture, url: 'javascript:alert(1)' }] }))).toThrow();
+    // Custom search URLs in backups must use https (or http on localhost).
+    expect(() => parseBackup(JSON.stringify({ ...backup, settings: { ...backup.settings!, search: { engine: 'custom', customUrl: 'javascript:alert(%s)' } } }))).toThrow();
+    expect(() => parseBackup(JSON.stringify({ ...backup, settings: { ...backup.settings!, search: { engine: 'custom', customUrl: 'http://evil.example/?q=%s' } } }))).toThrow();
+    expect(() => parseBackup(JSON.stringify({ ...backup, settings: { ...backup.settings!, search: { engine: 'custom', customUrl: 'http://localhost:8080/?q=%s' } } }))).not.toThrow();
+    // Reasoning effort and vision strategy are validated in backups.
+    expect(() => parseBackup(JSON.stringify({ ...backup, settings: { ...backup.settings!, agent: { ...backup.settings!.agent, reasoningEffort: 'low', visionStrategy: 'always' } } }))).not.toThrow();
+    expect(() => parseBackup(JSON.stringify({ ...backup, settings: { ...backup.settings!, agent: { ...backup.settings!.agent, reasoningEffort: 'turbo' } } }))).toThrow();
+    expect(() => parseBackup(JSON.stringify({ ...backup, settings: { ...backup.settings!, agent: { ...backup.settings!.agent, visionStrategy: 'pixelsOnly' } } }))).toThrow();
+
+    // Pending picture placeholders and built-in legacy skill names are never imported from backups.
+    const pendingPicture = { id: `${conversation.id} https://evil.example/track.png`, conversationId: conversation.id, url: 'https://evil.example/track.png', image: '', mediaType: 'image/webp' as const, width: 0, height: 0, at: 2, pending: true };
+    const forgedLegacy = {
+      ...backup,
+      skills: undefined,
+      pictures: [picture, pendingPicture],
+      settings: { ...backup.settings!, skills: { installed: [{ name: 'reputation', description: 'evil', instructions: 'hijack' }], off: [] } },
+    };
+    await db.skills.clear();
+    await db.pictures.clear();
+    expect(await restoreBackup(parseBackup(JSON.stringify(forgedLegacy)))).toMatchObject({ skills: 0 });
+    expect(await db.skills.get('reputation')).toBeUndefined();
+    expect((await db.pictures.toArray()).map((p) => p.url)).toEqual([picture.url]);
+
     // Erasing the conversation erases its pictures, and none is stored for it afterwards.
     await deleteConversation(conversation.id);
     await purgeConversation(conversation.id);

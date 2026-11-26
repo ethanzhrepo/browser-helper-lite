@@ -5,7 +5,7 @@ import { openOptions } from '../../src/ui/navigation';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ENABLE_CDP_DRIVER } from '../../src/shared/build-flags';
-import type { AgentMode, AgentSettings, Settings } from '../../src/shared/types';
+import type { AgentMode, AgentSettings, ReasoningEffort, Settings, VisionStrategy } from '../../src/shared/types';
 import { DEFAULT_MAX_STEPS, MAX_MAX_STEPS, MIN_MAX_STEPS, updateSettings } from '../../src/storage/settings';
 import { Card, ChoiceCard, Field, inputClass, Section, Toggle } from './Section';
 
@@ -15,7 +15,9 @@ const MODES: { id: AgentMode; icon: LucideIcon }[] = [
   { id: 'manual', icon: Hand },
 ];
 
+const EFFORTS: ReasoningEffort[] = ['auto', 'off', 'low', 'medium', 'high'];
 const SCREENSHOT_READERS: AgentSettings['screenshots'][] = ['auto', 'main', 'vision'];
+const VISION_STRATEGIES: VisionStrategy[] = ['off', 'auto', 'always'];
 
 function saveAgent(patch: Partial<AgentSettings>) {
   void updateSettings((s) => ({ ...s, agent: { ...s.agent, ...patch } }));
@@ -54,6 +56,23 @@ export function AgentSection({ settings }: { settings: Settings }) {
         <p className="text-xs text-muted">{t('agentSettings.modeHint')}</p>
       </div>
       <Card className="divide-y divide-line p-0 [&>*]:px-5 [&>*]:py-4">
+        <div>
+          <Field label={t('agentSettings.reasoningEffort')} htmlFor="reasoning-effort" hint={t('agentSettings.reasoningEffortHint')}>
+            <select
+              id="reasoning-effort"
+              data-testid="reasoning-effort"
+              className={`${inputClass} sm:w-64`}
+              value={agent.reasoningEffort}
+              onChange={(e) => saveAgent({ reasoningEffort: e.target.value as ReasoningEffort })}
+            >
+              {EFFORTS.map((level) => (
+                <option key={level} value={level}>
+                  {t(`composer.efforts.${level}`)}
+                </option>
+              ))}
+            </select>
+          </Field>
+        </div>
         <Toggle
           id="use-cdp"
           checked={ENABLE_CDP_DRIVER && agent.useCdp}
@@ -92,13 +111,26 @@ export function AgentSection({ settings }: { settings: Settings }) {
             </button>
           )}
         </div>
-        <Toggle
-          id="auto-screenshot"
-          checked={agent.autoScreenshot}
-          onChange={(autoScreenshot) => saveAgent({ autoScreenshot })}
-          label={t('agentSettings.autoScreenshot')}
-          hint={t('agentSettings.autoScreenshotHint')}
-        />
+        <div>
+          <Field label={t('agentSettings.visionStrategy')} htmlFor="vision-strategy" hint={t('agentSettings.visionStrategyHint')}>
+            <select
+              id="vision-strategy"
+              data-testid="vision-strategy"
+              className={`${inputClass} sm:w-64`}
+              value={agent.visionStrategy}
+              onChange={(e) => {
+                const visionStrategy = e.target.value as VisionStrategy;
+                saveAgent({ visionStrategy, autoScreenshot: visionStrategy !== 'off' });
+              }}
+            >
+              {VISION_STRATEGIES.map((strategy) => (
+                <option key={strategy} value={strategy}>
+                  {t(`agentSettings.visionStrategies.${strategy}`)}
+                </option>
+              ))}
+            </select>
+          </Field>
+        </div>
         <Toggle
           id="record-steps"
           checked={agent.recordSteps}

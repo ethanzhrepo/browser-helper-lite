@@ -50,7 +50,7 @@ export function isSensitivePage(url: string): boolean {
   } catch {
     return false;
   }
-  const host = parsed.hostname.toLowerCase().replace(/^www\./, '');
+  const host = parsed.hostname.toLowerCase().replace(/\.+$/, '').replace(/^www\./, '');
   if (SENSITIVE_SITES.some((site) => underSite(host, site))) return true;
   if (CODE_HOSTS.some((site) => underSite(host, site)) && CODE_HOST_SETTINGS.test(parsed.pathname)) return true;
   return SENSITIVE_PATHS.some((pattern) => pattern.test(parsed.pathname));

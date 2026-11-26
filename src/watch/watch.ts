@@ -90,6 +90,11 @@ export const WATCH_DAYS = 30;
 export const MAX_WATCHES = 20;
 /** After this many failed checks in a row a watch stops and says so. */
 export const MAX_WATCH_FAILURES = 3;
+/** Rate limits for live-page change events so a rapidly mutating page cannot burn API tokens. */
+export const LIVE_WINDOW_MS = 10 * 60 * 1000;
+export const LIVE_BURST_CHECKS = 3;
+export const MAX_LIVE_CHECKS_PER_WINDOW = 10;
+export const LIVE_COOLDOWN_PENALTY_MS = 15 * 60 * 1000;
 const HISTORY = 20;
 const NOTE_CHARS = 160;
 const QUOTES = 3;
@@ -117,6 +122,34 @@ export const alarmMinutes = (watch: Pick<Watch, 'everySeconds'>) => Math.max(wat
 
 /** How long to leave a site alone after the given number of failed looks in a row. */
 export const retryAfterMs = (failures: number) => RETRY_MINUTES * 60 * 1000 * 2 ** Math.max(0, failures - 1);
+
+export type LiveLimitResult =
+  | { action: 'allow' }
+  | { action: 'wait'; waitMs: number }
+  | { action: 'slowdown'; retryAt: number };
+
+/**
+ * Throttles model calls driven by live page mutations (`watch.changed`).
+ * First `LIVE_BURST_CHECKS` checks in `LIVE_WINDOW_MS` respect `everySeconds`;
+ * after that, the minimum gap backs off exponentially, and exceeding
+ * `MAX_LIVE_CHECKS_PER_WINDOW` pauses checks for `LIVE_COOLDOWN_PENALTY_MS`.
+ */
+export function liveLimit(watch: Pick<Watch, 'everySeconds' | 'history'>, now: number): LiveLimitResult {
+  const recent = watch.history.filter((entry) => !entry.error && now - entry.at >= 0 && now - entry.at < LIVE_WINDOW_MS);
+  if (recent.length >= MAX_LIVE_CHECKS_PER_WINDOW) {
+    return { action: 'slowdown', retryAt: now + LIVE_COOLDOWN_PENALTY_MS };
+  }
+  const last = recent.at(-1)?.at;
+  if (last === undefined) return { action: 'allow' };
+  const baseMs = Math.max(1000, watch.everySeconds * 1000);
+  const minGap =
+    recent.length >= LIVE_BURST_CHECKS
+      ? Math.min(LIVE_WINDOW_MS, Math.max(baseMs, 15_000) * 2 ** (recent.length - LIVE_BURST_CHECKS))
+      : baseMs;
+  const elapsed = now - last;
+  if (elapsed < minGap) return { action: 'wait', waitMs: minGap - elapsed };
+  return { action: 'allow' };
+}
 
 /**
  * How long a verdict is trusted while the text it depended on stays the

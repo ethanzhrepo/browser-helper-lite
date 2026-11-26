@@ -168,6 +168,7 @@ async function startTask(message: Extract<AgentClientMessage, { type: 'start' }>
 
   // The tab the request was made in shows this conversation from now on.
   await linkTab(tabId, task.conversationId);
+  if (stoppingAll) return;
   const runner = new AgentRunner(task, settings, locale, history, {
     t,
     onTabOpened: (openedTabId) => linkTab(openedTabId, task.conversationId),
@@ -176,7 +177,7 @@ async function startTask(message: Extract<AgentClientMessage, { type: 'start' }>
       broadcast(next);
       void persist(next);
     },
-    onWaiting: (next) => void notifyWaiting(next, settings, t),
+    onWaiting: (next) => void loadSettings().then((latest) => notifyWaiting(next, latest, t)).catch(() => undefined),
     createWatch,
     saveSitePolicy: async (host, policy) => {
       await updateSettings((s) => ({ ...s, sitePolicies: { ...s.sitePolicies, [host]: policy } }));
@@ -365,9 +366,12 @@ export function registerAgentService(): void {
     void browser.notifications.clear(id);
     // The click lets us open the side panel there, if it is not open yet.
     openPanel(tabId).catch(() => undefined);
-    void browser.tabs.get(tabId).then(async (tab) => {
-      await browser.windows.update(tab.windowId, { focused: true });
-      await browser.tabs.update(tabId, { active: true });
-    });
+    void browser.tabs
+      .get(tabId)
+      .then(async (tab) => {
+        await browser.windows.update(tab.windowId, { focused: true });
+        await browser.tabs.update(tabId, { active: true });
+      })
+      .catch(() => undefined);
   });
 }

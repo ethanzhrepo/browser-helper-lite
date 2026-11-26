@@ -2,32 +2,41 @@ import mermaid from 'mermaid';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { CodeFrame, CopyButton } from './Markdown';
+import { MERMAID_FORBID_TAGS, MERMAID_SECURE_KEYS, sanitizeMermaidSvg } from './mermaid-sanitize';
 
 let counter = 0;
+/** Mermaid keeps global config on a singleton, so renders run one at a time. */
+let renderQueue: Promise<unknown> = Promise.resolve();
 const darkQuery = () => window.matchMedia('(prefers-color-scheme: dark)');
 
 /** Renders one diagram; colors follow the light or dark theme. */
-async function renderDiagram(source: string, dark: boolean): Promise<string> {
-  mermaid.initialize({
-    startOnLoad: false,
-    // Strict: no click handlers, sanitized output.
-    securityLevel: 'strict',
-    // Plain SVG text labels: HTML labels could carry <img> tags that load remote URLs (§8.2).
-    htmlLabels: false,
-    flowchart: { htmlLabels: false },
-    dompurifyConfig: { FORBID_TAGS: ['img', 'image', 'foreignObject', 'a'], FORBID_ATTR: ['href', 'xlink:href'] },
-    theme: dark ? 'dark' : 'neutral',
-    fontFamily: 'inherit',
-  });
-  const id = `mermaid-${++counter}`;
-  try {
-    await mermaid.parse(source);
-    const { svg } = await mermaid.render(id, source);
-    return svg;
-  } finally {
-    // On errors mermaid leaves its scratch element in the document.
-    document.getElementById(`d${id}`)?.remove();
-  }
+function renderDiagram(source: string, dark: boolean): Promise<string> {
+  const run = async (): Promise<string> => {
+    mermaid.initialize({
+      startOnLoad: false,
+      // Strict: no click handlers, sanitized output, and directives cannot override security settings.
+      securityLevel: 'strict',
+      secure: MERMAID_SECURE_KEYS,
+      // Plain SVG text labels: HTML labels could carry <img> tags that load remote URLs (§8.2).
+      htmlLabels: false,
+      flowchart: { htmlLabels: false },
+      dompurifyConfig: { FORBID_TAGS: MERMAID_FORBID_TAGS, FORBID_ATTR: ['href', 'xlink:href'] },
+      theme: dark ? 'dark' : 'neutral',
+      fontFamily: 'inherit',
+    });
+    const id = `mermaid-${++counter}`;
+    try {
+      await mermaid.parse(source);
+      const { svg } = await mermaid.render(id, source);
+      return sanitizeMermaidSvg(svg);
+    } finally {
+      // On errors mermaid leaves its scratch element in the document.
+      document.getElementById(`d${id}`)?.remove();
+    }
+  };
+  const next = renderQueue.then(run, run);
+  renderQueue = next.catch(() => undefined);
+  return next;
 }
 
 export default function MermaidDiagram({ source }: { source: string }) {

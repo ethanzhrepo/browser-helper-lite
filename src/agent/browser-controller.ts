@@ -2,7 +2,7 @@ import { browser, type Browser } from 'wxt/browser';
 import type { PageExtraction } from '../browser/page-context';
 import { CdpDriver } from './drivers/cdp';
 import type { OverlayState, PageAgentApi, PageResult, TargetPoint, Viewport } from './page/types';
-import { fitScreenshot } from './screenshot';
+import { COMPACT_JPEG_QUALITY, COMPACT_SCREEN_EDGE, fitScreenshot } from './screenshot';
 import type { TabInfo } from './prompt';
 
 /** An error the agent should see and can recover from (bad index, covered element…). */
@@ -119,7 +119,11 @@ export class AgentBrowser {
   init(useCdp: boolean): void {
     if (!useCdp || !browser.debugger) return;
     this.cdp = new CdpDriver((_tabId, reason) => {
+      // Closing one tab only detaches that target; keep CDP alive for any other tabs.
+      if (reason === 'target_closed') return;
+      const cdp = this.cdp;
       this.cdp = undefined;
+      void cdp?.detachAll();
       this.options.onDebuggerDetached(reason);
     });
   }
@@ -548,7 +552,7 @@ export class AgentBrowser {
    * the debugger is not attached for it, so this resolves undefined when the
    * tab is hidden and the debugger is not already in use.
    */
-  async screen({ activate }: { activate: boolean }, tabId = this.currentTabId): Promise<Screen | undefined> {
+  async screen({ activate, compact = false }: { activate: boolean; compact?: boolean }, tabId = this.currentTabId): Promise<Screen | undefined> {
     await this.assertAllowed(tabId);
     let tab = await browser.tabs.get(tabId);
     // The user's tab, when they are looking at something else: it is put back after the picture is taken.
@@ -580,7 +584,10 @@ export class AgentBrowser {
       if (back !== undefined) await browser.tabs.update(back, { active: true }).catch(() => undefined);
     }
     if (!raw) return undefined;
-    return { ...(await fitScreenshot(raw, viewport.pixelRatio)), viewport, tabId, url: tab.url ?? '' };
+    const fit = compact
+      ? await fitScreenshot(raw, viewport.pixelRatio, { maxEdge: COMPACT_SCREEN_EDGE, quality: COMPACT_JPEG_QUALITY })
+      : await fitScreenshot(raw, viewport.pixelRatio);
+    return { ...fit, viewport, tabId, url: tab.url ?? '' };
   }
 
   private viewportOf(tabId: number) {
@@ -594,7 +601,10 @@ export class AgentBrowser {
       try {
         if (tab.active) return await this.cdp.screenshot(tabId);
         // Behind other tabs Chrome may never draw the page: the picture is given a moment, no more.
-        const shot = await Promise.race([this.cdp.screenshot(tabId), sleep(HIDDEN_SHOT_MS).then(() => undefined)]);
+        const pending = this.cdp.screenshot(tabId);
+        // Prevent an unhandled rejection if the timeout wins the race before screenshot fails.
+        pending.catch(() => undefined);
+        const shot = await Promise.race([pending, sleep(HIDDEN_SHOT_MS).then(() => undefined)]);
         if (shot) return shot;
       } catch (error) {
         this.dropCdp(error);

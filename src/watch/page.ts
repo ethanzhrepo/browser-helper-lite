@@ -76,7 +76,8 @@ export function watchInPage(command: PageCommand): WatchPart[] | (string | null)
     return best === document.body ? null : best;
   };
 
-  const scope = window as unknown as { __browserHelperWatch?: { stop(): void } };
+  const KEY = Symbol.for('browser-helper-watch');
+  const scope = window as unknown as Record<symbol, { stop(): void } | undefined>;
 
   switch (command.kind) {
     case 'locate': {
@@ -93,19 +94,20 @@ export function watchInPage(command: PageCommand): WatchPart[] | (string | null)
     case 'probe':
       return command.locators.map(textAt);
     case 'stop':
-      scope.__browserHelperWatch?.stop();
+      scope[KEY]?.stop();
       return true;
     case 'live': {
-      scope.__browserHelperWatch?.stop();
+      scope[KEY]?.stop();
       const { id, parts } = command;
       const every = Math.max(1, command.everySeconds) * 1000;
-      let lastRun = 0;
+      const minWait = Math.max(1000, every);
+      let lastRun = Date.now();
       let later: ReturnType<typeof setTimeout> | undefined;
       const stop = () => {
         observer.disconnect();
         clearInterval(timer);
         clearTimeout(later);
-        delete scope.__browserHelperWatch;
+        delete scope[KEY];
       };
       const compare = () => {
         lastRun = Date.now();
@@ -114,16 +116,16 @@ export function watchInPage(command: PageCommand): WatchPart[] | (string | null)
         const runtime = (globalThis as unknown as { chrome?: { runtime?: { sendMessage(message: unknown): Promise<unknown> } } }).chrome?.runtime;
         void runtime?.sendMessage({ type: 'watch.changed', id })?.catch(() => undefined);
       };
-      // The page changed. Reading it is not free, so not more than once a second.
+      // The page changed. Respect the watch pace (at least once a second) so noisy pages do not flood checks.
       const observer = new MutationObserver(() => {
-        const wait = 1000 - (Date.now() - lastRun);
+        const wait = minWait - (Date.now() - lastRun);
         if (wait <= 0) return compare();
         clearTimeout(later);
         later = setTimeout(compare, wait);
       });
       observer.observe(document.documentElement, { subtree: true, childList: true, characterData: true });
       const timer = setInterval(compare, every);
-      scope.__browserHelperWatch = { stop };
+      scope[KEY] = { stop };
       return true;
     }
   }

@@ -260,12 +260,39 @@ export function urlDataLeak(url: string): 'email' | 'card' | 'secret' | 'encoded
 
 /** Second-level labels under country domains, e.g. "co.uk", "com.au", "com.cn". */
 const SECOND_LEVEL = new Set(['co', 'com', 'net', 'org', 'gov', 'edu', 'ac', 'gc', 'or', 'ne', 'go', 'gob', 'gouv']);
+/** Multi-tenant hosting suffixes where each subdomain belongs to a separate site. */
+const SHARED_HOSTING_SUFFIXES = new Set([
+  'github.io',
+  'gitlab.io',
+  'pages.dev',
+  'workers.dev',
+  'vercel.app',
+  'netlify.app',
+  'web.app',
+  'firebaseapp.com',
+  'appspot.com',
+  'googleusercontent.com',
+  'blogspot.com',
+  'azurewebsites.net',
+  'herokuapp.com',
+  'fly.dev',
+  'onrender.com',
+  'railway.app',
+  's3.amazonaws.com',
+  'cloudfront.net',
+  'r2.dev',
+  'deno.dev',
+]);
 
-/** The registrable site of a host ("www.shop.rogers.com" → "rogers.com"), close enough without the public suffix list. */
+/** The registrable site of a host ("www.shop.rogers.com" → "rogers.com"), keeping multi-tenant subdomains distinct. */
 export function siteOf(host: string): string {
-  const bare = host.toLowerCase().replace(/^www\./, '').replace(/\.$/, '');
+  const bare = host.toLowerCase().replace(/^www\./, '').replace(/\.+$/, '');
   if (/^\d+(\.\d+){3}$/.test(bare) || bare.includes(':') || !bare.includes('.')) return bare;
   const labels = bare.split('.');
+  const tail3 = labels.length >= 3 ? labels.slice(-3).join('.') : '';
+  if (tail3 && SHARED_HOSTING_SUFFIXES.has(tail3)) return labels.length > 3 ? labels.slice(-4).join('.') : bare;
+  const tail2 = labels.slice(-2).join('.');
+  if (SHARED_HOSTING_SUFFIXES.has(tail2)) return labels.length > 2 ? labels.slice(-3).join('.') : bare;
   const [second, top] = labels.slice(-2) as [string, string];
   const keep = top.length === 2 && SECOND_LEVEL.has(second) && labels.length > 2 ? 3 : 2;
   return labels.slice(-keep).join('.');

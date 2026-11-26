@@ -6,6 +6,9 @@
 /** Longest edge sent to a model. Larger images are scaled down by the providers anyway, which would shift coordinates. */
 export const MAX_SCREEN_EDGE = 1280;
 const JPEG_QUALITY = 0.72;
+/** Compact SoM screenshot dimensions used by `visionStrategy: 'always'` to keep token use low while preserving coordinates. */
+export const COMPACT_SCREEN_EDGE = 960;
+export const COMPACT_JPEG_QUALITY = 0.62;
 
 async function decode(base64: string): Promise<ImageBitmap> {
   const binary = atob(base64);
@@ -33,23 +36,31 @@ async function encode(canvas: OffscreenCanvas, quality = JPEG_QUALITY): Promise<
  * pixel ratio say what it shows; stretching it to the viewport would move
  * every coordinate.
  */
-export function screenSize(capture: { width: number; height: number }, pixelRatio: number): { width: number; height: number; scale: number } {
+export function screenSize(
+  capture: { width: number; height: number },
+  pixelRatio: number,
+  maxEdge = MAX_SCREEN_EDGE,
+): { width: number; height: number; scale: number } {
   const ratio = pixelRatio > 0 ? pixelRatio : 1;
   const cssWidth = capture.width / ratio;
   const cssHeight = capture.height / ratio;
-  const shrink = Math.min(1, MAX_SCREEN_EDGE / Math.max(cssWidth, cssHeight, 1));
+  const shrink = Math.min(1, maxEdge / Math.max(cssWidth, cssHeight, 1));
   const width = Math.max(1, Math.round(cssWidth * shrink));
   return { width, height: Math.max(1, Math.round(cssHeight * shrink)), scale: cssWidth / width };
 }
 
 /** Scales a capture to the image the model gets; `scale` is CSS pixels per image pixel, on both axes. */
-export async function fitScreenshot(base64: string, pixelRatio: number): Promise<{ image: string; width: number; height: number; scale: number }> {
+export async function fitScreenshot(
+  base64: string,
+  pixelRatio: number,
+  { maxEdge = MAX_SCREEN_EDGE, quality = JPEG_QUALITY }: { maxEdge?: number; quality?: number } = {},
+): Promise<{ image: string; width: number; height: number; scale: number }> {
   const bitmap = await decode(base64);
-  const size = screenSize(bitmap, pixelRatio);
+  const size = screenSize(bitmap, pixelRatio, maxEdge);
   const canvas = new OffscreenCanvas(size.width, size.height);
   canvas.getContext('2d')!.drawImage(bitmap, 0, 0, size.width, size.height);
   bitmap.close();
-  return { image: await encode(canvas), ...size };
+  return { image: await encode(canvas, quality), ...size };
 }
 
 const THUMBNAIL_WIDTH = 640;

@@ -85,6 +85,19 @@
       "autoHint": "Trabaja solo. Pregunta antes de pagos, eliminaciones y otros pasos de alto riesgo.",
       "manualHint": "Lee y busca solo. Pregunta antes de cada cambio."
     },
+    "effort": "Esfuerzo de razonamiento",
+    "efforts": {
+      "auto": "Auto",
+      "off": "Desactivado",
+      "low": "Bajo",
+      "medium": "Medio",
+      "high": "Alto",
+      "autoHint": "Ligero en tareas sencillas y clics rutinarios; más profundo al planificar, corregir o resumir.",
+      "offHint": "Más rápido. Desactiva o minimiza el razonamiento cuando el modelo lo permite.",
+      "lowHint": "Razonamiento breve en cada paso. Ideal para tareas cotidianas.",
+      "mediumHint": "Razonamiento equilibrado en cada paso.",
+      "highHint": "Razonamiento profundo en cada paso. Más lento, mejor para tareas complejas."
+    },
     "removeAttachment": "Quitar el adjunto",
     "pickRegion": "Preguntar por una parte de la página",
     "regionHint": "Arrastra para marcar la zona · Esc para cancelar",
@@ -622,6 +635,8 @@
     "maxStepsHint": "De {{min}} a {{max}}; {{usual}} por defecto. Una tarea que da vueltas gasta más tokens con un límite más alto.",
     "mode": "Modo predeterminado",
     "modeHint": "También se cambia bajo el cuadro de mensaje, incluso en plena tarea.",
+    "reasoningEffort": "Esfuerzo de razonamiento",
+    "reasoningEffortHint": "Controla cuánto piensan los modelos de razonamiento. Auto mantiene rápidos los pasos rutinarios y las llamadas auxiliares; también se cambia bajo el cuadro de mensaje.",
     "screenshots": "Quién lee las capturas",
     "screenshotsHint": "Auto: el modelo actual si lee imágenes; si no, el modelo de visión.",
     "screenshotReaders": {
@@ -630,8 +645,13 @@
       "vision": "Modelo de visión"
     },
     "setVisionModel": "Elegir un modelo de visión",
-    "autoScreenshot": "Mirar la pantalla cuando el texto no basta",
-    "autoScreenshotHint": "En páginas con canvas, botones sin nombre y pasos fallidos. Envía una captura al modelo; nunca en páginas de inicio de sesión, cuenta o pago.",
+    "visionStrategy": "Cuándo mirar la pantalla",
+    "visionStrategyHint": "El DOM sigue siendo prioritario por precisión y seguridad. Auto añade una captura en páginas con canvas/iconos o si una acción no tuvo efecto; Siempre añade una captura compacta numerada con un modelo multimodal. Nunca en páginas de inicio de sesión, cuenta o pago.",
+    "visionStrategies": {
+      "off": "Solo bajo petición (solo DOM)",
+      "auto": "Auto (DOM primero, captura si hace falta)",
+      "always": "Siempre (DOM + captura compacta numerada)"
+    },
     "recordSteps": "Guardar imágenes para la repetición",
     "recordStepsHint": "Una captura pequeña antes de cada paso, guardada en este dispositivo. No en páginas de inicio de sesión, cuenta o pago.",
     "commands": {

@@ -121,11 +121,12 @@ export async function moveLegacySkills(): Promise<number> {
 
 /** Puts skills saved by 0.3.0 into the database as they are, next to those there; one of a name already there is left out. */
 export async function keepLegacySkills(legacy: readonly LegacySkill[]): Promise<number> {
+  const builtin = new Set(BUILTIN_SKILLS.map((skill) => skill.name));
   const now = Date.now();
   return db.transaction('rw', db.skills, async () => {
     let kept = 0;
     for (const [index, skill] of legacy.entries()) {
-      if (typeof skill?.name !== 'string' || !skill.name || (await db.skills.get(skill.name)) || (await db.skills.count()) >= MAX_INSTALLED_SKILLS) continue;
+      if (typeof skill?.name !== 'string' || !skill.name || builtin.has(skill.name) || (await db.skills.get(skill.name)) || (await db.skills.count()) >= MAX_INSTALLED_SKILLS) continue;
       await db.skills.put({ name: skill.name, description: String(skill.description ?? ''), instructions: String(skill.instructions ?? ''), installedAt: now + index, updatedAt: now + index });
       kept += 1;
     }

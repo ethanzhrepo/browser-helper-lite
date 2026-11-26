@@ -1,6 +1,6 @@
 import Dexie, { type Table } from 'dexie';
 import { monotonicFactory } from 'ulid';
-import type { ReplyPicture } from '../agent/pictures';
+import { pictureKey, replyPictures, type ReplyPicture } from '../agent/pictures';
 import { ACTIVE_STATUSES, type AgentTask, type StepShot } from '../agent/types';
 import type { ConversationRecord, MessageRecord } from '../shared/types';
 import type { InstalledSkill } from '../skills/skills';
@@ -206,6 +206,7 @@ export async function truncateConversation(conversationId: string, fromMessageId
         task.goal = '';
         task.steps = [];
         task.draft = '';
+        delete task.thinking;
         delete task.sections;
         delete task.stage;
         delete task.result;
@@ -213,6 +214,21 @@ export async function truncateConversation(conversationId: string, fromMessageId
         delete task.waiting;
         delete task.injection;
       });
+    // Drop cached reply pictures that are no longer referenced by any surviving assistant message.
+    const surviving = await db.messages
+      .where('conversationId')
+      .equals(conversationId)
+      .filter((m) => !m.deletedAt && m.role === 'assistant')
+      .toArray();
+    const keptUrls = new Set<string>();
+    for (const message of surviving) {
+      for (const url of replyPictures(message.content)) keptUrls.add(pictureKey(url));
+    }
+    await db.pictures
+      .where('conversationId')
+      .equals(conversationId)
+      .filter((picture) => !keptUrls.has(picture.url))
+      .delete();
     await db.conversations.update(conversationId, { updatedAt: now });
   });
 }

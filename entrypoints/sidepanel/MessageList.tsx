@@ -136,9 +136,16 @@ function TurnView({ task, replied, request, onSend }: { task: AgentTask; replied
   return (
     <>
       {hasActions && <AgentRunView task={task} request={request} onSend={onSend} />}
-      {!replied && (content || (active && !task.waiting)) && (
+      {!replied && (content || (active && task.thinking) || (!active && task.status === 'failed' && task.error) || (active && !task.waiting)) && (
         // A finished turn without a stored reply was cut off (e.g. the extension restarted).
-        <AssistantMessage content={content} modelId={task.model.modelId} streaming={active} aborted={!active && task.status !== 'done'} />
+        <AssistantMessage
+          content={content}
+          reasoning={active ? task.thinking : undefined}
+          modelId={task.model.modelId}
+          streaming={active}
+          aborted={!active && task.status !== 'done' && task.status !== 'failed'}
+          error={!active && task.status === 'failed' ? task.error : undefined}
+        />
       )}
     </>
   );

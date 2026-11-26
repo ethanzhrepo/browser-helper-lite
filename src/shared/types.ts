@@ -49,8 +49,26 @@ export type SitePolicy = 'blocked' | 'readOnly' | 'confirmEach' | 'confirmRisky'
  */
 export type AgentMode = 'query' | 'auto' | 'manual';
 
+/**
+ * How hard reasoning models think before replying or calling tools:
+ * - auto: light on simple requests, routine browser steps and helper calls; medium on planning, recovery and synthesis
+ * - off: disable or minimize reasoning
+ * - low / medium / high: explicit reasoning effort for the main loop
+ */
+export type ReasoningEffort = 'auto' | 'off' | 'low' | 'medium' | 'high';
+
+/**
+ * When page views include a screenshot alongside the DOM view:
+ * - off: DOM only (screenshots only when the model calls `look`)
+ * - auto: DOM-first, automatically add a screenshot when text isn't enough or an action had no effect
+ * - always: DOM + compact numbered screenshot (SoM) on every view when the current model sees images
+ */
+export type VisionStrategy = 'off' | 'auto' | 'always';
+
 export interface AgentSettings {
   mode: AgentMode;
+  /** Thinking effort for reasoning models. */
+  reasoningEffort: ReasoningEffort;
   /** Use the CDP driver when this build has the debugger permission. */
   useCdp: boolean;
   maxSteps: number;
@@ -63,7 +81,9 @@ export interface AgentSettings {
    * - vision: always the vision model (Model roles)
    */
   screenshots: 'auto' | 'main' | 'vision';
-  /** Add a screenshot to a page view when its text is not enough (canvas, unnamed controls, failing steps). */
+  /** When to attach screenshots automatically alongside the DOM page view. */
+  visionStrategy: VisionStrategy;
+  /** Kept in sync with `visionStrategy !== 'off'` for older backups and callers. */
   autoScreenshot: boolean;
   /** Keep a small picture of the page before each step, so a task can be replayed. Stored on this device only. */
   recordSteps: boolean;
@@ -131,7 +151,7 @@ export interface Settings {
   connections: Connection[];
   slots: Partial<Record<Capability, SlotAssignment>>;
   language: LanguageSetting;
-  /** Where the user is, for prices, shops and delivery: 'auto' (from the browser's language), 'none' (not told to the model) or an ISO country code (see region.ts). */
+  /** Where the user is, for prices, shops and delivery: 'auto' (from the IP address when enabled, else the browser's language), 'none' (not told to the model) or an ISO country code (see region.ts and ip-region.ts). */
   region: string;
   agent: AgentSettings;
   search: SearchSettings;

@@ -117,8 +117,10 @@ function ReplyImage({ src, alt }: { src?: string; alt?: string }) {
 function BlockedImage({ src, alt, pending }: { src?: string; alt?: string; pending?: ReplyPicture }) {
   const { t } = useTranslation();
   const [state, setState] = useState<'idle' | 'busy' | 'failed'>('idle');
+  const [checked, setChecked] = useState(false);
   const label = alt?.trim() || t('message.image');
   const safe = src && /^https?:/i.test(src) ? src : undefined;
+  const carriesData = safe ? urlDataLeak(safe) !== undefined : false;
   const show = () => {
     if (!pending) return;
     setState('busy');
@@ -139,6 +141,12 @@ function BlockedImage({ src, alt, pending }: { src?: string; alt?: string; pendi
       rel="noreferrer noopener"
       title={src}
       data-testid="blocked-image"
+      onClick={(event) => {
+        if (carriesData && !checked) {
+          event.preventDefault();
+          setChecked(true);
+        }
+      }}
       className="inline-flex max-w-full items-center gap-1.5 rounded-md border border-line bg-subtle px-2 py-0.5 align-middle text-xs text-muted no-underline hover:text-fg"
     >
       <ImageOff className="h-3.5 w-3.5 shrink-0" />
@@ -146,28 +154,43 @@ function BlockedImage({ src, alt, pending }: { src?: string; alt?: string; pendi
       {safe && <span className="shrink-0 text-faint">· {hostOf(safe)}</span>}
     </a>
   );
-  if (!pending) return link;
-  return (
-    <span className="inline-flex max-w-full items-center gap-1 align-middle">
-      {link}
-      {state === 'failed' ? (
-        <span className="shrink-0 text-xs text-faint" data-testid="picture-failed">
-          {t('message.pictureFailed')}
-        </span>
-      ) : (
-        <button
-          type="button"
-          onClick={show}
-          disabled={state === 'busy'}
-          title={t('message.showPictureHint', { host: hostOf(pending.url) })}
-          data-testid="show-picture"
-          className="inline-flex shrink-0 items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-medium text-accent hover:bg-accent-soft disabled:opacity-50"
-        >
-          {state === 'busy' && <Loader2 className="h-3 w-3 animate-spin" />}
-          {t('message.showPicture')}
-        </button>
-      )}
+  const warning = carriesData && checked && (
+    <span className="my-1 block rounded-md border border-warning/25 bg-warning-soft px-2 py-1 text-xs leading-relaxed" data-testid="data-link-warning">
+      {t('message.linkData')} <code className="break-all">{safe}</code>
     </span>
+  );
+  if (!pending) {
+    return (
+      <>
+        {link}
+        {warning}
+      </>
+    );
+  }
+  return (
+    <>
+      <span className="inline-flex max-w-full items-center gap-1 align-middle">
+        {link}
+        {state === 'failed' ? (
+          <span className="shrink-0 text-xs text-faint" data-testid="picture-failed">
+            {t('message.pictureFailed')}
+          </span>
+        ) : (
+          <button
+            type="button"
+            onClick={show}
+            disabled={state === 'busy'}
+            title={t('message.showPictureHint', { host: hostOf(pending.url) })}
+            data-testid="show-picture"
+            className="inline-flex shrink-0 items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-medium text-accent hover:bg-accent-soft disabled:opacity-50"
+          >
+            {state === 'busy' && <Loader2 className="h-3 w-3 animate-spin" />}
+            {t('message.showPicture')}
+          </button>
+        )}
+      </span>
+      {warning}
+    </>
   );
 }
 

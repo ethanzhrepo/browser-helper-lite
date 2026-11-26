@@ -28,6 +28,7 @@ import {
   renderSkillFile,
   serializeSkill,
   SKILL_DESCRIPTION_CHARS,
+  SKILL_FILE_BYTES,
   SKILL_FILE_READ_CHARS,
   SKILL_INSTRUCTION_CHARS,
   toSkillName,
@@ -609,6 +610,19 @@ describe('installed skills', () => {
     expect(restored).toBe(1);
     expect(await listInstalledSkills()).toMatchObject([{ ...FORUM, files: [{ path: 'references/a.md', text: 'A' }] }]);
   });
+
+  it('rejects parent traversal and spoofed sizes in readSkillFolder', () => {
+    const big = new Uint8Array(SKILL_FILE_BYTES + 10).fill(65);
+    const skill = readSkillFolder([
+      { path: 'forum-check/SKILL.md', size: 100, bytes: new TextEncoder().encode(serializeSkill(FORUM)) },
+      // Spoofed size: 10 bytes declared, but actual buffer exceeds SKILL_FILE_BYTES.
+      { path: 'forum-check/references/spoofed.md', size: 10, bytes: big },
+      { path: 'forum-check/../escape.md', size: 4, bytes: new TextEncoder().encode('nope') },
+      { path: 'forum-check/references/ok.md', size: 2, bytes: new TextEncoder().encode('ok') },
+    ]);
+    expect(skill.files).toEqual([{ path: 'references/ok.md', text: 'ok' }]);
+    expect(skill.skipped).toContainEqual({ path: 'references/spoofed.md', reason: 'large' });
+  });
 });
 
 describe('pictures in replies', () => {
@@ -645,9 +659,12 @@ See https://shop.test/volt, or (https://shop.test/terms).`;
       // Read, but it carries an email address.
       '![x](https://cdn.shop.test/avatar?user=ann@example.com)',
       '![x](data:image/png;base64,AAAA)',
+      '![x](https://user:pass@cdn.shop.test/img/volt-65.jpg)',
       '![Front](https://cdn.shop.test/img/volt-front.jpg?w=600)',
     ].join('\n');
+    seen.add(pictureKey('https://user:pass@cdn.shop.test/img/volt-65.jpg'));
     expect(allowedPictures(reply, seen)).toEqual(['https://cdn.shop.test/img/volt-65.jpg', 'https://cdn.shop.test/img/volt-front.jpg?w=600']);
+    expect(allowedPictures(reply, seen, 1)).toEqual(['https://cdn.shop.test/img/volt-65.jpg']);
     expect(allowedPictures(reply, new Set())).toEqual([]);
 
     // A page can offer many addresses; a reply fetches a few.

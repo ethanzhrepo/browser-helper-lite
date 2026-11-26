@@ -466,7 +466,7 @@ function WaitingCard({ task, waiting, onSend }: {
     const paces = [...new Set([...WATCH_INTERVALS, everySeconds])].sort((a, b) => a - b);
     const action = task.steps.flatMap((step) => step.actions).find((a) => a.id === waiting.actionId);
     // Trusting a whole site makes no sense when the page itself is the problem.
-    const suspicious = waiting.reason === 'injection' || waiting.reason === 'exfiltration' || waiting.reason === 'secret';
+    const suspicious = Boolean(task.injection) || waiting.reason === 'injection' || waiting.reason === 'exfiltration' || waiting.reason === 'secret';
     const high = waiting.risk >= 3 || suspicious;
     // Site-wide trust makes no sense for these; high-risk steps are approved one at a time (§8.1).
     const oneByOne = waiting.reason === 'exfiltration' || waiting.reason === 'secret' || waiting.reason === 'sensitivePage';
@@ -474,7 +474,10 @@ function WaitingCard({ task, waiting, onSend }: {
     const canAllowSite = waiting.risk < 3 && !suspicious && !oneByOne && !['newSite', 'download', 'unseen', 'watch', 'social'].includes(waiting.reason);
     const canAllowTask = waiting.risk < 3 && !oneByOne && waiting.reason !== 'watch';
     const typed = action?.tool === 'type' ? String(action.args.text ?? '') : '';
-    const fullUrl = action?.tool === 'navigate' || action?.tool === 'open_tab' ? String(action.args.url ?? '') : '';
+    const fullUrl =
+      action?.tool === 'navigate' || action?.tool === 'open_tab' || action?.tool === 'read_url' || action?.tool === 'watch_page'
+        ? String(action.args.url ?? '')
+        : '';
     return (
       <CardShell
         tone={high ? 'danger' : 'accent'}

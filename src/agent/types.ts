@@ -131,6 +131,8 @@ export interface AgentTask {
   steps: AgentStep[];
   /** Text of the model call in progress, streamed to the panel. */
   draft: string;
+  /** Live reasoning of the model call in progress, streamed while thinking and cleared once the step ends. */
+  thinking?: string;
   /**
    * Parts of the answer the assistant gave while still working, one for each
    * stage of a longer task (report_progress). They are shown as they come,

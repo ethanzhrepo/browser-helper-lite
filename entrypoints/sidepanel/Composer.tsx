@@ -1,9 +1,11 @@
 import {
   ArrowUp,
   BookOpenText,
+  Brain,
   Check,
   ChevronDown,
   FileText,
+  Gauge,
   Globe,
   Hand,
   Loader2,
@@ -14,13 +16,15 @@ import {
   Square,
   TextQuote,
   X,
+  Zap,
+  ZapOff,
   type LucideIcon,
 } from 'lucide-react';
 import { Fragment, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { ActiveTab } from '../../src/browser/page-context';
 import { matchCommands, type SlashCommand } from '../../src/chat/commands';
-import type { AgentMode, ContextKind, ContextSnapshot, MessageImage, SavedCommand } from '../../src/shared/types';
+import type { AgentMode, ContextKind, ContextSnapshot, MessageImage, ReasoningEffort, SavedCommand } from '../../src/shared/types';
 import type { Skill } from '../../src/skills/skills';
 import { skillTitle } from '../../src/skills/titles';
 import { faviconUrl } from '../../src/ui/favicon';
@@ -55,9 +59,19 @@ const MODES: { id: AgentMode; icon: LucideIcon }[] = [
   { id: 'manual', icon: Hand },
 ];
 
+const EFFORTS: { id: ReasoningEffort; icon: LucideIcon }[] = [
+  { id: 'auto', icon: Gauge },
+  { id: 'off', icon: ZapOff },
+  { id: 'low', icon: Zap },
+  { id: 'medium', icon: Brain },
+  { id: 'high', icon: Sparkles },
+];
+
 export function Composer(props: {
   mode: AgentMode;
   onModeChange: (mode: AgentMode) => void;
+  effort: ReasoningEffort;
+  onEffortChange: (effort: ReasoningEffort) => void;
   /** Replaces the default placeholder, e.g. while the agent asks a question. */
   placeholder?: string;
   /** The message box takes the cursor when the panel opens and whenever this changes. */
@@ -368,8 +382,11 @@ export function Composer(props: {
             className="block min-h-[44px] w-full resize-none bg-transparent px-3.5 py-2.5 text-sm leading-relaxed text-fg outline-none placeholder:text-faint"
           />
           <div className="flex items-center justify-between gap-2 px-2.5 pb-2.5">
-            <ModePicker mode={props.mode} onChange={props.onModeChange} />
-            <div className="flex items-center gap-1.5">
+            <div className="flex min-w-0 items-center gap-1.5">
+              <ModePicker mode={props.mode} onChange={props.onModeChange} />
+              <EffortPicker effort={props.effort} onChange={props.onEffortChange} />
+            </div>
+            <div className="flex shrink-0 items-center gap-1.5">
               <button
                 type="button"
                 data-testid="pick-region"
@@ -485,6 +502,82 @@ function ModePicker({ mode, onChange }: { mode: AgentMode; onChange: (mode: Agen
                 <span className="min-w-0 flex-1">
                   <span className="block text-sm font-medium">{t(`composer.modes.${id}`)}</span>
                   <span className="block text-xs leading-relaxed text-muted">{t(`composer.modes.${id}Hint`)}</span>
+                </span>
+                {checked && <Check className="mt-1 h-4 w-4 shrink-0 text-accent" />}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Auto / Off / Low / Medium / High thinking effort, remembered globally and effective mid-task. */
+function EffortPicker({ effort, onChange }: { effort: ReasoningEffort; onChange: (effort: ReasoningEffort) => void }) {
+  const { t } = useTranslation();
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const current = EFFORTS.find((e) => e.id === effort) ?? EFFORTS[0]!;
+  const Icon = current.icon;
+
+  useEffect(() => {
+    if (!open) return;
+    const onPointerDown = (event: PointerEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+    };
+    const onKey = (event: globalThis.KeyboardEvent) => event.key === 'Escape' && setOpen(false);
+    document.addEventListener('pointerdown', onPointerDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+
+  return (
+    <div ref={rootRef} className="relative">
+      <button
+        type="button"
+        data-testid="effort-picker"
+        data-effort={effort}
+        onClick={() => setOpen(!open)}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label={`${t('composer.effort')}: ${t(`composer.efforts.${effort}`)}`}
+        title={`${t('composer.effort')} · ${t(`composer.efforts.${effort}Hint`)}`}
+        className="flex h-7 items-center gap-1 rounded-lg bg-subtle px-2 text-xs font-medium text-muted transition-colors hover:bg-hover hover:text-fg"
+      >
+        <Icon className="h-3.5 w-3.5 text-accent" />
+        <span className="truncate">{t(`composer.efforts.${effort}`)}</span>
+        <ChevronDown className={`h-3 w-3 text-faint transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && (
+        <div
+          role="menu"
+          className="absolute bottom-full left-0 z-20 mb-2 w-72 max-w-[calc(100vw-2rem)] animate-fade-in overflow-hidden rounded-xl border border-line bg-surface p-1 shadow-float"
+        >
+          {EFFORTS.map(({ id, icon: EffortIcon }) => {
+            const checked = id === effort;
+            return (
+              <button
+                key={id}
+                type="button"
+                role="menuitemradio"
+                aria-checked={checked}
+                data-testid={`effort-option-${id}`}
+                onClick={() => {
+                  onChange(id);
+                  setOpen(false);
+                }}
+                className={`flex w-full items-start gap-2.5 rounded-lg px-2.5 py-2 text-left ${checked ? 'bg-accent-soft' : 'hover:bg-hover'}`}
+              >
+                <span className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md ${checked ? 'bg-accent text-on-accent' : 'bg-subtle text-muted'}`}>
+                  <EffortIcon className="h-3.5 w-3.5" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-medium">{t(`composer.efforts.${id}`)}</span>
+                  <span className="block text-xs leading-relaxed text-muted">{t(`composer.efforts.${id}Hint`)}</span>
                 </span>
                 {checked && <Check className="mt-1 h-4 w-4 shrink-0 text-accent" />}
               </button>

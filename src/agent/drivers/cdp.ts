@@ -17,6 +17,7 @@ export class CdpDriver {
   private handleDetach = (source: { tabId?: number }, reason: string) => {
     if (source.tabId === undefined || !this.attached.has(source.tabId)) return;
     this.attached.delete(source.tabId);
+    this.mouse.delete(source.tabId);
     this.onDetached(source.tabId, reason);
   };
 
@@ -32,6 +33,7 @@ export class CdpDriver {
       [...this.attached].map((tabId) => browser.debugger.detach({ tabId }).catch(() => undefined)),
     );
     this.attached.clear();
+    this.mouse.clear();
   }
 
   private async send(tabId: number, method: string, params?: Record<string, unknown>): Promise<unknown> {

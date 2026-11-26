@@ -83,6 +83,19 @@
       "autoHint": "自动操作。付款、删除等高风险步骤会先问你。",
       "manualHint": "自动读取和搜索。每次改动都先问你。"
     },
+    "effort": "思考强度",
+    "efforts": {
+      "auto": "自动思考",
+      "off": "关闭",
+      "low": "低",
+      "medium": "中",
+      "high": "高",
+      "autoHint": "简单任务和常规操作步骤轻思考，规划、排错和总结时再加深思考。",
+      "offHint": "最快。在模型支持的前提下关闭或压到最低思考。",
+      "lowHint": "每步简短思考，适合日常简单任务。",
+      "mediumHint": "每步均衡思考。",
+      "highHint": "每步深度思考，速度较慢，适合复杂任务。"
+    },
     "removeAttachment": "移除附件",
     "pickRegion": "框选页面的一部分来提问",
     "regionHint": "拖动框选要问的部分 · Esc 取消",
@@ -602,6 +615,8 @@
     "maxStepsHint": "{{min}} 到 {{max}}，默认 {{usual}}。上限越高，任务绕圈时消耗的 token 越多。",
     "mode": "默认模式",
     "modeHint": "也可以在输入框下方随时切换，任务进行中也生效。",
+    "reasoningEffort": "思考强度",
+    "reasoningEffortHint": "控制推理模型的思考时长。自动档在常规操作步骤和辅助提取时保持轻快；也可以在输入框下方随时切换，任务进行中也生效。",
     "screenshots": "由谁看截图",
     "screenshotsHint": "自动：当前模型能看图就用它，否则用视觉模型。",
     "screenshotReaders": {
@@ -610,8 +625,13 @@
       "vision": "视觉模型"
     },
     "setVisionModel": "设置视觉模型",
-    "autoScreenshot": "文字不够时自动看屏幕",
-    "autoScreenshotHint": "用于 canvas 页面、没有文字的按钮和连续失败的步骤。会把截图发给模型；登录、账户和支付页面除外。",
+    "visionStrategy": "何时附带页面截图",
+    "visionStrategyHint": "始终保留 DOM 结构以保证点击精度与安全脱敏。自动：遇到 canvas、图标页或操作无变化时自动附带截图；始终：使用多模态模型时每步附带轻量带编号截图。登录、账户和支付页面永不自动截图。",
+    "visionStrategies": {
+      "off": "仅按需查看（纯 DOM）",
+      "auto": "自动（DOM 优先，必要时看图）",
+      "always": "始终（DOM + 轻量编号截图）"
+    },
     "recordSteps": "保留截图用于回放",
     "recordStepsHint": "每一步之前存一张小截图，只存在这台设备上。登录、账户和支付页面不截。",
     "commands": {

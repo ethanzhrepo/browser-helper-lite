@@ -85,6 +85,19 @@
       "autoHint": "Travaille seul. Demande avant les paiements, suppressions et autres étapes à haut risque.",
       "manualHint": "Lit et cherche seul. Demande avant chaque modification."
     },
+    "effort": "Effort de réflexion",
+    "efforts": {
+      "auto": "Auto",
+      "off": "Désactivé",
+      "low": "Faible",
+      "medium": "Moyen",
+      "high": "Élevé",
+      "autoHint": "Léger pour les tâches simples et clics courants ; plus poussé pour planifier, corriger ou résumer.",
+      "offHint": "Le plus rapide. Désactive ou réduit au minimum la réflexion si le modèle le permet.",
+      "lowHint": "Réflexion courte à chaque étape. Adapté aux tâches quotidiennes.",
+      "mediumHint": "Réflexion équilibrée à chaque étape.",
+      "highHint": "Réflexion approfondie à chaque étape. Plus lent, idéal pour les tâches complexes."
+    },
     "removeAttachment": "Retirer la pièce jointe",
     "pickRegion": "Poser une question sur une partie de la page",
     "regionHint": "Faites glisser pour marquer la zone · Échap pour annuler",
@@ -622,6 +635,8 @@
     "maxStepsHint": "De {{min}} à {{max}} ; {{usual}} par défaut. Une tâche qui tourne en rond consomme plus de jetons avec une limite plus haute.",
     "mode": "Mode par défaut",
     "modeHint": "Se change aussi sous la zone de message, même en cours de tâche.",
+    "reasoningEffort": "Effort de réflexion",
+    "reasoningEffortHint": "Contrôle la durée de réflexion des modèles de raisonnement. Auto reste rapide sur les étapes courantes et les appels auxiliaires ; modifiable aussi sous la zone de message.",
     "screenshots": "Les captures sont lues par",
     "screenshotsHint": "Auto : le modèle actuel s'il lit les images, sinon le modèle de vision.",
     "screenshotReaders": {
@@ -630,8 +645,13 @@
       "vision": "Modèle de vision"
     },
     "setVisionModel": "Choisir un modèle de vision",
-    "autoScreenshot": "Regarder l'écran quand le texte ne suffit pas",
-    "autoScreenshotHint": "Pages en canvas, boutons sans nom, étapes en échec. Envoie une capture au modèle ; jamais sur les pages de connexion, de compte ou de paiement.",
+    "visionStrategy": "Quand regarder l'écran",
+    "visionStrategyHint": "Le DOM reste prioritaire pour la précision et la sécurité. Auto ajoute une capture sur les canvas/icônes ou si une action reste sans effet ; Toujours ajoute une capture compacte numérotée avec un modèle multimodal. Jamais sur les pages de connexion, de compte ou de paiement.",
+    "visionStrategies": {
+      "off": "Sur demande uniquement (DOM seul)",
+      "auto": "Auto (DOM d'abord, capture si besoin)",
+      "always": "Toujours (DOM + capture compacte numérotée)"
+    },
     "recordSteps": "Garder des images pour revoir la tâche",
     "recordStepsHint": "Une petite capture avant chaque étape, stockée sur cet appareil. Pas sur les pages de connexion, de compte ou de paiement.",
     "commands": {

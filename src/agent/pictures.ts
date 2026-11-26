@@ -62,11 +62,21 @@ export function replyPictures(reply: string): string[] {
   return [...found];
 }
 
-/** Those of a reply's pictures that may be fetched: addresses the assistant read, that carry no data. `seen` holds picture keys. */
-export function allowedPictures(reply: string, seen: ReadonlySet<string>): string[] {
+/** Those of a reply's pictures that may be fetched: addresses the assistant read, that carry no credentials or data. `seen` holds picture keys. */
+export function allowedPictures(reply: string, seen: ReadonlySet<string>, limit = MAX_REPLY_PICTURES): string[] {
   return replyPictures(reply)
-    .filter((url) => /^https?:\/\//i.test(url) && url.length <= MAX_ADDRESS_CHARS && seen.has(pictureKey(url)) && !['email', 'card', 'secret'].includes(urlDataLeak(url) ?? ''))
-    .slice(0, MAX_REPLY_PICTURES);
+    .filter((url) => {
+      if (url.length > MAX_ADDRESS_CHARS) return false;
+      let parsed: URL;
+      try {
+        parsed = new URL(url);
+      } catch {
+        return false;
+      }
+      if ((parsed.protocol !== 'https:' && parsed.protocol !== 'http:') || parsed.username || parsed.password) return false;
+      return seen.has(pictureKey(url)) && !['email', 'card', 'secret'].includes(urlDataLeak(url) ?? '');
+    })
+    .slice(0, limit);
 }
 
 /**

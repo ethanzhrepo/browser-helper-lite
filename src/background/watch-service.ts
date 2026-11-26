@@ -1,14 +1,15 @@
 import { generateText } from 'ai';
 import { browser, type Browser } from 'wxt/browser';
-import { newBoundary, wrapUntrusted } from '../agent/injection';
+import { containsSecret, newBoundary, wrapUntrusted } from '../agent/injection';
 import { policyFor } from '../agent/policy';
 import type { PageExtraction } from '../browser/page-context';
 import { resolveLocale } from '../i18n/resources';
 import { createTranslator } from '../i18n/translator';
 import { hasHostAccess, isRestrictedUrl } from '../permissions/hosts';
 import { toErrorInfo } from '../providers/errors';
+import { auxiliaryReasoning, rejectsReasoning } from '../providers/reasoning';
 import { pickSlot, resolveModelRef } from '../providers/resolve';
-import { isLoopbackHost } from '../providers/vendors';
+import { isPrivateHost } from '../providers/vendors';
 import { searchApiKey } from '../search/keys';
 import { deepseekFetch, fetchEndpoint, readsThroughDeepSeek } from '../search/search';
 import type { WatchActionRequest, WatchActionResult } from '../shared/protocol';
@@ -23,6 +24,7 @@ import {
   clampSeconds,
   isLive,
   isRushing,
+  liveLimit,
   MAX_WATCHES,
   newWatch,
   parseVerdict,
@@ -45,17 +47,38 @@ import { isExtensionPage } from './trust';
 const PAGE_CHARS = 40_000;
 const LOAD_TIMEOUT_MS = 25_000;
 const SETTLE_MS = 1500;
-/** Session storage: the background tab of each live watch, and the tab group they sit in. */
-const TABS_KEY = 'watchTabs';
+/** Session storage: one key per live watch (no shared map RMW race), plus the shared tab group id. */
+const TAB_PREFIX = 'watchTab:';
 const GROUP_KEY = 'watchGroup';
+const tabKey = (id: string) => `${TAB_PREFIX}${id}`;
 
 const hostOf = (url: string) => {
   try {
-    return new URL(url).hostname;
+    return new URL(url).hostname.toLowerCase().replace(/\.+$/, '');
   } catch {
     return '';
   }
 };
+
+function canFetchPublicly(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    if (parsed.username || parsed.password || containsSecret(url)) return false;
+    return !isPrivateHost(parsed.hostname);
+  } catch {
+    return false;
+  }
+}
+
+async function assertTabAllowed(tabId: number, settings: Settings): Promise<string> {
+  const tab = await browser.tabs.get(tabId);
+  const url = tab.url ?? '';
+  const host = hostOf(url);
+  if (!host || isRestrictedUrl(url)) throw new Error('Not a web page.');
+  if (policyFor(host, settings.sitePolicies) === 'blocked') throw new Error(`${host} is blocked for the assistant.`);
+  if (!(await hasHostAccess(url))) throw new Error(`The assistant has no access to ${host}.`);
+  return url;
+}
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
@@ -69,20 +92,27 @@ async function setAlarm(watch: Watch): Promise<void> {
 
 // ---- The tabs of live watches ----
 
-async function liveTabs(): Promise<Record<string, number>> {
-  return ((await browser.storage.session.get(TABS_KEY))[TABS_KEY] as Record<string, number> | undefined) ?? {};
+async function getLiveTab(id: string): Promise<number | undefined> {
+  const value = (await browser.storage.session.get(tabKey(id)))[tabKey(id)];
+  return typeof value === 'number' ? value : undefined;
 }
 
 async function setLiveTab(id: string, tabId: number | undefined): Promise<void> {
-  const tabs = await liveTabs();
-  if (tabId === undefined) delete tabs[id];
-  else tabs[id] = tabId;
-  await browser.storage.session.set({ [TABS_KEY]: tabs });
+  if (tabId === undefined) await browser.storage.session.remove(tabKey(id));
+  else await browser.storage.session.set({ [tabKey(id)]: tabId });
+}
+
+async function findLiveWatchByTab(tabId: number): Promise<string | undefined> {
+  const all = await browser.storage.session.get(null);
+  for (const [key, value] of Object.entries(all)) {
+    if (key.startsWith(TAB_PREFIX) && value === tabId) return key.slice(TAB_PREFIX.length);
+  }
+  return undefined;
 }
 
 /** Closes the background tab a live watch kept open, if it has one. */
 async function closeLiveTab(id: string): Promise<void> {
-  const tabId = (await liveTabs())[id];
+  const tabId = await getLiveTab(id);
   if (tabId === undefined) return;
   // Forgotten first, so that closing it is not taken for the user closing it.
   await setLiveTab(id, undefined);
@@ -118,13 +148,13 @@ export interface PageSession {
   /** What the given pieces of the page say now. */
   probe(locators: string[]): Promise<(string | null)[]>;
   /** The page's text, for the model. */
-  read(): Promise<{ title: string; content: string }>;
+  read(): Promise<{ title: string; content: string; url?: string }>;
   /** Where the texts the model named are in the page. */
   locate(quotes: string[]): Promise<WatchPart[]>;
   /** Whether the page asks to prove that a person is there instead of showing what was asked for. */
   blocked(): Promise<boolean>;
   /** Keeps watching those pieces from inside the page (live watches). */
-  live(parts: WatchPart[]): Promise<void>;
+  live(parts: WatchPart[], everySeconds?: number): Promise<void>;
   /** Done looking: a tab opened for one look is closed. */
   done(): Promise<void>;
 }
@@ -134,24 +164,34 @@ async function inPage<T>(tabId: number, command: PageCommand): Promise<T> {
   return injection?.result as T;
 }
 
-function tabSession(watch: Watch, tabId: number, keep: boolean): PageSession {
+function tabSession(watch: Watch, tabId: number, keep: boolean, settings: Settings): PageSession {
   return {
-    probe: (locators) => inPage<(string | null)[]>(tabId, { kind: 'probe', locators }),
+    probe: async (locators) => {
+      await assertTabAllowed(tabId, settings);
+      return inPage<(string | null)[]>(tabId, { kind: 'probe', locators });
+    },
     read: async () => {
+      await assertTabAllowed(tabId, settings);
       const [injection] = await browser.scripting.executeScript({ target: { tabId }, files: ['/extract-page.js'] });
       const page = injection?.result as PageExtraction | undefined;
       if (!page) throw new Error('The page could not be read.');
-      return { title: page.title, content: page.markdown };
+      return { title: page.title, content: page.markdown, url: page.url };
     },
-    locate: (quotes) => inPage<WatchPart[]>(tabId, { kind: 'locate', quotes }),
+    locate: async (quotes) => {
+      await assertTabAllowed(tabId, settings);
+      return inPage<WatchPart[]>(tabId, { kind: 'locate', quotes });
+    },
     // Whether the page asks to prove that a person is there (a CAPTCHA to solve, a "checking your browser" page).
     blocked: async () => {
+      await assertTabAllowed(tabId, settings);
       const [injection] = await browser.scripting.executeScript({ target: { tabId }, func: challengeShown });
       // "Access denied" asks nothing of a person, but the page is not what is watched either.
       return injection?.result === true || /^access denied/i.test((await browser.tabs.get(tabId).catch(() => undefined))?.title ?? '');
     },
-    live: async (parts) => {
-      if (keep) await inPage(tabId, { kind: 'live', id: watch.id, parts, everySeconds: watch.everySeconds });
+    live: async (parts, everySeconds) => {
+      if (!keep) return;
+      await assertTabAllowed(tabId, settings);
+      await inPage(tabId, { kind: 'live', id: watch.id, parts, everySeconds: everySeconds ?? watch.everySeconds });
     },
     done: async () => {
       if (!keep) await browser.tabs.remove(tabId).catch(() => undefined);
@@ -163,7 +203,10 @@ function tabSession(watch: Watch, tabId: number, keep: boolean): PageSession {
 function fetchSession(watch: Watch, settings: Settings): PageSession {
   let page: Promise<{ title: string; content: string }> | undefined;
   const read = () =>
-    (page ??= (async () => deepseekFetch(watch.url, { settings: settings.search, connections: settings.connections, apiKey: await searchApiKey('deepseek', settings) }))());
+    (page ??= (async () => {
+      if (!canFetchPublicly(watch.url)) throw new Error('Addresses with credentials, secrets or private hosts are not sent to DeepSeek.');
+      return deepseekFetch(watch.url, { settings: settings.search, connections: settings.connections, apiKey: await searchApiKey('deepseek', settings) });
+    })());
   const whole = async (): Promise<WatchPart[]> => [{ locator: '', text: textDigest((await read()).content) }];
   return {
     probe: async (locators) => {
@@ -190,7 +233,7 @@ async function openPage(watch: Watch, settings: Settings, { reload }: { reload: 
   if (!host || isRestrictedUrl(watch.url)) throw new Error('Not a web page.');
   if (policyFor(host, settings.sitePolicies) === 'blocked') throw new Error(`${host} is blocked for the assistant.`);
   if (!(await hasHostAccess(watch.url))) {
-    if (readsThroughDeepSeek(settings.search) && !isLoopbackHost(host) && (await hasHostAccess(fetchEndpoint(settings.search, settings.connections)))) {
+    if (readsThroughDeepSeek(settings.search) && canFetchPublicly(watch.url) && (await hasHostAccess(fetchEndpoint(settings.search, settings.connections)))) {
       return fetchSession(watch, settings);
     }
     throw new Error(`The assistant has no access to ${host}.`);
@@ -199,7 +242,7 @@ async function openPage(watch: Watch, settings: Settings, { reload }: { reload: 
   // A tab kept from a faster pace or a rush that is over goes: from now on the page is opened for each look.
   if (!keep) await closeLiveTab(watch.id);
   if (keep) {
-    const known = (await liveTabs())[watch.id];
+    const known = await getLiveTab(watch.id);
     const tab = known === undefined ? undefined : await browser.tabs.get(known).catch(() => undefined);
     // Still on the watched site: a page that sends the tab elsewhere is opened again.
     if (tab?.id !== undefined && hostOf(tab.url ?? '') === host) {
@@ -207,7 +250,13 @@ async function openPage(watch: Watch, settings: Settings, { reload }: { reload: 
         await browser.tabs.reload(tab.id);
         await loaded(tab.id);
       }
-      return tabSession(watch, tab.id, true);
+      try {
+        await assertTabAllowed(tab.id, settings);
+      } catch (error) {
+        await closeLiveTab(watch.id);
+        throw error;
+      }
+      return tabSession(watch, tab.id, true, settings);
     }
     if (known !== undefined) await closeLiveTab(watch.id);
   }
@@ -220,26 +269,37 @@ async function openPage(watch: Watch, settings: Settings, { reload }: { reload: 
   }
   try {
     await loaded(tab.id!);
+    // A watched URL may redirect to a blocked or unpermitted host: verify final destination before reading.
+    await assertTabAllowed(tab.id!, settings);
   } catch (error) {
-    if (!keep) await browser.tabs.remove(tab.id!).catch(() => undefined);
+    if (keep) await closeLiveTab(watch.id);
+    else await browser.tabs.remove(tab.id!).catch(() => undefined);
     throw error;
   }
-  return tabSession(watch, tab.id!, keep);
+  return tabSession(watch, tab.id!, keep, settings);
 }
 
 /** Asks the fast model (else the current one) whether the page shows that the condition holds, and which of its text that depends on. */
-async function judge(page: { title: string; content: string }, watch: Watch, settings: Settings): Promise<{ met: boolean; note: string; quotes: string[]; usage?: Usage }> {
+async function judge(page: { title: string; content: string; url?: string }, watch: Watch, settings: Settings): Promise<{ met: boolean; note: string; quotes: string[]; usage?: Usage }> {
   const ref = pickSlot(settings, ['fast', 'chat']);
   if (!ref) throw new Error('No model is set.');
-  const { model, providerOptions } = await resolveModelRef(settings, ref);
+  const resolved = await resolveModelRef(settings, ref);
   const text = page.content.length > PAGE_CHARS ? page.content.slice(0, PAGE_CHARS) : page.content;
-  const result = await generateText({
-    model,
+  const reasoning = auxiliaryReasoning(settings.agent.reasoningEffort, resolved.connection.vendor, resolved.ref.modelId);
+  const base = {
+    model: resolved.model,
     instructions: WATCH_SYSTEM,
-    prompt: `${wrapUntrusted('page', newBoundary(), { title: page.title.slice(0, 200), url: watch.url }, text)}\n\nCondition: ${watch.condition}\nToday's date: ${new Date().toISOString().slice(0, 10)}`,
-    providerOptions,
+    prompt: `${wrapUntrusted('page', newBoundary(), { title: page.title.slice(0, 200), url: page.url || watch.url }, text)}\n\nCondition: ${watch.condition}\nToday's date: ${new Date().toISOString().slice(0, 10)}`,
+    providerOptions: resolved.providerOptions,
     maxRetries: 1,
-  });
+  };
+  let result;
+  try {
+    result = await generateText({ ...base, ...(reasoning ? { reasoning } : {}) });
+  } catch (error) {
+    if (!reasoning || !rejectsReasoning(error)) throw error;
+    result = await generateText(base);
+  }
   return { ...parseVerdict(result.text), usage: { inputTokens: result.usage.inputTokens, outputTokens: result.usage.outputTokens } };
 }
 
@@ -274,7 +334,7 @@ class BlockedError extends Error {
 
 export interface CheckDeps {
   open: (watch: Watch, settings: Settings, options: { reload: boolean }) => Promise<PageSession | undefined>;
-  judge: (page: { title: string; content: string }, watch: Watch, settings: Settings) => Promise<{ met: boolean; note: string; quotes: string[]; usage?: Usage }>;
+  judge: (page: { title: string; content: string; url?: string }, watch: Watch, settings: Settings) => Promise<{ met: boolean; note: string; quotes: string[]; usage?: Usage }>;
   notify: (watch: Watch, settings: Settings, kind: WatchNotice) => Promise<void>;
   /** A watch stopped: what was kept for it (a live watch's tab) goes. */
   release: (id: string) => Promise<void>;
@@ -286,8 +346,10 @@ const realDeps: CheckDeps = { open: openPage, judge, notify, release: closeLiveT
 export interface CheckOptions {
   /** Load the page afresh (a timer tick, or the user asking); not when the open page itself reported a change. */
   reload?: boolean;
-  /** Ask the model even when the text it depended on reads the same. */
+  /** Ask the model even when the text it depended on reads the same (manual "Check now"). */
   ask?: boolean;
+  /** Triggered by a live page's MutationObserver (`watch.changed`): probe first and enforce cooldown/rate limits. */
+  live?: boolean;
 }
 
 /**
@@ -296,7 +358,7 @@ export interface CheckOptions {
  * that verdict is old, or when told to. Resolves with the watch as it is
  * afterwards (undefined when it is gone).
  */
-export async function checkWatch(id: string, deps: CheckDeps = realDeps, { reload = true, ask = false }: CheckOptions = {}): Promise<Watch | undefined> {
+export async function checkWatch(id: string, deps: CheckDeps = realDeps, { reload = true, ask = false, live = false }: CheckOptions = {}): Promise<Watch | undefined> {
   if (checking.has(id)) return db.watches.get(id);
   checking.add(id);
   try {
@@ -338,6 +400,18 @@ export async function checkWatch(id: string, deps: CheckDeps = realDeps, { reloa
           // What the verdict rested on reads the same: it still stands, and the model is not asked.
           await session.live(probe.parts);
           return await settle((current) => ({ ...current, checkedAt: at, failures: 0, retryAt: undefined }));
+        }
+      }
+      if (live) {
+        const limit = liveLimit(watch, at);
+        if (limit.action === 'slowdown') {
+          const next = await settle((current) => ({ ...current, checkedAt: at, retryAt: limit.retryAt, rushUntil: undefined }));
+          if (next?.status === 'active') await deps.notify(next, settings, 'slowed');
+          return next;
+        }
+        if (limit.action === 'wait') {
+          if (probe?.parts.length) await session.live(probe.parts, Math.max(watch.everySeconds, Math.ceil(limit.waitMs / 1000)));
+          return watch;
         }
       }
       const page = await session.read();
@@ -511,11 +585,11 @@ export function registerWatchService(): void {
       void act(message).then(sendResponse);
       return true;
     }
-    // A live watch's page says that what is watched reads differently. Only its own tab may say so; the page is then read by us.
+    // A live watch's page says that what is watched reads differently. Only its own tab may say so; the page is then probed and checked with rate limits.
     if (message?.type === 'watch.changed' && typeof message.id === 'string' && sender.tab?.id !== undefined) {
       const tabId = sender.tab.id;
-      void liveTabs().then((tabs) => {
-        if (tabs[message.id] === tabId) void checkWatch(message.id, realDeps, { reload: false, ask: true }).catch((error: unknown) => console.error('Watch check failed', error));
+      void getLiveTab(message.id).then((known) => {
+        if (known === tabId) void checkWatch(message.id, realDeps, { reload: false, live: true }).catch((error: unknown) => console.error('Watch check failed', error));
       });
     }
     return undefined;
@@ -524,8 +598,7 @@ export function registerWatchService(): void {
   // Closing a live watch's tab is the plain way to say "stop": the watch is paused, not opened again behind the user's back.
   browser.tabs.onRemoved.addListener((tabId, info) => {
     if (info.isWindowClosing) return;
-    void liveTabs().then(async (tabs) => {
-      const id = Object.keys(tabs).find((key) => tabs[key] === tabId);
+    void findLiveWatchByTab(tabId).then(async (id) => {
       if (!id) return;
       await setLiveTab(id, undefined);
       const watch = await db.watches.get(id);

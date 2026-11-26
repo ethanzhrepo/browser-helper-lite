@@ -77,7 +77,7 @@ export function socialHost(input: string): string {
   const trimmed = input.trim().toLowerCase();
   if (!trimmed) return '';
   try {
-    const host = new URL(trimmed.includes('://') ? trimmed : `https://${trimmed}`).hostname.replace(/^(\*\.|www\.)/, '');
+    const host = new URL(trimmed.includes('://') ? trimmed : `https://${trimmed}`).hostname.replace(/\.+$/, '').replace(/^(\*\.|www\.)/, '');
     return /^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(host) ? host : '';
   } catch {
     return '';
@@ -111,7 +111,7 @@ export function withoutSocialSite(settings: SocialSettings, site: string): Socia
 
 /** The social site a host belongs to, if it is one of `sites`. */
 export function socialSite(host: string, sites: readonly string[] = DEFAULT_SOCIAL_SITES): string | undefined {
-  const name = host.toLowerCase().replace(/^www\./, '');
+  const name = host.toLowerCase().replace(/\.+$/, '').replace(/^www\./, '');
   return sites.find((site) => name === site || name.endsWith(`.${site}`));
 }
 
